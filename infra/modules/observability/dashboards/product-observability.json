@@ -1,0 +1,612 @@
+{
+  "uid": "product-observability",
+  "title": "Product Observability",
+  "description": "Single pane of glass for operating one product/environment reliably: SLO burn, golden signals (RED), deploy/rollout status, resource headroom, cost, and log/trace jump-off points. Pick Team → Product → Stage above.",
+  "tags": [
+    "product",
+    "sre",
+    "golden-signals"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "label": "Datasource",
+        "query": "prometheus",
+        "regex": "/Mimir.*/",
+        "refresh": 1,
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "text": "Mimir (all clusters)",
+          "value": "mimir-all",
+          "selected": true
+        }
+      },
+      {
+        "name": "team",
+        "type": "query",
+        "label": "Team",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(kube_namespace_labels{label_platform_refplat_org_team=~\".+\"}, label_platform_refplat_org_team)",
+        "definition": "label_values(kube_namespace_labels{label_platform_refplat_org_team=~\".+\"}, label_platform_refplat_org_team)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": { "text": "alpha", "value": "alpha", "selected": true }
+      },
+      {
+        "name": "product",
+        "type": "query",
+        "label": "Product",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(kube_namespace_labels{label_platform_refplat_org_team=\"$team\"}, label_platform_refplat_org_product)",
+        "definition": "label_values(kube_namespace_labels{label_platform_refplat_org_team=\"$team\"}, label_platform_refplat_org_product)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": { "text": "shop", "value": "shop", "selected": true }
+      },
+      {
+        "name": "stage",
+        "type": "query",
+        "label": "Stage",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(kube_namespace_labels{label_platform_refplat_org_team=\"$team\",label_platform_refplat_org_product=\"$product\"}, label_platform_refplat_org_stage)",
+        "definition": "label_values(kube_namespace_labels{label_platform_refplat_org_team=\"$team\",label_platform_refplat_org_product=\"$product\"}, label_platform_refplat_org_stage)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": { "text": "prod", "value": "prod", "selected": true }
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Explore → Loki (this namespace)",
+      "type": "link",
+      "url": "/explore?left=%7B%22datasource%22:%22loki-all%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki-all%22%7D,%22expr%22:%22%7Bk8s_namespace_name%3D%5C%22$team-$product-$stage%5C%22%7D%22%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
+      "targetBlank": true
+    },
+    {
+      "title": "Explore → Tempo (this namespace)",
+      "type": "link",
+      "url": "/explore?left=%7B%22datasource%22:%22tempo-all%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo-all%22%7D,%22queryType%22:%22traceqlSearch%22,%22filters%22:%5B%7B%22id%22:%22namespace%22,%22tag%22:%22k8s.namespace.name%22,%22operator%22:%22%3D%22,%22value%22:%5B%22$team-$product-$stage%22%5D%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
+      "targetBlank": true
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "enable": true,
+        "expr": "changes(kube_deployment_metadata_generation{namespace=\"$team-$product-$stage\"}[2m]) > 0",
+        "iconColor": "blue",
+        "name": "Deploys",
+        "step": "1m",
+        "tagKeys": "namespace,deployment",
+        "textFormat": "{{namespace}}/{{deployment}}",
+        "titleFormat": "Deploy"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Availability Burn Rate",
+      "description": "Current (1h) error-budget burn rate for the requests-availability SLO. >1 means the 30-day budget is being spent faster than it replenishes. Only populated for the prod stage (per-app SLOs are prod-only today).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "N/A (non-prod)",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 6 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "slo:current_burn_rate:ratio{sloth_id=\"$team-$product-$stage-availability\"}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Latency Burn Rate",
+      "description": "Current (1h) error-budget burn rate for the requests-latency SLO (99% under 500ms). Prod-only.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "N/A (non-prod)",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 6 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "slo:current_burn_rate:ratio{sloth_id=\"$team-$product-$stage-latency\"}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Availability Budget Remaining (30d)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A (non-prod)",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.2 },
+              { "color": "green", "value": 0.5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "slo:period_error_budget_remaining:ratio{sloth_id=\"$team-$product-$stage-availability\"}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "ArgoCD Apps Healthy",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(argocd_app_info{name=~\"$team-$product-$stage.*\",health_status=\"Healthy\"}) or vector(0)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "ArgoCD Apps OutOfSync",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(argocd_app_info{name=~\"$team-$product-$stage.*\",sync_status=\"OutOfSync\"}) or vector(0)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Pod Restarts (1h)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$team-$product-$stage\"}[1h])) or vector(0)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Golden signals (RED) — by service",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Request rate",
+      "description": "Beyla RED metric, broken out per service in this environment. OTel-SDK-instrumented services break out by `job` instead of `service_name` — if a service is missing here, check Explore with `job=~\"$team-$product/.*\"` instead (ADR-100 gotcha).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10, "stacking": { "mode": "normal" } } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"$team-$product-$stage\"}[5m]))",
+          "legendFormat": "{{service_name}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Error rate (5xx ratio)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 6 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 10 },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.05 } ] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"$team-$product-$stage\",http_response_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"$team-$product-$stage\"}[5m]))",
+          "legendFormat": "{{service_name}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Latency (p95)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, service_name) (rate(http_server_request_duration_seconds_bucket{k8s_namespace_name=\"$team-$product-$stage\"}[5m])))",
+          "legendFormat": "{{service_name}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Deploys & progressive delivery",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }
+    },
+    {
+      "id": 13,
+      "type": "state-timeline",
+      "title": "Rollout phase by service",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "options": {
+        "legend": { "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 0, "fillOpacity": 70 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rollout_phase{exported_namespace=\"$team-$product-$stage\"} == 1",
+          "legendFormat": "{{name}} — {{phase}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Rollout replicas (desired / available / updated)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 0 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rollout_info_replicas_desired{exported_namespace=\"$team-$product-$stage\"}",
+          "legendFormat": "{{name}} desired",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        },
+        {
+          "refId": "B",
+          "expr": "rollout_info_replicas_available{exported_namespace=\"$team-$product-$stage\"}",
+          "legendFormat": "{{name}} available",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        },
+        {
+          "refId": "C",
+          "expr": "rollout_info_replicas_updated{exported_namespace=\"$team-$product-$stage\"}",
+          "legendFormat": "{{name}} updated",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Resource headroom & cost",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "CPU usage vs request / limit by container",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{namespace=\"$team-$product-$stage\"}[5m]))",
+          "legendFormat": "{{container}} usage",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (container) (kube_pod_container_resource_requests{namespace=\"$team-$product-$stage\",resource=\"cpu\"})",
+          "legendFormat": "{{container}} request",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (container) (kube_pod_container_resource_limits{namespace=\"$team-$product-$stage\",resource=\"cpu\"})",
+          "legendFormat": "{{container}} limit",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Memory usage vs request / limit by container",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (container) (container_memory_working_set_bytes{namespace=\"$team-$product-$stage\"})",
+          "legendFormat": "{{container}} usage",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (container) (kube_pod_container_resource_requests{namespace=\"$team-$product-$stage\",resource=\"memory\"})",
+          "legendFormat": "{{container}} request",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (container) (kube_pod_container_resource_limits{namespace=\"$team-$product-$stage\",resource=\"memory\"})",
+          "legendFormat": "{{container}} limit",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "HPA replicas (min / current / max)",
+      "description": "Only services with an HPA show data here — not every service autoscales.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 32 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 0 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"$team-$product-$stage\"}",
+          "legendFormat": "{{horizontalpodautoscaler}} current",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        },
+        {
+          "refId": "B",
+          "expr": "kube_horizontalpodautoscaler_spec_min_replicas{namespace=\"$team-$product-$stage\"}",
+          "legendFormat": "{{horizontalpodautoscaler}} min",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        },
+        {
+          "refId": "C",
+          "expr": "kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"$team-$product-$stage\"}",
+          "legendFormat": "{{horizontalpodautoscaler}} max",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "Est. Monthly Cost",
+      "description": "In-cluster OpenCost-style allocation estimate for this namespace (CPU+memory allocation × node hourly cost × 730h). Same formula as the per-team overview dashboard, scoped to this one environment.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum( (container_cpu_allocation{namespace=\"$team-$product-$stage\"} * on(node) group_left() node_cpu_hourly_cost) + ((container_memory_allocation_bytes{namespace=\"$team-$product-$stage\"} / 1024^3) * on(node) group_left() node_ram_hourly_cost) ) * 730",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "text",
+      "title": "Logs & Traces",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 40 },
+      "options": {
+        "mode": "markdown",
+        "content": "Use the **Explore → Loki / Tempo** links at the top of this dashboard (best-effort deep link, prefilled with the current Team/Product/Stage). If a link doesn't land pre-filtered, use these manually in Explore:\n\n- **Logs (LogQL):** `{k8s_namespace_name=\"$team-$product-$stage\"}`\n- **Traces (TraceQL):** `{resource.k8s.namespace.name=\"$team-$product-$stage\"}`\n\nDatasources: `Loki (all clusters)` / `Tempo (all clusters)` (or the cluster-specific one if you know which cluster this environment runs on — preprod for all current team products)."
+      }
+    }
+  ]
+}
