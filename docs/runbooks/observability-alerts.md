@@ -252,6 +252,26 @@ scrapeable `/metrics`, so it reads `up==0` while healthy).
   durable across restarts — a brief blip shouldn't fire this), and the cross-cluster remote-write path
   (Tailscale/TGW connectivity, the Gateway HTTPRoute at `<prefix>-mimir.aws.refplat.org`).
 
+## platform-slos
+
+Hand-authored Sloth SLOs (`infra/live/aws/platform/us-east-1/platform/slo/terragrunt.hcl`'s `slos` input) —
+the Sloth controller renders each into SLI recording rules + multi-window burn-rate `PrometheusRule`s,
+evaluated by the hub's local Prometheus (all four SLOs below are on components that run on the hub, so no
+Mimir-ruler round-trip is needed — contrast with `## app-slos`, which evaluates inside the preprod tenant
+because the app metrics live there). Same burn-rate math/severities as `## app-slos` below.
+
+- **`K8sApiserverAvailability`** — the one control-plane signal EKS exposes: apiserver request availability.
+- **`MimirRequestsAvailability`** / **`LokiRequestsAvailability`** / **`TempoRequestsAvailability`** — stack
+  self-SLOs (meta-monitoring): error-budget the observability stack's OWN request success rate (ingest +
+  query, all routes combined — not split per-route; a meta-monitoring signal doesn't need 6 SLOs). Distinct
+  from **MimirComponentDown**/**LokiDown**/**TempoComponentDown** (plain up/down, no budget) and
+  **MimirRequestErrors**/**LokiRequestErrors** (plain threshold, no budget) — those still fire independently;
+  these give the SAME underlying failure an error-budget/burn-rate view instead of a flat threshold. If one
+  of these is burning fast, triage the same way as the matching `Down`/`RequestErrors` alert above (check
+  `kubectl -n observability get pods` for the store, then component-specific logs).
+- **`HighErrorBudgetBurn`** (page, `severity: critical`) / **`ErrorBudgetBurn`** (ticket, `severity:
+  warning`) suffix each alert name — same Google SRE fast/slow-burn semantics as the app-slos below.
+
 ## app-slos
 
 Per-app SLOs (ADR-056 / W11), registry-derived from every prod `XEnvironment` claim

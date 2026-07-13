@@ -39,6 +39,7 @@ variable "slos" {
     alert_labels    = optional(map(string), {})    # extra labels on the alerts
     page_severity   = optional(string, "critical") # fast-burn alert severity
     ticket_severity = optional(string, "warning")  # slow-burn alert severity
+    runbook_url     = optional(string)             # applied to both page + ticket alert annotations
   }))
   default = []
 }
