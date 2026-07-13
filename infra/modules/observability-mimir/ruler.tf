@@ -28,6 +28,15 @@ resource "kubernetes_config_map_v1" "ruler_rules" {
         })]
       })
     } : {},
+    var.spoke_metrics_freshness.enabled ? {
+      # "Who watches the watcher": a dead spoke shows zero errors under availability-only SLOs. Evaluated
+      # inside each ruler tenant, since `up`'s own last-received timestamp only exists in that tenant's
+      # remote-written data, not the hub's local scrape.
+      "spoke-freshness.yaml" = templatefile("${path.module}/templates/spoke-freshness-rules.yaml.tftpl", {
+        warning_stale_after_seconds  = var.spoke_metrics_freshness.warning_stale_after_seconds
+        critical_stale_after_seconds = var.spoke_metrics_freshness.critical_stale_after_seconds
+      })
+    } : {},
   )
 }
 
@@ -105,6 +114,7 @@ resource "kubernetes_cron_job_v1" "ruler_rules_sync" {
                 [for f in fileset("${path.module}/files/ruler", "*.yaml") : "/rules/${f}"],
                 # The generated per-app SLO namespace isn't a static file — list it explicitly when present.
                 length(var.app_slos) > 0 ? ["/rules/app-slos.yaml"] : [],
+                var.spoke_metrics_freshness.enabled ? ["/rules/spoke-freshness.yaml"] : [],
               )
               resources {
                 requests = { cpu = "10m", memory = "32Mi" }

@@ -103,6 +103,16 @@ module READMEs).
   SCP needs client-side SSE) or other S3 errors.
 - **TempoBackendFlushFailures** — Tempo's backend scheduler is failing compaction flushes; same S3 triage.
 - **LokiPanics** — Loki logged panics; capture logs and check for a bad query/config.
+- **LokiTenantIngestStale** / **TempoTenantIngestStale** — tenant `{{ $labels.tenant }}` has shipped zero
+  log lines / spans for 15m (`loki_distributor_lines_received_total` / `tempo_distributor_spans_received_total`
+  flat), even though Loki/Tempo themselves are up. This is the "who watches the watcher" freshness check —
+  distinct from **LokiDown**/**TempoComponentDown**, which only catch the *store* being unreachable, not a
+  *specific tenant's* shipper going dark. Check that tenant's Alloy (logs) / OTel collector or Beyla (traces)
+  pods on the owning cluster. TempoTenantIngestStale only fires for tenants that normally ship traces
+  (currently `platform`/`preprod` — per-team trace scoping is deferred, so `alpha`/`bravo` never have this
+  series and won't alert). LokiTenantIngestStale has a known blind spot: if the Loki distributor pod itself
+  restarted after a tenant's last log line, that tenant's counter series doesn't exist yet and won't alert
+  until at least one line lands post-restart.
 
 ## External Secrets
 
@@ -232,6 +242,39 @@ scrapeable `/metrics`, so it reads `up==0` while healthy).
   itself (the dead-man's switch is the backstop for total failure). Triage by component: ingester = memory /
   back-pressure; store-gateway / compactor = S3/IAM; distributor = ingest path.
 - **MimirRequestErrors** (warning) — >5% 5xx for 15m: reads (Grafana/alerting) or writes (remote-write) failing.
+- **SpokeMetricsFreshnessWarning** / **SpokeMetricsFreshnessCritical** — a spoke tenant (`{{ $labels.cluster }}`)
+  hasn't produced a fresh metrics sample in Mimir for 10m / 30m. This is the "who watches the watcher" check —
+  a dead or WAL-stuck spoke Prometheus-agent shows zero errors and looks healthy under availability-only SLOs.
+  Evaluated by the Mimir ruler *inside* the spoke tenant (`infra/modules/observability-mimir/templates/spoke-freshness-rules.yaml.tftpl`,
+  rendered into the `spoke-freshness` ruler namespace, synced by the same `mimirtool rules sync` CronJob as
+  the per-app SLOs). Triage: check the spoke's `prometheus-agent` pod/PVC on the affected cluster (`kubectl -n
+  observability get pods -l app.kubernetes.io/name=prometheus-agent-prometheus`), the WAL PVC (#1416 made it
+  durable across restarts — a brief blip shouldn't fire this), and the cross-cluster remote-write path
+  (Tailscale/TGW connectivity, the Gateway HTTPRoute at `<prefix>-mimir.aws.refplat.org`).
+
+## app-slos
+
+Per-app SLOs (ADR-056 / W11), registry-derived from every prod `XEnvironment` claim
+(`infra/live/aws/platform/us-east-1/platform/mimir/terragrunt.hcl`'s `local.app_slos`) — no authoring step, no
+per-Product config. Each prod Environment gets TWO SLOs over its Beyla RED metrics
+(`http_server_request_duration_seconds_*`), evaluated by the Mimir ruler inside the `preprod` tenant (the
+app metrics live there): a fixed 99.9% HTTP-success-rate SLO (`requests-availability`) and a fixed 99%
+sub-500ms latency SLO (`requests-latency`, `<Env>Latency*` alerts — the "good" bucket is `le="0.5"`, the
+nearest actual Beyla histogram boundary; there is no exact 300ms bucket). Both objectives/thresholds are
+fixed for now (same as the pre-existing availability SLO) — no per-Product/tier override yet, since the
+XEnvironment XRD schema is strict/structural (no freeform passthrough) and nobody has asked for one.
+
+- **`<Env>Availability`/`<Env>Latency` `HighErrorBudgetBurn`** (page, `severity: critical`) — fast burn:
+  the SLO's error budget is being exhausted within hours at the current rate (Google SRE 14.4×/6× multi-window
+  thresholds). Treat as an active incident for that app. Open the app's dashboard (`Grafana → SLO dashboard`,
+  filter `sloth_service`) and, for a latency burn specifically, check for a slow downstream dependency,
+  resource starvation (CPU throttling/OOM), or a bad deploy (correlate with the Rollout).
+- **`<Env>Availability`/`<Env>Latency` `ErrorBudgetBurn`** (ticket, `severity: warning`) — slow burn: the
+  budget is trending down over days, not yet critical. Investigate at the next opportunity; not page-worthy.
+- These alerts are synced into the ruler by the SAME `mimirtool rules sync` CronJob as the spoke-freshness
+  check above — if a burn alert seems stuck/stale, verify the CronJob's `lastSuccessfulTime`
+  (`kubectl -n observability get cronjob mimir-ruler-rules-sync-preprod`) before assuming the app itself
+  is the problem.
 
 ## tailscale
 

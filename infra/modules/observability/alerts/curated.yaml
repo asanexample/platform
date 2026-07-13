@@ -265,6 +265,15 @@ groups:
           summary: Loki is panicking
           description: "Loki has logged panics over the last 10m."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+      - alert: LokiTenantIngestStale
+        expr: sum by (tenant) (rate(loki_distributor_lines_received_total[15m])) == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tenant {{ $labels.tenant }} has shipped no logs in 15m"
+          description: "Loki's distributor has received zero log lines for tenant {{ $labels.tenant }} over the last 15m — the tenant's Alloy shipper may be down, or the cluster/team it belongs to has gone dark. \"Who watches the watcher\": a dead shipper produces no errors and looks healthy under availability-only alerts. Known limitation: if the Loki distributor pod itself restarted after the tenant last shipped, the per-tenant series won't exist yet and this alert won't fire until at least one line lands post-restart."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
   # ---------------------------------------------------------------------------
   - name: tempo.rules
     rules:
@@ -294,6 +303,15 @@ groups:
         annotations:
           summary: Tempo backend compaction flushes are failing
           description: "Tempo's backend scheduler has failed work flushes over the last 15m — compaction/backend write issues."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+      - alert: TempoTenantIngestStale
+        expr: sum by (tenant) (rate(tempo_distributor_spans_received_total[15m])) == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tenant {{ $labels.tenant }} has shipped no traces in 15m"
+          description: "Tempo's distributor has received zero spans for tenant {{ $labels.tenant }} over the last 15m — the tenant's OTel collector/Beyla path may be down, or the workload has gone dark. Only fires for tenants that normally ship traces (currently platform and preprod) — a tenant with no trace-producing workload never has this series and won't alert, which is expected, not a bug."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
   # ---------------------------------------------------------------------------
   - name: external-secrets.rules

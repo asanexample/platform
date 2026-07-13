@@ -12,24 +12,47 @@ terraform {
 }
 
 locals {
-  # Per-app availability SLOs (ADR-056 / W11), DERIVED from the prod XEnvironment claims (registries-as-source,
-  # ADR-067) — every prod Environment gets a 99.9% HTTP success-rate SLO over its Beyla RED metrics, evaluated in
-  # THIS hub's Mimir ruler for the spoke tenant (the app metrics live there). Auto-extends as products gain a prod
-  # Environment. Default objective for now; a per-Product/tier override can be added later. NB the SLI filters by
+  # Per-app availability + latency SLOs (ADR-056 / W11), DERIVED from the prod XEnvironment claims
+  # (registries-as-source, ADR-067) — every prod Environment gets a 99.9% HTTP success-rate SLO AND a 99%
+  # sub-500ms latency SLO over its Beyla RED metrics, evaluated in THIS hub's Mimir ruler for the spoke tenant
+  # (the app metrics live there). Auto-extends as products gain a prod Environment. Fixed objective/threshold
+  # for now, same as the availability SLO's fixed 99.9% — no per-Product/tier override yet: the XEnvironment
+  # XRD schema is strict/structural (no freeform passthrough), so adding one is a live XRD edit with real
+  # cascade-delete risk (crossplane-composition-authoring's safe-apply rule) and nobody has asked to override
+  # this threshold yet — a follow-up once a real need shows up, not built speculatively. NB the SLI filters by
   # the env namespace = the claim's metadata.name (truncate+hash on >63 chars not handled — fine for current names).
-  envs_dir  = "${get_repo_root()}/gitops/environments"
-  prod_envs = [for f in fileset(local.envs_dir, "**/prod.yaml") : yamldecode(file("${local.envs_dir}/${f}"))]
-  app_slos = [for e in local.prod_envs : {
-    id              = "${e.metadata.name}-availability"
-    service         = "app-${e.spec.team}-${e.spec.product}"
-    slo_name        = "requests-availability"
-    objective       = 99.9
-    alert_name      = "${replace(title(replace(e.metadata.name, "-", " ")), " ", "")}Availability"
-    error_query     = "sum(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"${e.metadata.name}\",http_response_status_code=~\"5..\"}[{{window}}])) or vector(0)"
-    total_query     = "sum(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"${e.metadata.name}\"}[{{window}}]))"
-    page_severity   = "critical"
-    ticket_severity = "warning"
-  }]
+  #
+  # Latency threshold = 500ms via the `le="0.5"` bucket — verified live against Beyla's actual histogram
+  # buckets (`0.0,0.005,0.01,0.025,0.05,0.075,0.1,0.25,0.5,0.75,1,...`); there is NO `le="0.3"` bucket, so a
+  # 300ms threshold would silently match zero series (permanently 0% "good" — a broken SLO), not error.
+  envs_dir             = "${get_repo_root()}/gitops/environments"
+  prod_envs            = [for f in fileset(local.envs_dir, "**/prod.yaml") : yamldecode(file("${local.envs_dir}/${f}"))]
+  latency_threshold_le = "0.5" # 500ms — must be an actual Beyla histogram bucket boundary, not an arbitrary value
+  app_slos = flatten([for e in local.prod_envs : [
+    {
+      id              = "${e.metadata.name}-availability"
+      service         = "app-${e.spec.team}-${e.spec.product}"
+      slo_name        = "requests-availability"
+      objective       = 99.9
+      alert_name      = "${replace(title(replace(e.metadata.name, "-", " ")), " ", "")}Availability"
+      error_query     = "sum(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"${e.metadata.name}\",http_response_status_code=~\"5..\"}[{{window}}])) or vector(0)"
+      total_query     = "sum(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"${e.metadata.name}\"}[{{window}}]))"
+      page_severity   = "critical"
+      ticket_severity = "warning"
+    },
+    {
+      id         = "${e.metadata.name}-latency"
+      service    = "app-${e.spec.team}-${e.spec.product}"
+      slo_name   = "requests-latency"
+      objective  = 99 # 99% of requests complete within latency_threshold_le
+      alert_name = "${replace(title(replace(e.metadata.name, "-", " ")), " ", "")}Latency"
+      # "bad" = requests slower than the threshold = total - (requests within the cumulative le bucket).
+      error_query     = "(sum(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"${e.metadata.name}\"}[{{window}}])) - sum(rate(http_server_request_duration_seconds_bucket{k8s_namespace_name=\"${e.metadata.name}\",le=\"${local.latency_threshold_le}\"}[{{window}}]))) or vector(0)"
+      total_query     = "sum(rate(http_server_request_duration_seconds_count{k8s_namespace_name=\"${e.metadata.name}\"}[{{window}}]))"
+      page_severity   = "critical"
+      ticket_severity = "warning"
+    },
+  ]])
 }
 
 dependency "eks" {
@@ -193,6 +216,10 @@ inputs = {
   # Per-app SLO rules (ADR-056 / W11) — registry-derived above; rendered into the `app-slos` ruler namespace and
   # synced into the preprod tenant's ruler (the burn-rate metric + budget alerts the freeze gate will use).
   app_slos = local.app_slos
+
+  # Spoke metrics freshness ("who watches the watcher") — a dead/stuck spoke shows zero errors under
+  # availability-only SLOs. Evaluated inside every ruler_tenants entry (currently just preprod).
+  spoke_metrics_freshness = { enabled = true }
 
   # ADR-091 A3: admit Backstage's Cost tab to query the Mimir gateway directly (the ns default-denies ingress).
   query_consumer_namespaces = ["backstage"]
