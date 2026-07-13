@@ -101,8 +101,15 @@ inputs = {
   # ADR-091: emit team_budget_monthly_usd{team} via KSM CustomResourceState from the Team CRs (which live on
   # this env-API cluster) → hub Mimir tenant preprod → the cost dashboard's spend-vs-budget overlay.
   enable_team_budget_metric = true
-  # WAL on emptyDir (module default): preprod has no gp3 StorageClass, and an ephemeral WAL is fine for a
-  # lightweight spoke (the agent re-scrapes on restart). Set to an existing class for a durable WAL.
+  # Durable remote-write WAL on a PVC (encrypted `gp3`, the cluster default). The spoke remote-writes across
+  # the TGW to the hub, so a transient hub/network outage together with a pod restart (Karpenter consolidation,
+  # node rotation, OOM) is the realistic data-loss window the WAL exists to survive — and on an emptyDir the
+  # growing buffer competes for node ephemeral storage, so a long outage can trigger eviction and make it worse.
+  # `gp3` is provisioned cluster-default by eks-addons (create_default_storageclass) and already backs
+  # CNPG/SPIRE here. NB: flipping emptyDir→PVC recreates the agent StatefulSet (immutable volumeClaimTemplates)
+  # — apply with helm_wait=false, then flip back (the emptyDir→PVC gotcha in the observability-authoring skill).
+  storage_class = "gp3"
+  wal_size      = "10Gi"
 
   # P14 log→trace: allow OTLP (4317/4318) to the OTel collector from environment namespaces labeled
   # platform.refplat.org/otel-export=true (the Composition stamps it), so SDK-instrumented tenant apps
