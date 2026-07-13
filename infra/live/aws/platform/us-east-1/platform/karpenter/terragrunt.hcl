@@ -92,12 +92,18 @@ inputs = {
   # This is the stateful hub (Prometheus/Mimir/Loki/Tempo/Pyroscope, Keycloak, CNPG). WhenEmptyOrUnderutilized
   # lets Karpenter reclaim UNDERUTILIZED nodes (not just fully-empty ones) — needed because the post-unpark
   # scheduling storm over-provisions small on-demand nodes that WhenEmpty then never reclaimed (6 nodes at
-  # ~20% CPU observed 2026-07-13). The stateful TSDBs/DBs stay protected: they carry `karpenter.sh/do-not-disrupt`
-  # + PDBs, which Karpenter honors under EITHER policy, so consolidation drains only stateless/underutilized
-  # capacity and won't disrupt a running stateful pod or violate a PDB. (ADR-078.)
+  # ~20% CPU / ~13-32% mem observed 2026-07-13, pure waste on a nightly-parked cost-demo cluster).
+  #
+  # ⚠️ consolidate_after = 15m is DELIBERATELY long (module default is 1m). The post-unpark reschedule storm
+  # settles in ~10 min; a short (1m) consolidateAfter makes Karpenter consolidate DURING the storm — on preprod
+  # (spot + WhenEmptyOrUnderutilized + 1m) that produced a node-churn thrash loop 2026-07-14 (scale 3->6, disrupt,
+  # re-pend, Cilium-429, repeat). 15m lets the storm fully settle FIRST, then reclaims only stably-idle nodes as a
+  # calm one-time right-sizing. Platform avoids preprod's other amplifier by design: it is on-demand (no spot
+  # interruptions). Stateful TSDBs/DBs stay protected — they carry `karpenter.sh/do-not-disrupt` + PDBs, honored
+  # under either policy, so consolidation drains only stateless/underutilized capacity. (ADR-078.)
   capacity_types       = ["on-demand"]
   consolidation_policy = "WhenEmptyOrUnderutilized"
-  consolidate_after    = "1m"
+  consolidate_after    = "15m"
   cpu_limit            = 32
   memory_limit         = "128Gi"
   # Require 8 GiB+ nodes (t4g.large, like the system group). The observability hub's per-node DaemonSets
