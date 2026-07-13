@@ -252,6 +252,30 @@ scrapeable `/metrics`, so it reads `up==0` while healthy).
   durable across restarts — a brief blip shouldn't fire this), and the cross-cluster remote-write path
   (Tailscale/TGW connectivity, the Gateway HTTPRoute at `<prefix>-mimir.aws.refplat.org`).
 
+## app-slos
+
+Per-app SLOs (ADR-056 / W11), registry-derived from every prod `XEnvironment` claim
+(`infra/live/aws/platform/us-east-1/platform/mimir/terragrunt.hcl`'s `local.app_slos`) — no authoring step, no
+per-Product config. Each prod Environment gets TWO SLOs over its Beyla RED metrics
+(`http_server_request_duration_seconds_*`), evaluated by the Mimir ruler inside the `preprod` tenant (the
+app metrics live there): a fixed 99.9% HTTP-success-rate SLO (`requests-availability`) and a fixed 99%
+sub-500ms latency SLO (`requests-latency`, `<Env>Latency*` alerts — the "good" bucket is `le="0.5"`, the
+nearest actual Beyla histogram boundary; there is no exact 300ms bucket). Both objectives/thresholds are
+fixed for now (same as the pre-existing availability SLO) — no per-Product/tier override yet, since the
+XEnvironment XRD schema is strict/structural (no freeform passthrough) and nobody has asked for one.
+
+- **`<Env>Availability`/`<Env>Latency` `HighErrorBudgetBurn`** (page, `severity: critical`) — fast burn:
+  the SLO's error budget is being exhausted within hours at the current rate (Google SRE 14.4×/6× multi-window
+  thresholds). Treat as an active incident for that app. Open the app's dashboard (`Grafana → SLO dashboard`,
+  filter `sloth_service`) and, for a latency burn specifically, check for a slow downstream dependency,
+  resource starvation (CPU throttling/OOM), or a bad deploy (correlate with the Rollout).
+- **`<Env>Availability`/`<Env>Latency` `ErrorBudgetBurn`** (ticket, `severity: warning`) — slow burn: the
+  budget is trending down over days, not yet critical. Investigate at the next opportunity; not page-worthy.
+- These alerts are synced into the ruler by the SAME `mimirtool rules sync` CronJob as the spoke-freshness
+  check above — if a burn alert seems stuck/stale, verify the CronJob's `lastSuccessfulTime`
+  (`kubectl -n observability get cronjob mimir-ruler-rules-sync-preprod`) before assuming the app itself
+  is the problem.
+
 ## tailscale
 
 Namespace `tailscale-system` (ADR-010). The **primary** private cluster-access path. Not scraped for its own

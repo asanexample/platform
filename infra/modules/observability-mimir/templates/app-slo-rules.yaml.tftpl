@@ -62,6 +62,7 @@ groups:
           sloth_service: ${s.service}
         annotations:
           summary: "High error-budget burn for ${s.service} (${s.slo_name}) — budget exhausting fast."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#app-slos"
       # Slow burn (ticket): slower windows agree the budget is trending down.
       - alert: ${s.alert_name}ErrorBudgetBurn
         expr: |
@@ -75,4 +76,5 @@ groups:
           sloth_service: ${s.service}
         annotations:
           summary: "Error-budget burn for ${s.service} (${s.slo_name}) — budget trending down."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#app-slos"
 %{ endfor ~}
