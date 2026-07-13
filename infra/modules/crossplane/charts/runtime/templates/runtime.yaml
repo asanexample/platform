@@ -39,7 +39,7 @@ spec:
                 # in its cmd/provider — verified against source) and always serves on controller-runtime's
                 # hardcoded default :8080, so its "metrics" port must be declared as 8080, not the computed
                 # per-provider value, or the PodMonitor's named-port lookup resolves to a dead address.
-                - { name: metrics, containerPort: {{ $p.metricsPortFixed8080 | ternary 8080 $m }} }
+                - { name: metrics, containerPort: {{ if $p.metricsPortFixed8080 }}8080{{ else }}{{ $m }}{{ end }} }
                 - { name: webhook, containerPort: {{ $w }} }
 {{- end }}
 {{- if $p.hostNetwork }}
