@@ -129,3 +129,9 @@ variable "finalizer_clear_script" {
   type        = string
   default     = ""
 }
+
+variable "system_nodegroup_name" {
+  description = "Managed node group name to pin the subnet router to (stable, non-Karpenter compute), matched via the eks.amazonaws.com/nodegroup label. Keeps the tailnet access path off ephemeral Karpenter nodes so consolidation/disruption can't flap it."
+  type        = string
+  default     = "system"
+}
