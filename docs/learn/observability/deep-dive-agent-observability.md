@@ -12,9 +12,9 @@ gap is the whole subject here.
 ## The new problem: a non-deterministic worker
 
 A `Deployment` is deterministic-ish: same request, same code path, same answer. You watch it with RED
-metrics (Rate, Errors, Duration) and you know roughly how it's doing. An agent — here, the
-[triage copilot](../../adrs/080-triage-copilot.md), which wakes on a critical alert, gathers evidence, and
-proposes *"here's the likely culprit change and team"* — is a non-deterministic, LLM-driven worker. The
+metrics (Rate, Errors, Duration) and you know roughly how it's doing. An agent — here, the triage copilot,
+which wakes on a critical alert, gathers evidence, and proposes *"here's the likely culprit change and
+team"* — is a non-deterministic, LLM-driven worker. The
 same alert can take a different path each time: a different number of model turns, a different set of tool
 calls, a different confidence. "HTTP 200, p95 = 1.2s" is true and useless. The questions that matter are
 new:
@@ -38,11 +38,10 @@ telemetry — operations (`invoke_agent`, `chat`, `execute_tool`), token counts,
 eval result. Adopting them means the platform's agents speak the industry's language, not a bespoke one.
 
 The catch drives a design choice worth holding onto: this semconv is still `Development`-tier (OTel's
-pre-stable status) and actively shifting — it has even graduated into its own repo. So
-[ADR-076](../../adrs/076-agent-observability.md) (D1) wraps it. All convention-specific attribute mapping
-lives behind a single thin platform-owned instrumentation helper, so when the spec renames a field that's
-one edit in the wrapper, not a fleet-wide rewrite. The agent's own code emits plain "input tokens"; the
-wrapper decides what OTel calls that this month.
+pre-stable status) and actively shifting — it has even graduated into its own repo. So the platform wraps
+it. All convention-specific attribute mapping lives behind a single thin platform-owned instrumentation
+helper, so when the spec renames a field that's one edit in the wrapper, not a fleet-wide rewrite. The
+agent's own code emits plain "input tokens"; the wrapper decides what OTel calls that this month.
 
 ## The agent loop is a span tree
 
@@ -73,7 +72,7 @@ $ wget -qO- --header 'X-Scope-OrgID: platform' \
 
 ## The attributes, and why there's no cost metric
 
-On the spans hang the `gen_ai.*` attributes (ADR-076 D1, verified against the semconv): the provider
+On the spans hang the `gen_ai.*` attributes: the provider
 (`gen_ai.provider.name = "aws.bedrock"`), the request/response model, token usage
 (`gen_ai.usage.input_tokens` / `output_tokens`), and — because this agent runs on a prompt-cached model —
 the cache-aware counts `cache_read.input_tokens` / `cache_creation.input_tokens`. Tool spans carry
@@ -82,27 +81,26 @@ the cache-aware counts `cache_read.input_tokens` / `cache_creation.input_tokens`
 
 Notice what's absent: there's no cost metric in the spec. That's deliberate. Cost is derived —
 `tokens × price(model@version)` — because the price isn't the agent's to know and changes without the agent
-changing. That derivation is the [ADR-074](../../adrs/074-agentic-workloads-platform.md) metering seam:
-the same tokens feed cost attribution. The dashboard's "Est. cost / day" panel does the arithmetic in
+changing. That derivation is the platform metering seam: the same tokens feed cost attribution. The
+dashboard's "Est. cost / day" panel does the arithmetic in
 PromQL, pricing Sonnet 4.6 at $3 / $15 / $0.30 per million input / output / cache-read tokens.
 
 > The bill and the doctor's notes. The metadata — tokens, latency, tool names, disposition — is the
 > itemised bill and the vitals chart: cheap to keep, carries no patient data, kept for everything, always.
 > The prompt and response content is the doctor's private notes: kept only behind a privacy gate, never
-> sold to an outside service. ADR-076 (D3) makes that split load-bearing — metadata-first is the default,
-> and it's why cost, quality, and latency all work without ever storing a prompt. Where it breaks: a bill
+> sold to an outside service. That split is load-bearing — metadata-first is the default, and it's why
+> cost, quality, and latency all work without ever storing a prompt. Where it breaks: a bill
 > still implies what happened; token metadata genuinely can't reconstruct the reasoning. For that you'd
 > need the content, which is exactly the gated, deferred part.
 
 ## Instrument once, fan out per consumer — the three paths
 
-The kernel of ADR-076 (as corrected by its 2026-06-27 amendment): instrument the agent once, then fan the
-signal out to consumers that each want a *different substrate*. An early draft said "one trace serves all
-four consumers"; operating a live agent proved that wrong, and the amendment split it into three real paths.
-Four consumers collapse to three substrates because two of them — audit and eval — both want the same thing,
-a complete and durable record, so they share the single write-once S3 path; metrics and traces keep their own
-stores. And this is the reassuring part: none of those stores are new. It's the *same four-signal machine*
-from the rest of this stack, pointed at a new kind of workload — not a second observability system.
+The kernel: instrument the agent once, then fan the signal out to consumers that each want a *different
+substrate* — metrics (Mimir), traces (Tempo), and a durable eval/audit record (S3). Four consumers
+collapse to three substrates because two of them — audit and eval — both want the same thing, a complete
+and durable record, so they share the single write-once S3 path; metrics and traces keep their own stores.
+And this is the reassuring part: none of those stores are new. It's the *same four-signal machine* from the
+rest of this stack, pointed at a new kind of workload — not a second observability system.
 
 **Path 1 — metrics, by Prometheus scrape (not OTLP push).** The agent exposes a `/metrics` endpoint and is
 a plain scrape target — a Kubernetes `Service` on port `http` (container port 8080) plus a `ServiceMonitor`
@@ -133,27 +131,22 @@ enriched with the `gen_ai.*` attributes, flows over OTLP to the platform's OpenT
 the *same* Tempo that holds every other workload's traces — the debug consumer, where you open one triage
 and read its whole reasoning waterfall.
 
-**Path 3 — durable eval / audit, by structured log → S3.** This is the sharp correction. The original ADR
-claimed the sampled Tempo trace could double as the audit record. The amendment withdraws that: a sampled,
-retention-bounded trace is not an audit record — you cannot audit on evidence that may have been dropped or
-expired. So audit/eval gets its own durable, write-once path — provisioned as a write-once S3 corpus
+**Path 3 — durable eval / audit, by structured log → S3.** Audit gets its own durable, write-once record;
+the sampled Tempo trace is not the audit record, because a sampled, retention-bounded trace can silently
+drop or expire the very evidence you'd audit on. So audit/eval writes to a write-once S3 corpus
 (`platform-agent-eval-corpus`), where the agent writes forward-capture eval records. The bucket and its
-write-once IAM are provisioned by the agent's own
-[XAgent claim](../../adrs/082-platform-agent-runtime-xagent.md), which grants it `s3:PutObject`/`GetObject`
+write-once IAM are provisioned by the agent's own XAgent claim, which grants it `s3:PutObject`/`GetObject`
 but no `s3:DeleteObject` (write-once integrity); the record-writing itself lives in the agent's app code.
-
-The reason the Tempo trace can't be the audit record: traces are sampled and retention-bounded, so the one
-you need may have been dropped or aged out. Audit needs a complete, durable path.
 
 ## The three slices — and the live token data behind them
 
-ADR-076's build order shipped as three slices, all live.
+Agent observability comes in three slices, all live.
 
-![The live Triage Agent (ADR-076) Grafana dashboard — token rate by type, operation latency p50/p95, tool calls, and disposition mix, from real triages over a week.](images/screenshot-agent-triage.png)
+![The live Triage Agent Grafana dashboard — token rate by type, operation latency p50/p95, tool calls, and disposition mix, from real triages over a week.](images/screenshot-agent-triage.png)
 
-*The real **Triage Agent (ADR-076)** dashboard: token rate, operation latency (p50/p95 ≈ 2.5s/7.7s), tool calls, and disposition mix from actual triages. The eval/calibration panels below (not shown) stay empty until a human renders the first Accept/Correct/Dismiss verdict — the cold-start state described later.*
+*The real **Triage Agent** dashboard: token rate, operation latency (p50/p95 ≈ 2.5s/7.7s), tool calls, and disposition mix from actual triages. The eval/calibration panels below (not shown) stay empty until a human renders the first Accept/Correct/Dismiss verdict — the cold-start state described later.*
 
-**Slice 1 — the meter + the "Triage Agent (ADR-076)" dashboard.** Before this there was no agent meter at
+**Slice 1 — the meter + the "Triage Agent" dashboard.** Before this there was no agent meter at
 all. Slice 1 added the token/latency/disposition/tool counters and the Grafana dashboard
 (`agent-triage.json`, uid `agent-triage`) that renders them (see the go-deeper links for the source). Real
 token counts flow today — a point-in-time snapshot:
@@ -179,8 +172,8 @@ $ ... 'query=count(triage_tool_calls_total) by (gen_ai_tool_name)'
 {"gen_ai_tool_name":"workload_status"}     1
 ```
 
-**Slice 2 — span enrichment.** The span tree already existed — the agent was exporting
-`invoke_agent`/`chat`/`execute_tool` before ADR-076. Slice 2 enriched those spans with the `gen_ai.*`
+**Slice 2 — span enrichment.** The span tree already existed — the agent exports
+`invoke_agent`/`chat`/`execute_tool` spans on its own. Slice 2 enriches those spans with the `gen_ai.*`
 attributes so Tempo carries provider, model, tokens, and tool names. An enrichment, not a greenfield build.
 The split shows up in practice: on the *metric* series, provider/model aren't labels — that dimension lives
 on the *spans*, keeping metric cardinality low. Query the metric and the provider/model labels come back
@@ -244,10 +237,8 @@ This area is easy to oversell, so here's what isn't built.
   a hard invariant: regulated tiers (hipaa/pci) are metadata-only *permanently* — because reliable
   secret/PII redaction of free-form text is itself an unsolved problem, so the platform refuses to depend
   on it as a guarantee.
-- **Langfuse (self-hosted LLM lens)** — *deferred, adopt-when-triggered.* A dedicated trace-tree/eval UX
-  for LLMs; ADR-076 landed it as "adopt later," and the amendment flags it as a reconsider-pulling-forward
-  now that a live agent with an eval harness exists. Today: OTel spans in Tempo, viewed in Grafana, are
-  enough.
+- **Langfuse (self-hosted LLM lens)** — *deferred.* A dedicated trace-tree/eval UX for LLMs is deferred;
+  today, OTel spans in Tempo, viewed in Grafana, are enough.
 - **A2A (agent-to-agent) causality** — *designed, unexercised.* The plumbing propagates
   [W3C trace context](https://www.w3.org/TR/trace-context/) so a future multi-agent chain would be one
   correlated tree — but there's one agent today, so it's never been exercised.
@@ -262,9 +253,9 @@ This area is easy to oversell, so here's what isn't built.
 - **Metrics scrape, traces push — on purpose.** Metrics come off a `/metrics` scrape (`:8080` +
   `ServiceMonitor`), not the OTLP trace pipeline, so a metrics load never stalls behind the trace gateway.
   Two paths, one instrumentation point.
-- **A sampled trace is not an audit record.** The most instructive design correction in the ADR: audit/eval
-  needs a complete, durable, write-once path (structured log → S3), because a retention-bounded, sampled
-  Tempo trace can silently lose the very record you need.
+- **A sampled trace is not an audit record.** Audit/eval needs a complete, durable, write-once path
+  (structured log → S3), because a retention-bounded, sampled Tempo trace can silently lose the very
+  record you need.
 - **Calibration lives in a ratio, not a count.** "Accept-rate by disposition" is where over-confidence
   shows up; raw token and latency graphs will look perfectly healthy while the agent is confidently wrong.
 - **The convention will move under you.** GenAI semconv is `Development`-tier — that's why the mapping is
@@ -272,25 +263,20 @@ This area is easy to oversell, so here's what isn't built.
 
 ## Go deeper
 
-- **Sources of truth:** [ADR-076](../../adrs/076-agent-observability.md) (this design + its 2026-06-27
-  correction) · [ADR-074](../../adrs/074-agentic-workloads-platform.md) (the data boundary + metering seam) ·
+- **ADRs:** [ADR-076](../../adrs/076-agent-observability.md) (agent observability) ·
+  [ADR-074](../../adrs/074-agentic-workloads-platform.md) (data boundary + metering seam) ·
   [ADR-080](../../adrs/080-triage-copilot.md) (the agent being observed) ·
-  [ADR-082](../../adrs/082-platform-agent-runtime-xagent.md) (the XAgent runtime that provisions the agent's
-  namespace, Pod Identity, and scrape wiring).
+  [ADR-082](../../adrs/082-platform-agent-runtime-xagent.md) (the XAgent runtime).
 - **The code:** the dashboard
-  [`infra/modules/observability/dashboards/agent-triage.json`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/dashboards/agent-triage.json)
+  [`agent-triage.json`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/dashboards/agent-triage.json)
   · the agent claim
   [`gitops/agents/triage-copilot.yaml`](https://github.com/asanexample/platform/blob/main/gitops/agents/triage-copilot.yaml)
-  · the Agent Composition (which emits the namespace, Pod Identity, obs-read RBAC, and network policies)
-  [`infra/modules/crossplane/charts/agent-api/files/composition.yaml`](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/agent-api/files/composition.yaml)
-  · the `/metrics` `ServiceMonitor` itself, which ships from the app repo's manifests via the per-agent ArgoCD
-  ApplicationSet (declared as a managed kind in
-  [`infra/modules/argocd-apps/agents.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/argocd-apps/agents.tf)),
-  not the Composition.
-- **Back to the whole machine:** the [Observability orientation](orientation.md); to *author* obs, the
-  `observability-authoring` house skill; to author an agent, the `authoring-platform-agents` skill.
+  · the Agent
+  [Composition](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/agent-api/files/composition.yaml)
+  · the per-agent ArgoCD ApplicationSet
+  [`argocd-apps/agents.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/argocd-apps/agents.tf).
 - **Substrate:** [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
-  (the vocabulary — note the `Development` status banner) ·
-  [GenAI metrics spec](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-metrics/) (the exact
-  `gen_ai.client.token.usage` / `operation.duration` histograms) ·
-  [W3C Trace Context](https://www.w3.org/TR/trace-context/) (the standard behind the deferred A2A causality).
+  · [GenAI metrics spec](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-metrics/) ·
+  [W3C Trace Context](https://www.w3.org/TR/trace-context/).
+- **The whole machine:** the [Observability orientation](orientation.md); to author obs or an agent, the
+  `observability-authoring` and `authoring-platform-agents` house skills.

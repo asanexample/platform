@@ -115,9 +115,9 @@ per-object cost on a high-churn store, for no benefit here.
 
 ### The auth: Pod Identity, no IRSA, no keys
 
-How does the ingester get credentials to write that bucket? **[EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html)**
-([ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md)), the platform's standard AWS-identity
-mechanism. In the module the ServiceAccount is created with `annotations = {}` — pointedly empty,
+How does the ingester get credentials to write that bucket? **[EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html)**,
+the platform's standard AWS-identity mechanism. In the module the ServiceAccount is created with
+`annotations = {}` — pointedly empty,
 because the old IRSA way stamped an `eks.amazonaws.com/role-arn` annotation there. Instead an
 `aws_eks_pod_identity_association` binds the tuple `(namespace, service-account) → IAM role`, and the role
 trusts the service principal `pods.eks.amazonaws.com` (with `sts:AssumeRole` + `sts:TagSession`). The AWS SDK
@@ -128,16 +128,14 @@ carries **no KMS statement at all**.
 
 ## The metrics twist: Prometheus scrapes, Mimir keeps
 
-Metrics have one extra move the other three signals don't, and it's the heart of
-[ADR-044](../../adrs/044-mimir-durable-multi-tenant-metrics.md). Prometheus is still the scraper — it
+Metrics have one extra move the other three signals don't. Prometheus is still the scraper — it
 pulls `/metrics` off every target — but it keeps only **~15 days** of local TSDB (the module's
 `prometheus_retention` default) and `remote_write`s every sample to Mimir, which holds the long tail on
 S3. So Grafana's **default datasource is Mimir, not Prometheus**: the module provisions the Mimir datasource
 with `isDefault = true`, and Prometheus stays selectable for recent/local queries. Lose Prometheus and you
-lose nothing but the last few minutes of scrape buffer — the truth is in Mimir/S3. The change was additive:
-no migration, Prometheus just grew a remote write.
+lose nothing but the last few minutes of scrape buffer — the truth is in Mimir/S3.
 
-Why Mimir and not Thanos? Both are OSS, object-store-backed, and mature — ADR-044 calls it defensible
+Why Mimir and not Thanos? Both are OSS, object-store-backed, and mature — it's defensible
 either way. Tenancy decided it. Mimir's multi-tenancy is native: a single `X-Scope-OrgID` header names
 the tenant on both read and write, over one horizontally-scaled ingest path. Thanos bolts tenancy on via
 a sidecar-per-Prometheus plus store-gateway federation — more moving parts to glue for a hub, and
@@ -170,8 +168,7 @@ The naming is deliberate, because it's how tenancy surfaces to a human. Every da
 - `Mimir (all clusters)` — a *federated* datasource whose header is `platform|preprod|alpha|bravo`, so one
   panel spans every tenant (Mimir's `tenant_federation` splits the `|`-joined header across tenants on read).
 - `Mimir (alpha)` / `Mimir (bravo)` — a per-team datasource pinned to that tenant via a static
-  `X-Scope-OrgID`, direct to the gateway (the read proxy that once fronted this was retired — see the
-  honest-status section).
+  `X-Scope-OrgID`, direct to the gateway.
 
 Loki, Tempo, and Pyroscope follow the identical `(tenant)` scheme. The datasources are wired to each
 other for the **correlation jump**: the Mimir datasource carries `exemplarTraceIdDestinations` pointing
@@ -217,8 +214,8 @@ allowed to write that number. Where the metaphor breaks: unlike a real building,
 the store reading IDs. So if a tenant workload could *reach* Mimir, it could scribble any apartment
 number and read or write any tenant's data.
 
-So the real isolation boundary is **not the header — it's the network** ([ADR-044](../../adrs/044-mimir-durable-multi-tenant-metrics.md)
-names this the single most important operational invariant). Two rules enforce it:
+So the real isolation boundary is **not the header — it's the network**, the single most important
+operational invariant in the stack. Two rules enforce it:
 
 1. The **`observability` namespace is default-deny ingress.** No pod outside it can open a connection in.
 2. The **stores are `ClusterIP` only — never on the Gateway.** Verified live: `mimir-gateway`,
@@ -263,7 +260,7 @@ another tenant's data — it can only ever land in its own. Authentication of th
 network isolation (the internal NLB is reachable only across the VPC/TGW); mTLS is a documented hardening
 follow-up, not yet in place.
 
-## Honest status: the write-split is live; read isolation is soft (the hard proxy was retired)
+## Per-team isolation: hard write-split, soft reads
 
 ![Per-team isolation in three bands — a soft read plane (per-tenant datasources + Grafana folder permissions), a struck-through retired fail-closed read proxy (#1269), and a hard write plane where cortex-tenant splits namespaces into real alpha/bravo/platform tenants — all resting on a network default-deny, ClusterIP-only floor.](images/isolation-status.svg)
 
@@ -285,35 +282,22 @@ tenant=bravo   distinct_metric_names=118
 
 Those are real, isolated `alpha` and `bravo` tenants — the write split is running, not a diagram.
 
-**Per-team *read* isolation — the soft model, after the hard one was retired.** The write split gives you real
-separate tenants; the read side went a different way than planned, and the story is worth telling honestly. The
-platform first built the *hard* version — a pair of fail-closed read proxies (`observability-tenant-proxy` in
-front of Mimir, `loki-tenant-proxy` in front of Loki) that verified the Grafana-forwarded OIDC token against
-Keycloak, mapped the caller's `groups` to a tenant, overwrote `X-Scope-OrgID`, and denied anything
-unauthenticated. It was **retired** ([#1269](https://github.com/asanexample/platform/issues/1269)): OSS
-Grafana's `oauthPassThru` can't reliably forward the SSO token to a downstream proxy, so the proxy fail-closed
-on `no_token` and *every dashboard went blank for admins*. The modules remain in the repo but inert
-(re-enableable if Grafana's token forwarding is ever fixed).
-
-What's live instead is the **soft model** — which was the actual need. Each team gets a datasource pinned to its
-own tenant (`Mimir (<team>)` / `Loki (<team>)`, a static `X-Scope-OrgID`), and per-team read isolation is
-enforced by **Grafana dashboard-folder permissions** plus the **namespace-filtered per-team overview
-dashboards** ([#1157](https://github.com/asanexample/platform/issues/1157)). It's an RBAC-level boundary, not a
-fail-closed data gate — an organizational separation, not a security wall. (The platform hub runs no team
-workloads, so its own metrics are the `platform` tenant; the real per-team tenants come from the **preprod
+**Per-team *read* scoping — soft.** The write split gives you real separate tenants; read scoping is an
+organizational boundary layered on top of them. Each team gets a datasource pinned to its own tenant
+(`Mimir (<team>)` / `Loki (<team>)`, a static `X-Scope-OrgID`), and per-team reads are fenced by **Grafana
+dashboard-folder permissions** plus the **namespace-filtered per-team overview dashboards**. It's an
+RBAC-level boundary, not a fail-closed data gate — an organizational separation, not a security wall. The real
+data-plane boundary underneath is the network (default-deny + ClusterIP-only stores). (The platform hub runs no
+team workloads, so its own metrics are the `platform` tenant; the real per-team tenants come from the **preprod
 spoke's dual-write**, where the team apps run.) Per-team **traces (Tempo)** and **profiles (Pyroscope)** read
 scoping is likewise a follow-up.
 
-Cross-team *sharing* is a soft act too — share the dashboard or grant folder access. The `AccessGrant` model
-([ADR-068](../../adrs/068-product-scoped-and-cross-team-access-model.md), `gitops/grants/`) still governs
-cross-team access in general, but its enforcement as a **fail-closed observability read federation**
-(`X-Scope-OrgID: alpha|bravo`) went with the retired proxy.
+Cross-team *sharing* is a soft act too — share the dashboard or grant folder access.
 
 ## Why self-host all of this at all?
 
-The whole doc is downstream of one decision ([ADR-043](../../adrs/043-self-hosted-observability-stack.md)):
-run the stack yourself instead of shipping everything to Datadog or Grafana Cloud. The trade, stated bluntly
-in the ADR, is *"we operate it."* Three reasons it's worth that:
+The whole doc is downstream of one choice: run the stack yourself instead of shipping everything to Datadog
+or Grafana Cloud. The trade is blunt — *"we operate it."* Three reasons it's worth that:
 
 - **Cost.** A SaaS observability bill is a metered utility — the meter spins per host and per series, and
   at platform scale (many teams × many services × high cardinality) that meter becomes the *dominant*
@@ -340,39 +324,24 @@ cluster, switching to managed is a config change, not a rewrite.
   replicas *and* RF together. A lone ingester at RF3 rejects every write.
 - **`X-Scope-OrgID` isolates nothing on its own.** Isolation is the default-deny namespace + ClusterIP-only
   stores. A single over-broad NetworkPolicy or one store accidentally exposed on the Gateway would collapse
-  the entire tenancy model — which is why ADR-044 calls the network boundary *the* invariant.
+  the entire tenancy model — the network boundary is *the* invariant.
 - **The Gateway needs a `CiliumNetworkPolicy`, not a NetworkPolicy.** Envoy's reserved `ingress` identity (8)
   is invisible to a standard `from:` clause. Every store that admits Gateway traffic uses `fromEntities:
   ["ingress"]`.
 - **Grafana Viewer-for-everyone is by design — per-team reads are fenced *organizationally*, not by a data
   gate.** Grafana itself has no per-team RBAC (every authenticated non-admin is a Viewer). The per-team read
   boundary is **Grafana dashboard-folder permissions** plus the **namespace-filtered per-team overview
-  dashboards** ([#1157](https://github.com/asanexample/platform/issues/1157)) — an organizational separation,
-  **not** a fail-closed data gate. The hard version — fail-closed tenant-proxies in front of Mimir + Loki —
-  was built and then **retired** ([#1269](https://github.com/asanexample/platform/issues/1269),
-  `read_proxy_url=""`, inert), and the `AccessGrant` read-federation went with it. The real data-plane
-  boundary underneath is the **network** (default-deny + ClusterIP-only stores).
+  dashboards** — an organizational separation, **not** a fail-closed data gate. The real data-plane boundary
+  underneath is the **network** (default-deny + ClusterIP-only stores).
 
 ## Go deeper
 
-- **ADRs (source of truth):** [ADR-043](../../adrs/043-self-hosted-observability-stack.md) (self-hosted
-  stack), [ADR-044](../../adrs/044-mimir-durable-multi-tenant-metrics.md) (Mimir + the tenancy invariant),
-  [ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md) (Pod Identity). As-built:
-  [observability-current-state](../../architecture/observability-current-state.md).
+- **ADRs:** [ADR-043](../../adrs/043-self-hosted-observability-stack.md) (self-hosted stack),
+  [ADR-044](../../adrs/044-mimir-durable-multi-tenant-metrics.md) (Mimir + the tenancy invariant),
+  [ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md) (Pod Identity).
 - **Module code:**
-  [`observability`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/main.tf) (Grafana + Prometheus + Alertmanager),
+  [`observability`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/main.tf),
   [`observability-mimir`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-mimir/main.tf),
-  [`observability-loki`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-loki/main.tf),
-  [`observability-tempo`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tempo/main.tf),
-  [`observability-pyroscope`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-pyroscope/main.tf),
-  [`observability-cortex-tenant`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-cortex-tenant/main.tf),
-  [`observability-tenant-proxy`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-tenant-proxy/main.tf).
-- **Upstream docs** (all newer than our pins, but the concepts are stable):
-  [Grafana Mimir](https://grafana.com/docs/mimir/latest/) ·
-  [Mimir architecture](https://grafana.com/docs/mimir/latest/get-started/about-grafana-mimir-architecture/) (~15 min — the microservices/RF model above) ·
-  [Mimir authentication & multi-tenancy](https://grafana.com/docs/mimir/latest/manage/secure/authentication-and-authorization/) (~10 min — the `X-Scope-OrgID` trust-header behaviour, first-hand) ·
-  [Loki](https://grafana.com/docs/loki/latest/) · [Tempo](https://grafana.com/docs/tempo/latest/) ·
-  [Pyroscope](https://grafana.com/docs/pyroscope/latest/) ·
-  [cortex-tenant](https://github.com/blind-oracle/cortex-tenant) (the per-team write-split proxy) ·
-  [EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) (~10 min).
+  [`observability-cortex-tenant`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-cortex-tenant/main.tf)
+  (`-loki`/`-tempo`/`-pyroscope` follow the same shape).
 - **Back to the map:** the [Observability orientation](orientation.md) and the [Reference](reference.md).

@@ -80,8 +80,7 @@ one store per signal, all self-hosted: **L**oki (logs), **G**rafana (the view), 
 ## Collection — watched from below, for free
 
 On most platforms, emitting these signals is the app's job — link a library, wire an SDK, per language, and
-maintain it forever. Here it's **platform-injected**
-([ADR-077](../../adrs/077-application-instrumentation-strategy.md)): the platform stands up the collectors and
+maintain it forever. Here it's **platform-injected**: the platform stands up the collectors and
 instruments your workload without a line of app code, obeying the same paved-road rule as everything else.
 
 The headline is **Beyla** — an **eBPF** agent running as a DaemonSet on every node. eBPF lets a program run
@@ -96,15 +95,13 @@ zero manifest change, zero redeploy.
 > not the inside of the car — Beyla sees request boundaries, not your in-process function spans or custom
 > attributes. That gap is exactly what the opt-in SDK layer fills.
 
-That gives an **instrumentation ladder** you climb only as far as you need
-([ADR-077](../../adrs/077-application-instrumentation-strategy.md)):
+That gives an **instrumentation ladder** you climb only as far as you need:
 
 ![The instrumentation ladder: Layer 0, Beyla eBPF, is the free automatic floor for every workload; Layer 1, the opt-in OpenTelemetry SDK, adds code-level depth; Layer 2 is agent observability — run one or the other on a service, never both.](images/instrumentation-ladder.svg)
 
 - **Layer 0 — Beyla (eBPF), free and automatic.** RED metrics + traces + service graph for everything, live
   across both clusters, no app change. This is the floor every workload stands on.
-- **Layer 1 — the OpenTelemetry SDK, the golden path**
-  ([ADR-100](../../adrs/100-observability-instrumentation-and-otlp-convention.md)). Want code-level spans,
+- **Layer 1 — the OpenTelemetry SDK, the golden path.** Want code-level spans,
   custom attributes, and RED metrics your app defines? Add one annotation
   (`instrumentation.opentelemetry.io/inject-<lang>`) and the OTel Operator injects the SDK plus the platform's
   OTLP endpoint at admission — no rebuild, and you never hardcode where telemetry goes. SDK-instrumented
@@ -125,7 +122,7 @@ logs, its only job is the oldest rule in the book: *log to stdout*.
 
 The signals land in the LGTM+P backends, and two design choices define the platform's posture.
 
-**First, it's self-hosted** ([ADR-043](../../adrs/043-self-hosted-observability-stack.md)) — the platform
+**First, it's self-hosted** — the platform
 runs Grafana, Mimir, Loki, Tempo, and Pyroscope itself, on its own **S3** buckets, rather than shipping
 everything to Datadog or Grafana Cloud. A SaaS observability bill is a metered utility — the meter spins on
 every host and every series, and at platform scale (many teams × many services × high cardinality) that meter
@@ -135,8 +132,7 @@ plus cheap S3, your data never leaves your account (residency), and dashboards a
 your stack, and know how.
 
 **Second, the durable store is Mimir, not Prometheus.** Prometheus stays the *scraper* with only ~15 days of
-local history; it remote-writes every sample to **Mimir**, which keeps the long-range history on S3
-([ADR-044](../../adrs/044-mimir-durable-multi-tenant-metrics.md)). So you can lose and rebuild Prometheus
+local history; it remote-writes every sample to **Mimir**, which keeps the long-range history on S3. So you can lose and rebuild Prometheus
 without losing history — the truth is in Mimir/S3. Every store follows the same shape: a small hot buffer on
 disk, the durable blocks on S3 (via Pod Identity, no static keys). A cluster-wide `cost_profile` gates the
 expensive stores — `dev` runs Prometheus-only; the platform cluster flips the full LGTM+P bundle on
@@ -177,26 +173,22 @@ lock. Isolation is layered on top of it:
   end to end — not one bucket with a label.
 - **Reads are scoped by Grafana, softly.** Each team gets a datasource pinned to its own tenant
   (`Mimir (<team>)`, a static `X-Scope-OrgID`), and per-team read isolation is enforced by **Grafana
-  dashboard-folder permissions** plus the **namespace-filtered per-team dashboards**
-  ([#1157](https://github.com/asanexample/platform/issues/1157)) — an RBAC-level boundary, not a data-layer
-  gate. (Traces and profiles per-team read scoping is a follow-up.)
+  dashboard-folder permissions** plus the **namespace-filtered per-team dashboards** — an RBAC-level boundary,
+  not a data-layer gate. (Traces and profiles per-team read scoping is a follow-up.)
 
-There's an honest story in that last bullet. The platform first built the *hard* version — a fail-closed proxy
-(`tenant-proxy`) that authenticated each caller's SSO token and stamped their tenant, denying anything
-unauthenticated — and then **retired it**
-([#1269](https://github.com/asanexample/platform/issues/1269)): OSS Grafana couldn't reliably forward the SSO
-token to the proxy (`oauthPassThru` dropped it), so the proxy fail-closed and *broke every dashboard*. The
-soft model was the actual need, so the platform reverted to it — a useful lesson in not building an isolation
-boundary the tooling can't hold up. (One subtlety regardless: the platform hub runs *no* team workloads, so
-its own metrics are the `platform` tenant — the real per-team tenants come from the **preprod spoke's live
-dual-write**, where the team apps actually run.)
+Be honest about that last bullet: read scoping is *soft*. It's an organizational boundary — Grafana folder
+permissions and per-team dashboards — not a fail-closed security gate. The header (`X-Scope-OrgID`) is
+routing, not auth, so the thing that actually keeps a team from reading another's data is the network floor
+above: the stores are unreachable from any tenant namespace. (One subtlety regardless: the platform hub runs
+*no* team workloads, so its own metrics are the `platform` tenant — the real per-team tenants come from the
+**preprod spoke's live dual-write**, where the team apps actually run.)
 
 > It's a shared apartment building with a locked mailroom. The `X-Scope-OrgID` on each envelope is just the
 > unit number — anyone could *write* one. What keeps your mail yours is that the mailroom door is locked
 > (network default-deny), the boxes are physically separate (per-team tenants), and your key opens only your
 > own box (Grafana folder permissions). **Where it breaks:** that last lock is a *soft* one — building policy,
-> not a bank vault — because the hard version (an ID-checking clerk at the door) turned people away by mistake
-> and had to be pulled. Cross-*cluster* ingest likewise rests on network isolation rather than mTLS today.
+> not a bank vault — so the real boundary is the locked mailroom door, not the box key. Cross-*cluster* ingest
+> likewise rests on network isolation rather than mTLS today.
 
 ---
 
@@ -249,20 +241,19 @@ A threshold alert is a smoke detector that shrieks at burnt toast; burn-rate is 
 trip-computer — it warns when your projected time-to-empty is short. The sharp part: every `prod` app gets a
 99.9%-success SLO **auto-derived** from its Beyla RED metrics — no authoring step — and it does real work.
 Before any canary shifts traffic, a **freeze gate** checks the environment isn't *already* burning through its
-budget, so the platform won't stack a risky deploy on top of a live incident
-([ADR-056](../../adrs/056-progressive-delivery-and-safe-rollback.md)). (Platform services get hand-authored
-SLOs too; the [deep dive](deep-dive-slos-alerting-and-cost.md) has both mechanisms.)
+budget, so the platform won't stack a risky deploy on top of a live incident. (Platform services get
+hand-authored SLOs too; the [deep dive](deep-dive-slos-alerting-and-cost.md) has both mechanisms.)
 
 ![Burn-rate SLOs: an error budget (the 0.1% beyond a 99.9% target) depletes over time; a fast burn empties it in ~2 days and pages now, a slow leak files a ticket — a fuel gauge with a trip computer, not a threshold smoke detector. Auto-derived per prod app from Beyla RED, and read by the canary freeze gate.](images/burn-rate-slo.svg)
 
-**Alerts that page the *right* person.** A curated alert set (the #1124 alerting epic) fires through
+**Alerts that page the *right* person.** A curated alert set fires through
 Alertmanager, routed by severity: `critical` → SNS + Slack + PagerDuty; `warning` → Slack; and an
 always-firing **dead-man's switch** pages an external service if the whole pipeline ever goes silent.
 *(Honest status: the `critical`→PagerDuty wire is real — an Events-API-v2 receiver fed by the `pagerduty`
 unit's routing key — but the PagerDuty trial account lapsed (~2026-07-07), so paging is momentarily offline;
 criticals today still reach Slack + SNS + the dead-man's switch, just not a human page. The design stands; the
 account doesn't.)* But Alertmanager only knows *severity*, not *ownership* — so the **triage agent**
-([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)) resolves the culprit's team
+resolves the culprit's team
 from the git registries and routes the alert to *that team's* on-call, @-mentioning the commit author in
 Slack. The fire panel shows the zone; the dispatcher looks up whose apartment it is and calls *them*.
 
@@ -270,7 +261,7 @@ Slack. The fire panel shows the zone; the dispatcher looks up whose apartment it
 
 **Cost as an observable signal.** Cost is just another signal here — attributed per team in near-real-time and
 reconciled against the *actual* AWS bill, so it's a metric you can dashboard, alert on, and even **enforce**:
-an over-budget team can be blocked from provisioning ([ADR-091](../../adrs/091-cost-guardrails.md)). (The live
+an over-budget team can be blocked from provisioning. (The live
 estimate vs the real billed spend — and why you want both — is in the
 [deep dive](deep-dive-slos-alerting-and-cost.md).) It's exactly how the "runaway LLM bill" from the opening
 becomes findable.
@@ -279,8 +270,8 @@ becomes findable.
 
 ## Observing the observers — agent observability
 
-The platform runs AI **agents** now (the triage copilot), and they get observed too
-([ADR-076](../../adrs/076-agent-observability.md)) — using OpenTelemetry's **GenAI semantic conventions**. One
+The platform runs AI **agents** now (the triage copilot), and they get observed too — using OpenTelemetry's
+**GenAI semantic conventions**. One
 instrumentation seam in the agent fans out to three consumers: **metrics** (token usage, operation latency,
 dispositions) into Mimir; **traces** (`invoke_agent` → `chat` → `execute_tool` spans, enriched with `gen_ai.*`
 attributes) into Tempo; and a durable **eval** signal — the human's Accept/Correct/Dismiss verdict as a counter
@@ -300,10 +291,10 @@ auto-instrumented apps, the correlation walk end to end, both SLO systems, alert
 
 - **Per-team isolation: write-split is real; reads are soft.** `cortex-tenant` splits each team's metrics/logs
   into its own real Mimir/Loki tenant (live). Read isolation is Grafana folder permissions + per-team
-  dashboards — the hard fail-closed read proxy was built and then **retired** (#1269) as unreliable in OSS
-  Grafana. Traces/profiles per-team read scoping is a follow-up.
+  dashboards — an organizational boundary, not a fail-closed security gate; the real data-plane boundary is the
+  network floor. Traces/profiles per-team read scoping is a follow-up.
 - **The OTel SDK golden path is real but not fleet-wide.** The operator, the inject annotation, and the
-  log↔trace correlation for SDK'd services are live (ADR-100); most workloads still ride the Beyla Layer-0
+  log↔trace correlation for SDK'd services are live; most workloads still ride the Beyla Layer-0
   baseline, and rolling the SDK across the fleet is the ongoing golden-path work.
 - **PagerDuty paging is offline** (trial account lapsed) — the wire is intact; only the account needs
   restoring.
@@ -327,19 +318,16 @@ auto-instrumented apps, the correlation walk end to end, both SLO systems, alert
   just quiet.
 - **"Per-team data isolation — how strong is it?"** Your writes land in a *real* separate tenant, but your
   reads are scoped *softly* — by Grafana folder permissions and your team-overview dashboard, not a fail-closed
-  gate (the hard read-proxy was retired as unreliable, #1269). Treat it as an organizational boundary, not a
-  security wall — and use your team-overview dashboard as the ready-made view.
+  gate. Treat it as an organizational boundary, not a security wall (the real data-plane boundary is the
+  network floor) — and use your team-overview dashboard as the ready-made view.
 
 ## Go deeper
 
-- [The stack & storage](deep-dive-the-stack-and-storage.md) — the LGTM+P backends, S3, Grafana + SSO, the
-  X-Scope-OrgID tenancy model, hub-and-spoke, and why self-hosted.
-- [Collection & instrumentation](deep-dive-collection-and-instrumentation.md) — every collector, the eBPF
-  zero-code story, the instrumentation ladder, platform-injection.
-- [Correlation & the team experience](deep-dive-correlation-and-the-team-experience.md) — the metrics↔traces↔
-  logs↔profiles jumps, the per-team dashboards, and the full per-team-isolation story.
-- [SLOs, alerting & cost](deep-dive-slos-alerting-and-cost.md) — burn-rate SLOs (both systems), curated alerts +
-  owner-routing, OpenCost + true-cost.
-- [Agent observability](deep-dive-agent-observability.md) — ADR-076, the GenAI semantic conventions, the
-  live slices.
-- The lookup: the [Reference](reference.md). Foundational context: [Foundations](../foundations/orientation.md).
+The deep dives: [the stack & storage](deep-dive-the-stack-and-storage.md),
+[collection & instrumentation](deep-dive-collection-and-instrumentation.md),
+[correlation & the team experience](deep-dive-correlation-and-the-team-experience.md),
+[SLOs, alerting & cost](deep-dive-slos-alerting-and-cost.md), and
+[agent observability](deep-dive-agent-observability.md). The lookup: the [Reference](reference.md).
+
+The decisions behind it, if you want them: instrumentation strategy (ADR-077), the OTLP convention
+(ADR-100), self-hosting (ADR-043), and durable multi-tenant metrics (ADR-044).
