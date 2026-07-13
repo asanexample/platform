@@ -41,9 +41,19 @@ git config user.name "asanexample-promote[bot]"
 git config user.email "asanexample-promote[bot]@users.noreply.github.com"
 
 # Push + open the Release PR AS the promote App — its token (GH_TOKEN) has contents+pull_requests write on the
-# platform repo, and the gate only auto-merges asanexample-promote[bot] PRs. actions/checkout left a read-only
-# default-GITHUB_TOKEN Authorization header (the workflow is contents:read), so repoint origin at the token URL
-# and drop that header. (Skipped in DRY_RUN — and harmless where there is no origin, e.g. local tests.)
+# platform repo, and the gate only auto-merges asanexample-promote[bot] PRs. The workflow's checkout step sets
+# persist-credentials: false specifically so nothing here fights the promote App's token; repoint origin at it
+# regardless (belt-and-suspenders — cheap insurance if that setting is ever dropped from the workflow).
+# (Skipped in DRY_RUN — and harmless where there is no origin, e.g. local tests.)
+#
+# Gotcha (found the hard way): a bare `git config --unset-all "http.https://github.com/.extraheader"` here does
+# NOT undo actions/checkout's default credential — modern actions/checkout persists it via a temp config file
+# wired in through `includeIf.gitdir`, not a plain key in this repo's own .git/config, so an --unset-all against
+# the local config silently finds nothing to remove (its `|| true` masked that). The push then authenticates as
+# github-actions[bot] instead of the promote App and fails with a 403 — with NO log line pointing at the cause,
+# since it happens mid-loop on whatever service is first found promotable. persist-credentials: false on the
+# checkout step is the actual fix (never sets up the conflicting credential in the first place); this unset
+# stays only as a no-op safety net.
 if [ "$DRY_RUN" != "true" ]; then
   git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
   git config --unset-all "http.https://github.com/.extraheader" 2>/dev/null || true
