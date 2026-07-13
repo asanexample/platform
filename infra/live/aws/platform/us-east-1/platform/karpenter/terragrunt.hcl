@@ -89,11 +89,14 @@ inputs = {
   single_az                 = include.base.locals.single_az_nodes
   node_arch                 = include.base.locals.node_arch
 
-  # CONSERVATIVE — this is the stateful hub (Prometheus/Mimir/Loki/Tempo/Pyroscope, Keycloak, CNPG). On-demand +
-  # WhenEmpty consolidation NEVER disrupts a running stateful pod (only reclaims fully-empty nodes); paired with
-  # do-not-disrupt + PDBs on the TSDBs. (ADR-078.)
+  # This is the stateful hub (Prometheus/Mimir/Loki/Tempo/Pyroscope, Keycloak, CNPG). WhenEmptyOrUnderutilized
+  # lets Karpenter reclaim UNDERUTILIZED nodes (not just fully-empty ones) — needed because the post-unpark
+  # scheduling storm over-provisions small on-demand nodes that WhenEmpty then never reclaimed (6 nodes at
+  # ~20% CPU observed 2026-07-13). The stateful TSDBs/DBs stay protected: they carry `karpenter.sh/do-not-disrupt`
+  # + PDBs, which Karpenter honors under EITHER policy, so consolidation drains only stateless/underutilized
+  # capacity and won't disrupt a running stateful pod or violate a PDB. (ADR-078.)
   capacity_types       = ["on-demand"]
-  consolidation_policy = "WhenEmpty"
+  consolidation_policy = "WhenEmptyOrUnderutilized"
   consolidate_after    = "1m"
   cpu_limit            = 32
   memory_limit         = "128Gi"
