@@ -192,7 +192,17 @@ Pending and workloads can't scale.
   self-heals from — hence the sustained window; a brief blip is normal.)
 - **KarpenterPodsPendingUnscheduled** (warning) — a pod has been Pending 15m. `kubectl describe pod` for the
   unschedulable reason; check NodePool limits/taints and the Karpenter logs. If many fire at once, the
-  elasticity loop is broken (Karpenter down, at a NodePool limit, or no matching capacity).
+  elasticity loop is broken (Karpenter down, at a NodePool limit, or no matching capacity). If
+  **KarpenterNodePoolAtCapacity** is also firing, the deliberate cost cap is the root cause — see below.
+- **KarpenterNodePoolAtCapacity** (warning) — a NodePool's cpu/memory usage is ≥90% of its `spec.limits` (the
+  deliberate cost guardrail, set intentionally low on this nightly-parked demo — ADR-078). At 100% Karpenter
+  **stops launching nodes**, so Pending pods here are due to the **cost cap**, not a bug or a broken elasticity
+  loop. This is the intended behaviour and firing is acceptable — it exists so cap-exhaustion is diagnosable as a
+  distinct root cause (vs. guessing at "pods pending"). **Decide:** (a) accept the Pending — the demo hit its
+  capacity ceiling, which is fine; or (b) if the workload legitimately grew, raise `cpu_limit`/`memory_limit` in
+  `infra/live/aws/<env>/us-east-1/platform/karpenter/terragrunt.hcl` (small, deliberate steps — the whole point
+  of the low cap is to avoid unbounded compute spend). Current caps: platform & preprod = **16 vCPU / 64 GiB**
+  each. Metric: `karpenter_nodepools_usage / karpenter_nodepools_limit`.
 
 ## controllers
 
