@@ -33,7 +33,7 @@ guide. Everything else (naming, typed variables, described outputs, `for_each` o
 
 | Topic | Generic Terraform guidance | **This repo** |
 |---|---|---|
-| Resource organisation | "data sources first, dependency order"; a separate `locals.tf` | **Section-header banners** grouping resources in `main.tf`; locals live in `main.tf` |
+| Resource organisation | "data sources first, dependency order"; a separate `locals.tf` | **Section-header banners** grouping resources in `main.tf`; locals live in `main.tf` — until a module gets big, when the banner sections become per-concern `.tf` files (see below) |
 | Version block file | `terraform.tf` | **`versions.tf`** — **every** module ships one (pins `required_version` + the `aws` provider); a non-AWS provider just adds a `required_providers` entry |
 | Provider blocks | `providers.tf` with `provider "aws" {}` | **None.** Modules declare *zero* provider blocks — providers are injected by Terragrunt (`root.hcl` / `_base.hcl`) |
 | Version constraints | "use the latest major version" | Pessimistic `~> MAJOR.0` constraints (aws is on `~> 6.0`); CLI versions pinned canonically in `/.tool-versions` |
@@ -52,9 +52,39 @@ A module is three files, plus a fourth when needed:
 | `outputs.tf` | Output declarations |
 | `versions.tf` | The `terraform { required_version, required_providers }` block — **every module has one** (pins `required_version` + the `aws` provider); modules that need a provider beyond `aws` (e.g. `helm`, `kubernetes`, `keycloak`) add it to `required_providers` |
 
-Do **not** create `providers.tf`, `terraform.tf`, or `locals.tf`. We don't split
-providers out because modules never declare them (see below), and locals stay next to
-the resources they serve, under the relevant section header in `main.tf`.
+Do **not** create `providers.tf` or `terraform.tf`. We don't split providers out
+because modules never declare them (see below).
+
+For a **small or mid-sized module**, keep everything in `main.tf` — locals included,
+next to the resources they serve under the relevant section header. Don't create
+`locals.tf` or per-concern files just to have them.
+
+### Splitting a large `main.tf` into per-concern files
+
+Once a `main.tf` clears **~500 lines** (or has a cleanly separable subsystem — e.g.
+`observability-opencost`'s `budget-enforcer.tf` / `true-cost-exporter.tf`), promote its
+banner sections to their own `.tf` files rather than scrolling one wall. OpenTofu reads
+every `*.tf` in a module dir as one config, so this is **purely organisational** — a
+resource's address is `type.name`, not file-scoped, so moving a block between files
+changes nothing in state (**no `moved` blocks, a clean 0-change plan**).
+
+Rules for the split:
+
+- **Split along the existing `# ---` banner seams** — one cohesive concern per file
+  (`networkpolicy.tf`, `iam.tf`, `s3.tf`, `dashboards.tf`, `alerting.tf`, …). The seams
+  are already there; the split is mechanical.
+- **`main.tf` stays the anchor** — keep the primary resource (the `helm_release`, the
+  `aws_eks_cluster`, …) and the namespace/scaffolding there, so `main.tf` still answers
+  "what does this deploy". Peel off the *satellite* resources (secrets, netpol,
+  configmaps, IAM).
+- **`locals.tf` is allowed here** — when the computed inputs (helm values, config maps)
+  are a big block, move the whole `locals {}` block into `locals.tf` verbatim. This is
+  the one case where `locals.tf` is fine.
+- Each file still opens with its banner header; keep `variables.tf` / `outputs.tf` /
+  `versions.tf` as the other three files.
+- Verify it's a true no-op: `tofu fmt -check` clean + `tofu validate` passes + the diff
+  is pure block-moves (no content change). Reference split: the `observability` and
+  `observability-mimir` modules.
 
 ## Section headers in `main.tf`
 
