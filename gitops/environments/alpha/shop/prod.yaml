@@ -15,6 +15,12 @@ spec:
   product: shop
   stage: prod
   tier: standard
+  # Cross-team dependency (ADR-101), same as dev: orders calls bravo's dispatch/intake to kick off a real
+  # shipment on checkout. Consented to by bravo's stage-scoped ServiceGrant (gitops/grants/bravo/
+  # allow-alpha-shop-orders-to-dispatch-intake-prod.yaml) — restrict-environment-dependencies admits this
+  # claim only because that grant exists; the Composition then materializes both CNP halves automatically.
+  dependencies:
+    - { team: bravo, product: dispatch, stage: prod, service: intake }
   # One Product, many services (ADR-067) — same shape as dev. storefront/payment/checkout are stateless →
   # share app-alpha. catalog/cart/orders/accounts own self-service AWS data (ADR-073) so each needs its OWN SA
   # (Pod Identity binds one role per SA); the Composition mints their least-privilege DynamoDB/SQS IAM and
