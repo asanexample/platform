@@ -21,7 +21,7 @@ locals {
   # Policy reporting (P12, #93): tenant environments (Kyverno Enforce) live here — the PolicyReport/
   # ClusterPolicyReport volume that actually matters is on preprod, not the platform hub.
   enable_policy_reporting = true
-  enable_per_team_tenants = true # P13 (#590): dual-write preprod metrics into per-team tenants via cortex-tenant, additive to the `preprod` tenant. Consumed only by observability-spoke's per_team_write_url.
+  enable_per_team_tenants = false # P13 (#590) per-team tenancy PARKED (ADR-104) — standardized on cluster tenancy for all signals.
 
   tags = {
     Environment        = local.environment
