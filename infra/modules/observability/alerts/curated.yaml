@@ -668,19 +668,11 @@ groups:
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#tailscale"
   # ---------------------------------------------------------------------------
   # Platform-service breadth (#1123): control-plane components scraped but previously unalerted for their own
-  # up/down. cortex-tenant (per-team metric re-tenanting), argo-rollouts (progressive delivery), Beyla (the
-  # eBPF app-metric source the SLOs depend on), external-dns (DNS record sync — kube-state, not scraped).
+  # up/down. argo-rollouts (progressive delivery), Beyla (the eBPF app-metric source the SLOs depend on),
+  # external-dns (DNS record sync — kube-state, not scraped). cortex-tenant was here (per-team metric
+  # re-tenanting) — decommissioned, ADR-104.
   - name: platform-services.rules
     rules:
-      - alert: CortexTenantDown
-        expr: up{job="cortex-tenant"} == 0
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "cortex-tenant is down — per-team metric re-tenanting stopped"
-          description: "cortex-tenant (the P13 write-splitter that routes each series into its team's Mimir tenant) has been down for 10m. Per-team metric isolation degrades — new metrics stop being split by team. Check the pod in observability."
-          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#platform-services"
       - alert: ArgoRolloutsControllerDown
         expr: up{job="argo-rollouts-metrics"} == 0
         for: 10m

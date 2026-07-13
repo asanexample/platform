@@ -181,11 +181,11 @@ inputs = {
       service_port    = 8080
     } : null
   }
-  # Surface every tenant as its own direct Grafana datasource + fold them into the federated `mimir-all`
-  # view: the two cluster tenants (preprod spoke; platform is the default below) and the two per-team app
-  # tenants cortex-tenant splits out (alpha, bravo). This replaces the break-glass admin datasource — with
-  # the read proxy retired (see read_proxy_url), these direct datasources are the reliable read path.
-  extra_tenant_datasources = ["preprod", "alpha", "bravo"]
+  # Surface every cluster tenant as its own direct Grafana datasource + fold them into the federated
+  # `mimir-all` view (preprod spoke; platform is the default below). This replaces the break-glass admin
+  # datasource — with the read proxy retired (see read_proxy_url), these direct datasources are the
+  # reliable read path. ADR-104: dropped alpha/bravo — per-team tenancy is parked, cortex-tenant decommissioned.
+  extra_tenant_datasources = ["preprod"]
 
   # Multi-cluster single pane (#626): enable read-path tenant federation + a `Mimir (all clusters)`
   # datasource spanning platform|preprod. Platform-admin overview lane (per-team scoping = P13).
@@ -205,7 +205,7 @@ inputs = {
   # already federates the full tenant set. Only ever rendered while the proxy was enforced (a no-op now); kept
   # false-by-effect so re-enabling the proxy would also restore it.
   enable_admin_all_datasource  = false
-  admin_all_datasource_tenants = ["alpha", "bravo", "platform", "preprod"]
+  admin_all_datasource_tenants = ["platform", "preprod"]
 
   # P4 / ADR-082: the ruler evaluates alerting rules against EACH tenant's metrics (incl. preprod's
   # remote-written data) and posts fired alerts to the hub Alertmanager → the triage agent. The rules-sync

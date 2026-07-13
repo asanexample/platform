@@ -15,7 +15,8 @@
 > is live** (closes #93 — policy-reporter on both clusters, dashboards on the hub, curated alerts
 > verified). Small chores **#595** (chart bump) and **#151** (dashboard cluster/env filters) are closed.
 > **Remaining:** **P11-cost** CUR→Athena (#668 — cost-allocation-tag prereq applied #673), **P13**
-> per-team isolation (#590, designed + paused), **P14** golden path (#591), and #161 Hubble export.
+> per-team isolation **parked** (#590 → ADR-104: standardized on cluster tenancy for all signals,
+> per-team machinery decommissioned), **P14** golden path (#591), and #161 Hubble export.
 > Tracking issue: [#102](https://github.com/asanexample/platform/issues/102).
 
 ## Context
@@ -352,11 +353,14 @@ independently-verifiable sub-issue + unit(s); do not batch.
 
 ### Track G — Tenancy & self-service
 
-+ **P13 — Full per-team tenant isolation.** Per-team Grafana access (per-team OSS instances or Enterprise
-  `org_mapping`); datasources pinned to the team's `X-Scope-OrgID`; IC group-GUID gating; `teams.hcl`
-  `observability` block + maps. Applies across **all** signals — metrics, logs, traces, profiles.
-  **Verify (money shot):** alpha dev sees only alpha's telemetry; bravo query AND a forged-header write are
-  both denied — across all signals and clusters.
++ **P13 — Full per-team tenant isolation. PARKED (ADR-104).** Was: per-team Grafana access (per-team OSS
+  instances or Enterprise `org_mapping`); datasources pinned to the team's `X-Scope-OrgID`; IC group-GUID
+  gating. Only the write-side half shipped (logs per-team tenant + a metrics dual-write via
+  `cortex-tenant`); traces never got a per-team path, and OSS Grafana can't enforce per-team *reads*
+  regardless (Enterprise-only datasource RBAC) — so the split delivered zero isolation for real
+  complexity. ADR-104 standardizes on **cluster tenancy for all signals** instead and decommissions
+  `cortex-tenant` + the per-team datasources; per-team read isolation stays available to rebuild later if
+  a real requirement appears, paired with a Grafana read-enforcement decision.
 + **P14 — Self-service & golden path.** Make observability a paved road, not a ticket: per-team
   dashboards/alerts/SLOs **auto-provisioned** from the `teams.hcl` `observability` block; documented app-repo
   conventions (`ServiceMonitor`/`PodMonitor`/OTLP/profiling labels); a **Backstage** tie-in (#103/#104) so a
@@ -477,7 +481,7 @@ The high-signal alerts the mixins don't cover — one rule file per component:
   (healthchecks.io / PagerDuty heartbeat). If it stops arriving, the *monitoring pipeline itself* is down.
   Ships in P1.
 + **Severity routing** — `critical` → PagerDuty/OnCall page, `warning` → Slack, `info` →
-  inhibited/dashboard; per-team routing keys arrive with isolation (P13).
+  inhibited/dashboard; per-team routing keys were the P13 plan, now parked (ADR-104).
 + **Inhibition** — node-down suppresses that node's pod alerts; API/cluster-down suppresses the rest; a
   Kyverno-webhook-down inhibits the deny-spike noise it causes.
 + **Maintenance windows / silences** — documented flow (later, auto-silence around ArgoCD syncs).
@@ -527,4 +531,5 @@ Module stays team-agnostic.
 + Extend the `s3` module with **lifecycle rules + KMS** (retention currently in-app; AES256 today).
 
 *(Previously out-of-scope, now folded into phases: AWS cloud-cost via CUR→Athena → **P11**; Grafana
-Enterprise org-per-team → the **OSS-default/commercial opt-in** seam (Editions section) + **P13**.)*
+Enterprise org-per-team → the **OSS-default/commercial opt-in** seam (Editions section) + **P13**, since
+parked — ADR-104.)*

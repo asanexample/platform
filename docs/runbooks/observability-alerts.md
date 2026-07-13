@@ -361,8 +361,6 @@ own metrics (a follow-up).
 
 Control-plane components whose own up/down was previously unalerted.
 
-- **CortexTenantDown** (warning) — the P13 per-team metric write-splitter is down; new metrics stop being split
-  by team (isolation degrades). Pod in `observability`.
 - **ArgoRolloutsControllerDown** (warning) — canary/blue-green Rollouts stop progressing; new Rollout deploys
   can't advance (running pods unaffected). Controller pod in `argo-rollouts`.
 - **BeylaDown** (warning) — the eBPF RED-metrics source is down; SLOs + APM correlation go stale. DaemonSet pod

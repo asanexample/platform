@@ -12,11 +12,10 @@ locals {
   # Render external_labels into River syntax (a block-level arg on loki.write). Empty => omitted entirely.
   external_labels_block = length(var.external_labels) > 0 ? "external_labels = { ${join(", ", [for k, v in var.external_labels : "\"${k}\" = \"${v}\""])} }" : ""
 
-  # P13 per-team log isolation (#590): when enabled, derive the Loki tenant from each pod's Kyverno-injected
-  # `team` label (present on env-namespace pods) and stamp it per stream; system pods with no team fall back to
-  # the cluster tenant. This is the WRITE half — the loki-tenant-proxy enforces per-team reads. Off = unchanged
-  # single-tenant behaviour. NB: for a spoke this requires the hub Loki ingest edge to PASS THROUGH the tenant
-  # (not force-stamp) — a deferred write-integrity tradeoff hardened later by ingest mTLS (#590 Phase-4 D-2).
+  # P13 per-team log isolation (#590) is PARKED (ADR-104): cluster tenancy is now standard across all
+  # three signals, so the per-team relabel + tenant stamp/drop stay flag-gated (re-enable without a
+  # redesign if a real isolation need appears later) while trace_id/span_id extraction below is
+  # unconditional — it must never regress logs->traces regardless of the flag (ADR-104 D2).
   # (heredocs kept out of the ternary — HCL rejects a heredoc directly in a `?:` true-branch.)
   retenant_rules_raw = <<-RULES
 
@@ -34,9 +33,24 @@ locals {
       }
   RULES
 
-  retenant_process_raw = <<-PROC
+  # Stamp X-Scope-OrgID from the per-stream `tenant` label, then drop it so it isn't indexed as a label.
+  # Only meaningful when the per-team relabel rules above are also active.
+  retenant_tenant_stage_raw = <<-STAGE
+      stage.tenant {
+        label = "tenant"
+      }
+      stage.label_drop {
+        values = ["tenant"]
+      }
+  STAGE
 
-    // Stamp X-Scope-OrgID from the per-stream `tenant` label, then drop it so it isn't indexed as a label.
+  retenant_rules        = var.per_team_tenant ? local.retenant_rules_raw : ""
+  retenant_tenant_stage = var.per_team_tenant ? local.retenant_tenant_stage_raw : ""
+
+  # loki.process "retenant" always runs: it's the sole place trace_id/span_id are promoted to Loki
+  # structured metadata (log->trace), independent of per-team tenanting.
+  retenant_process = <<-PROC
+
     loki.process "retenant" {
       forward_to = [loki.write.platform.receiver]
       // Promote the app's OTel trace_id/span_id (in the JSON body) to Loki STRUCTURED METADATA (Loki 3.x) so the
@@ -56,19 +70,12 @@ locals {
           span_id  = "",
         }
       }
-      stage.tenant {
-        label = "tenant"
-      }
-      stage.label_drop {
-        values = ["tenant"]
-      }
+      ${local.retenant_tenant_stage}
     }
   PROC
 
-  retenant_rules   = var.per_team_tenant ? local.retenant_rules_raw : ""
-  retenant_process = var.per_team_tenant ? local.retenant_process_raw : ""
-  # loki.source.file forwards to the re-tenant processor when enabled, else straight to the writer.
-  source_forward = var.per_team_tenant ? "loki.process.retenant.receiver" : "loki.write.platform.receiver"
+  # loki.source.file always forwards through the retenant processor now (it always runs).
+  source_forward = "loki.process.retenant.receiver"
 
   # ---- Alloy River config: tail this node's pod logs -> Loki (tenant _platform) ----
   # DaemonSet + file-tailing is the node-local pattern (each Alloy reads only its own node's

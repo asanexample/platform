@@ -224,10 +224,14 @@ locals {
     #  - "P13 Spike Echo (TEMPORARY - delete me)": a leftover prometheus datasource from an early P13 spike whose
     #    source CM was deleted, leaving it as an orphaned read-only entry the Grafana API refuses to delete —
     #    deleteDatasources is the only way to prune it.
+    #  - "Mimir (alpha)" / "Mimir (bravo)": per-team tenancy parked (ADR-104) — dropped from
+    #    extra_tenant_datasources, so the sidecar needs the explicit delete or they linger orphaned in Grafana.
     deleteDatasources = [
       { name = "Mimir", orgId = 1 },
       { name = "Mimir (admin — all tenants)", orgId = 1 },
       { name = "P13 Spike Echo (TEMPORARY - delete me)", orgId = 1 },
+      { name = "Mimir (alpha)", orgId = 1 },
+      { name = "Mimir (bravo)", orgId = 1 },
     ]
     datasources = concat([for ds in local.datasource_tenants : {
       name   = ds.name
