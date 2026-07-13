@@ -118,3 +118,15 @@ variable "enable_otlp_ingress" {
   type        = bool
   default     = false
 }
+
+variable "enable_crossplane_pod_monitor" {
+  description = "Create a PodMonitor scraping the Crossplane core controller on THIS cluster (crossplane-system, app=crossplane, named `metrics` port) — mirrors the hub `observability` module's variable of the same name. Enable where crossplane + this spoke co-reside (e.g. preprod, where XEnvironment claims actually reconcile, ADR-048)."
+  type        = bool
+  default     = false
+}
+
+variable "enable_crossplane_provider_pod_monitor" {
+  description = "Create a PodMonitor scraping Crossplane PROVIDER pods on THIS cluster (provider-aws-*, provider-family-aws, provider-kubernetes — any pod carrying `pkg.crossplane.io/provider`, named `metrics` port) — mirrors the hub `observability` module's variable of the same name. Covers composed-resource reconciliation, distinct from the core-controller PodMonitor above."
+  type        = bool
+  default     = false
+}

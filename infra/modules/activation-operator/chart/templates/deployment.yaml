@@ -36,6 +36,12 @@ spec:
         args:
         - --leader-elect
         - --health-probe-bind-address=:8081
+        # Controller-runtime reconcile metrics (#1424) — --metrics-secure=false serves plain HTTP, matching
+        # every other scraped component in this repo (no bearer-token/RBAC auth plumbing needed for a
+        # PodMonitor to read it). The default (secureMetrics=true) would otherwise require a ClusterRole
+        # binding + bearer token this platform doesn't wire up anywhere else.
+        - --metrics-bind-address=:8080
+        - --metrics-secure=false
         - --aws-region={{ .Values.awsRegion }}
         - --sync-period={{ .Values.syncPeriod }}
         {{- if .Values.identityCenterRoleArn }}
@@ -60,6 +66,10 @@ spec:
               name: {{ .Values.auditDbSecret }}
               key: dsn
         {{- end }}
+        ports:
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
