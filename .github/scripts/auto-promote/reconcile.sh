@@ -145,6 +145,15 @@ for prod_file in gitops/products/*/*.yaml; do
         -d "$(jq -n --arg t "$pr_title" --arg h "$branch" --arg b "$pr_body" '{title: $t, head: $h, base: "main", body: $b}')" >/dev/null
       git checkout -q main
       git branch -q -D "$branch" 2>/dev/null || true
+      # Re-sync local main before the next service's branch-off. Without this, two services promoted to
+      # the SAME brand-new upper_rel in one run both branch from the stale pre-loop main; if the gate
+      # auto-merges the first one's PR before this loop reaches the second (routine — the gate is fast,
+      # this loop is not), the second's PR conflicts on the same file add. Confirmed live (#1516-1519):
+      # only the first of five same-file promotions in one run merged cleanly, the rest needed a manual
+      # close+regenerate. Fast-forward-only: if this ever fails (should be impossible — this script is the
+      # only writer of these branches, and each pushed branch is deleted immediately above), fall through
+      # and let the next run's stale-PR check catch it rather than silently diverging local state.
+      git fetch -q origin main && git merge -q --ff-only origin/main || true
       echo "PROMOTE ${team}/${product} ${svc} ${lower}→${upper} @ ${lower_digest}"
       promoted=$((promoted + 1))
     done < <(yq -r '.spec.services | keys | .[]' "$lower_rel" 2>/dev/null)
