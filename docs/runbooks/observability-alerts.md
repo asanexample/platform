@@ -243,6 +243,18 @@ goes silent for a long stretch, check `helm status crossplane -n crossplane-syst
 `last_deployed` before assuming everything's fine — a live PodMonitor doesn't guarantee the pod behind it
 still matches the selector.
 
+**`provider-kubernetes` port quirk (#1428, fixed):** this provider's binary honours NEITHER port-relocation
+env var the runtime template sets for it — verified against its `cmd/provider/main.go`, which defines no
+metrics or webhook flag/env var at all. It always binds controller-runtime's hardcoded defaults: metrics on
+`:8080`, the conversion webhook on `:9443`. Under `hostNetwork` those are node-level binds — `:8080` collides
+with CNPG's operator (also a hostPort-8080 claimant) and `:9443` with Kyverno's admission controller. The
+`crossplane` module's runtime chart now declares `provider-kubernetes`'s metrics port as the literal `8080`
+(not the computed per-provider port) and hard anti-affinities it off any node running either collider. If a
+future crossplane provider upgrade or a NEW hostNetwork provider ever reports `down` on its PodMonitor target
+despite the pod being healthy, suspect this same class of bug first — `curl` the pod's actual `:8080` (or
+whatever controller-runtime's default is for that provider's manager options) before assuming it's genuinely
+unscraped.
+
 - **CrossplaneDown** (critical) — `up{namespace="crossplane-system"} == 0` for 5m: the core controller is
   down, so claims/Compositions/resources stop reconciling — new provisioning is halted (existing environments
   keep running). Check the `crossplane` deployment pod + logs. Composition/provider reconcile *errors* surface

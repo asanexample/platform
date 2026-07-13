@@ -55,6 +55,13 @@ locals {
     # Conversion webhook binds controller-runtime's default :9443 (WEBHOOK_PORT doesn't move it); under
     # hostNetwork that collides with Kyverno's admission controller on its node. Anti-affinity keeps them apart.
     avoidKyvernoWebhookNode = var.kubernetes_provider_hostnetwork
+    # #1428: this provider ALSO ignores METRICS_BIND_ADDRESS (verified live via its cmd/provider/main.go —
+    # no metrics flag/env var exists at all; only --health-probe-bind-addr does). It always serves real
+    # controller-runtime metrics on controller-runtime's hardcoded default :8080, so the PodMonitor's named
+    # "metrics" port must declare 8080 here (not the computed per-provider port), which under hostNetwork
+    # ALSO auto-reserves hostPort 8080 — CNPG's operator already claims that same hostPort, so this needs
+    # the SAME anti-affinity treatment as the Kyverno webhook-port collision above, not just a port-number fix.
+    metricsPortFixed8080 = var.kubernetes_provider_hostnetwork
   }] : []
 
   # k8s_provider FIRST so provider-kubernetes keeps list index 0 (and thus its port assignment) stable across
