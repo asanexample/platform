@@ -93,8 +93,14 @@ inputs = {
   capacity_types       = ["spot", "on-demand"]
   consolidation_policy = "WhenEmptyOrUnderutilized"
   consolidate_after    = "1m"
-  cpu_limit            = 48
-  memory_limit         = "192Gi"
+  # Cost guardrail (deliberately CONSERVATIVE — demo env, a runaway node-count is worse than Pending pods). Real
+  # Karpenter usage here is ~1-3 nodes (~3-4 vCPU / 8-24 GiB across the tenant apps + obs spoke). 16 vCPU / 64 GiB
+  # is a hard ceiling ~5x over normal — a 3x cut from the old 48/192. When hit, Karpenter STOPS (pods Pending,
+  # "all available instance types exceed limits"); outages from this are ACCEPTABLE and surfaced by the
+  # KarpenterNodePoolAtCapacity alert so capacity is diagnosable as the root cause. Bounds Karpenter only; the
+  # system node group has its own maxSize=2.
+  cpu_limit    = 16
+  memory_limit = "64Gi"
   # Require 8 GiB+ nodes — the per-node DaemonSet slab (Cilium, Beyla, Alloy) exhausts a 4 GiB t4g.medium.
   min_instance_memory_mib = 6144
 

@@ -546,7 +546,24 @@ groups:
           severity: warning
         annotations:
           summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} stuck Pending for 15m"
-          description: "{{ $labels.namespace }}/{{ $labels.pod }} has been Pending for 15m and can't be scheduled — usually Karpenter hasn't (or can't) provision matching capacity. Check `kubectl describe pod` for the unschedulable reason, the Karpenter logs, and any NodePool limits/taints. Sustained pending = the elasticity loop is broken."
+          description: "{{ $labels.namespace }}/{{ $labels.pod }} has been Pending for 15m and can't be scheduled — usually Karpenter hasn't (or can't) provision matching capacity. Check `kubectl describe pod` for the unschedulable reason, the Karpenter logs, and any NodePool limits/taints. Sustained pending = the elasticity loop is broken. If KarpenterNodePoolAtCapacity is also firing, the deliberate cost cap is the root cause — see that alert."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#karpenter"
+      - alert: KarpenterNodePoolAtCapacity
+        # Makes the DELIBERATE COST CAP (spec.limits, set intentionally low on this nightly-parked demo — ADR-078)
+        # diagnosable as a distinct ROOT CAUSE. At 100% of the limit Karpenter STOPS launching nodes and pods stay
+        # Pending; without this you'd only see generic "pods pending" and have to guess. Firing is EXPECTED/
+        # acceptable per the cost stance — it's the signal to decide accept-the-pending vs raise the limit, not a
+        # page. The `> 0` guard on the denominator drops the series if a limit is unset (avoids divide-by-zero).
+        expr: |
+          max by (nodepool, resource_type) (
+            karpenter_nodepools_usage / (karpenter_nodepools_limit > 0)
+          ) >= 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Karpenter NodePool {{ $labels.nodepool }} at its {{ $labels.resource_type }} cost cap ({{ $value | humanizePercentage }})"
+          description: "NodePool {{ $labels.nodepool }} {{ $labels.resource_type }} usage has been >=90% of its configured spec.limits (the deliberate cost guardrail) for 10m. At 100% Karpenter STOPS launching nodes, so any Pending pods here are due to the COST CAP — not a scheduling bug or a broken elasticity loop. This is intended behavior on a cost-capped demo. DECIDE: (a) accept the Pending (capacity ceiling reached — fine for a demo), or (b) if the workload legitimately grew, raise cpu_limit/memory_limit in infra/live/aws/<env>/us-east-1/platform/karpenter/terragrunt.hcl. Cross-check KarpenterPodsPendingUnscheduled: if it's also firing, the cap is actively blocking scheduling right now."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#karpenter"
   # ---------------------------------------------------------------------------
   # Operator reconcile health (alerting P1, #1121). Any controller-runtime operator — Karpenter, ESO, the
