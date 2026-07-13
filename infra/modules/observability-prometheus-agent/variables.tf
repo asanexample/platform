@@ -130,3 +130,15 @@ variable "enable_crossplane_provider_pod_monitor" {
   type        = bool
   default     = false
 }
+
+variable "memory_request" {
+  description = "Prometheus agent container memory request. Bump on spokes with heavier scrape cardinality (e.g. crossplane core+provider PodMonitors enabled — #1422/#1423 OOM-killed the default 512Mi/1Gi on preprod)."
+  type        = string
+  default     = "512Mi"
+}
+
+variable "memory_limit" {
+  description = "Prometheus agent container memory limit. See memory_request."
+  type        = string
+  default     = "1Gi"
+}
