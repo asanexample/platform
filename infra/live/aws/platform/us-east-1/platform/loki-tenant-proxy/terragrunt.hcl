@@ -22,7 +22,10 @@ locals {
     for e in local.all_envs : e.spec.team if contains(["pci", "hipaa"], try(e.spec.tier, "standard"))
   ])
 
-  access_grants = [for f in fileset(local.grants_dir, "**/*.yaml") : yamldecode(file("${local.grants_dir}/${f}"))]
+  # gitops/grants/ holds more than one CRD kind (ADR-101 added ServiceGrant alongside AccessGrant, same
+  # tree) — filter to AccessGrant before assuming `spec.subject` is a `group:team-<X>` string.
+  all_grant_docs = [for f in fileset(local.grants_dir, "**/*.yaml") : yamldecode(file("${local.grants_dir}/${f}"))]
+  access_grants  = [for d in local.all_grant_docs : d if try(d.kind, "") == "AccessGrant"]
   team_grants = [
     for g in local.access_grants : {
       grantee = trimprefix(g.spec.subject, "group:team-")
