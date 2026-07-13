@@ -1,0 +1,19 @@
+# test-stage twin of allow-alpha-shop-orders-to-dispatch-intake.yaml (ADR-101) — same grant, same SPIRE
+# mutual-auth requirement (ADR-057 Phase 2), scoped to the test stage so orders/intake stay in lockstep as
+# both products promote through test/uat/staging/prod together. See the dev grant for the full rationale.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata:
+  name: allow-alpha-shop-orders-to-dispatch-intake-test
+spec:
+  target: { team: bravo, product: dispatch, stage: test, service: intake }
+  subject: { team: alpha, product: shop, stage: test, service: orders }
+  capability:
+    network:
+      ports: [8080]
+      protocol: TCP
+      http:
+        - method: POST
+          path: /shipments
+      authentication:
+        mode: required
