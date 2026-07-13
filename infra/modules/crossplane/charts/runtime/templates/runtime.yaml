@@ -35,7 +35,11 @@ spec:
                 - { name: METRICS_BIND_ADDRESS, value: ":{{ $m }}" }
                 - { name: HEALTH_PROBE_BIND_ADDRESS, value: ":{{ $h }}" }
               ports:
-                - { name: metrics, containerPort: {{ $m }} }
+                # #1428: provider-kubernetes ignores METRICS_BIND_ADDRESS too (no metrics flag/env var exists
+                # in its cmd/provider — verified against source) and always serves on controller-runtime's
+                # hardcoded default :8080, so its "metrics" port must be declared as 8080, not the computed
+                # per-provider value, or the PodMonitor's named-port lookup resolves to a dead address.
+                - { name: metrics, containerPort: {{ if $p.metricsPortFixed8080 }}8080{{ else }}{{ $m }}{{ end }} }
                 - { name: webhook, containerPort: {{ $w }} }
 {{- end }}
 {{- if $p.hostNetwork }}
@@ -43,12 +47,15 @@ spec:
           dnsPolicy: ClusterFirstWithHostNet
 {{- end }}
 {{- if $p.avoidKyvernoWebhookNode }}
-          # provider-kubernetes serves the Object conversion webhook on controller-runtime's default :9443 and
-          # does NOT honour WEBHOOK_PORT for it (unlike metrics/health). With hostNetwork that :9443 bind is
-          # node-level and collides with Kyverno's hostNetwork admission controller (also :9443), crash-looping
-          # the provider ("listen tcp :9443: bind: address already in use"). Hard anti-affinity keeps it off any
-          # node running kyverno-admission-controller so the port is free. (aws providers have no conversion
-          # webhook, so they don't bind :9443 and don't need this.)
+          # provider-kubernetes doesn't honour EITHER port-relocation env var this template sets for it —
+          # verified against its cmd/provider/main.go, which defines no metrics/webhook flag or env var at
+          # all. It always binds controller-runtime's hardcoded defaults: the conversion webhook on :9443,
+          # metrics on :8080 (#1428). Under hostNetwork those are node-level binds that collide with two
+          # unrelated existing hostPort claimants — Kyverno's admission controller (also :9443) and CNPG's
+          # operator (hostPort 8080) — crash-looping this provider ("listen tcp :9443/:8080: bind: address
+          # already in use") if co-scheduled with either. Hard anti-affinity keeps it off both. (The AWS
+          # providers have no conversion webhook and use the computed metrics port correctly, so they don't
+          # need this.)
           affinity:
             podAntiAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
@@ -57,6 +64,10 @@ spec:
                     matchLabels:
                       app.kubernetes.io/part-of: kyverno
                       app.kubernetes.io/component: admission-controller
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: cloudnative-pg
 {{- end }}
 ---
 apiVersion: pkg.crossplane.io/v1
