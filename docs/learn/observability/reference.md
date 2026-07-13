@@ -81,10 +81,10 @@ in datasource config (`exemplarTraceIdDestinations`, `tracesToLogsV2`, `tracesTo
 ## Act: SLOs · alerting · cost
 
 - **SLOs:** **Sloth** (`PrometheusServiceLevel` → SLI recording rules + **multi-window burn-rate** alerts).
-  Live: an API-server 99.9% SLO. **Per-prod-app SLOs auto-derived** from `gitops/environments/**/prod.yaml`
-  (99.9% HTTP success off `http_server_request_duration_seconds_count` — Beyla-emitted or OTLP-emitted and
-  converged to the same name/labels at Mimir ingest), evaluated in the Mimir ruler — feeds the canary
-  error-budget freeze gate.
+  Live: an API-server 99.9% SLO. **Per-app SLOs auto-derived for every environment, any stage** from
+  `gitops/environments/**/*.yaml` (99.9% HTTP success + 99% sub-500ms latency off
+  `http_server_request_duration_seconds_count` — Beyla-emitted or OTLP-emitted and converged to the same
+  name/labels at Mimir ingest), evaluated in the Mimir ruler — feeds the canary error-budget freeze gate.
 - **Alerting:** ~60 curated alert rules across 20 groups (`observability/alerts/curated.yaml`); Alertmanager routes by
   `severity` (critical → PagerDuty + Slack + SNS; warning → Slack; inhibit critical→warning); a **dead-man's
   switch** (Healthchecks.io) pages if the pipeline goes silent. *PagerDuty status:* the critical→PagerDuty wire

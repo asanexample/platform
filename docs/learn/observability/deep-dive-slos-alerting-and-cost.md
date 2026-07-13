@@ -57,9 +57,9 @@ The platform generates these rules two ways, and they live on different tenants.
 
 ![The two SLO delivery pipelines side by side — hand-authored PrometheusServiceLevel CRs through Sloth to a hub PrometheusRule consumed by humans, versus registry-derived per-app SLOs through a mimirtool CronJob to the Mimir ruler consumed by the canary freeze gate — both converging on the same multi-window burn-rate rules.](images/two-slo-pipelines.svg)
 
-|  | **Path A — Sloth** (platform services) | **Path B — auto-derived** (every prod app) |
+|  | **Path A — Sloth** (platform services) | **Path B — auto-derived** (every app, every stage) |
 |--|--|--|
-| **Who authors it** | A human hand-writes a `PrometheusServiceLevel` CR (objective + two queries) | No one — `fileset`+`yamldecode` over `gitops/environments/**/prod.yaml` synthesizes it |
+| **Who authors it** | A human hand-writes a `PrometheusServiceLevel` CR (objective + two queries) | No one — `fileset`+`yamldecode` over `gitops/environments/**/*.yaml` synthesizes it |
 | **Where it's evaluated** | The Sloth controller renders a `PrometheusRule`, evaluated on the **hub** | A template → `mimirtool rules sync` CronJob → the **Mimir ruler** against the **`preprod` tenant** |
 | **Who consumes it** | Human dashboards + alerting (live: kubernetes-apiserver @ 99.9%) | The canary **freeze gate** (fixed 99.9%; live: alpha-shop-prod) |
 
@@ -83,16 +83,17 @@ sloth-slo-alerts-kubernetes-apiserver-requests-availability
 
 One CR in, three rule groups out (recordings, metadata, alerts) — the controller did the burn-rate math.
 
-**Path B — the Mimir ruler, for per-app SLOs.** Every product's **prod** environment gets a 99.9%
-HTTP-success SLO *auto-derived* — no one writes it. The `mimir` Terragrunt unit `fileset`s over
-`gitops/environments/**/prod.yaml`, and for each prod claim it synthesizes an SLO whose SLI is
-`http_server_request_duration_seconds_count` filtered to the app's namespace (`k8s_namespace_name`). The
-query doesn't care whether that metric came from **Beyla** (native Prometheus naming) or an app's **OTel
-SDK** — Mimir's OTLP ingest translates SDK metrics to the same `..._seconds` naming and promotes
-`k8s.namespace.name` to the same label (`otel_metric_suffixes_enabled` + `promote_otel_resource_attributes`),
-so one query works for both delivery paths — a Beyla-only app and an SDK'd app (e.g. alpha-shop) get the
-identical SLO mechanism for free. This is registries-as-source (the same pattern the whole platform runs on):
-add a prod environment, get an SLO free.
+**Path B — the Mimir ruler, for per-app SLOs.** Every environment, any stage, gets a 99.9%
+HTTP-success SLO plus a 99% sub-500ms latency SLO — *auto-derived*, no one writes it. The `mimir`
+Terragrunt unit `fileset`s over `gitops/environments/**/*.yaml`, and for each claim it synthesizes an
+SLO whose SLI is `http_server_request_duration_seconds_count` filtered to the app's namespace
+(`k8s_namespace_name`). The query doesn't care whether that metric came from **Beyla** (native
+Prometheus naming) or an app's **OTel SDK** — Mimir's OTLP ingest translates SDK metrics to the same
+`..._seconds` naming and promotes `k8s.namespace.name` to the same label
+(`otel_metric_suffixes_enabled` + `promote_otel_resource_attributes`), so one query works for both
+delivery paths — a Beyla-only app and an SDK'd app (e.g. alpha-shop) get the identical SLO mechanism
+for free. This is registries-as-source (the same pattern the whole platform runs on): add an
+environment, get an SLO free.
 
 Two things differ from Path A. First, these rules are rendered from a template into a Mimir **ruler**
 namespace and evaluated *in the Mimir ruler against the `preprod` tenant* — because that's where the app

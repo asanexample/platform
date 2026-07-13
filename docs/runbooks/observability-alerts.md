@@ -335,9 +335,9 @@ because the app metrics live there). Same burn-rate math/severities as `## app-s
 
 ## app-slos
 
-Per-app SLOs (ADR-056 / W11), registry-derived from every prod `XEnvironment` claim
+Per-app SLOs (ADR-056 / W11), registry-derived from every `XEnvironment` claim, any stage
 (`infra/live/aws/platform/us-east-1/platform/mimir/terragrunt.hcl`'s `local.app_slos`) — no authoring step, no
-per-Product config. Each prod Environment gets TWO SLOs over its Beyla RED metrics
+per-Product config. Each Environment gets TWO SLOs over its Beyla RED metrics
 (`http_server_request_duration_seconds_*`), evaluated by the Mimir ruler inside the `preprod` tenant (the
 app metrics live there): a fixed 99.9% HTTP-success-rate SLO (`requests-availability`) and a fixed 99%
 sub-500ms latency SLO (`requests-latency`, `<Env>Latency*` alerts — the "good" bucket is `le="0.5"`, the
