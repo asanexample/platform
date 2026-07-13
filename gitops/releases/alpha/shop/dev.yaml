@@ -6,7 +6,7 @@ spec:
   environmentRef: alpha-shop-dev
   services:
     storefront:
-      digest: sha256:f4e7c37e08a7bf593a911cfbaed11a53a1a51cdf7ad9d40331622f66138c377e
+      digest: sha256:0652b24629f646293e01a63103e234b8c624c96ce198482be481eb84fc16d090
     catalog:
       digest: sha256:e5b25047206f840329ccebc499218cbad825d6ecfbfb41fef24e426a1cb106fc
     cart:
