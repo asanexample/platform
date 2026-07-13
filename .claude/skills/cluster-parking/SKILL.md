@@ -99,6 +99,22 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-13 (end-of-day PARK) — routine, cost-zero.** Both parked (system→0, 0 running/pending instances both
+  accounts, bastions stopped). BOTH clusters threw the softer `warning: EC2NodeClass still present after 90s
+  (finalizer stuck?) — 'up' should reconcile it` (not the hard `i/o timeout` from the 07-12 park) — so the
+  NodeClass may be left Terminating; **watch next unpark for the stuck-NodeClass / provider-cache combo** (07-12's
+  unpark also needed a `terragrunt init` on the karpenter unit — check that first if `up` fails at the Karpenter
+  step). **Context from the 07-12 session (so the next unpark sweep expects a CLEANER preprod):** the standing
+  preprod `falco` + `alloy-profiles` `Pending / Insufficient cpu` was fixed durably — the descheduler
+  `LowNodeUtilization` CPU thresholds were widened (underutil 50→78, overutil 70→85; PR #1381, applied) so it now
+  rebalances the 2-node post-unpark imbalance instead of no-op'ing in the threshold blind spot. ⚠️ its first run
+  evicted 31 pods (big one-time correction) — if post-unpark preprod shows a burst of evictions/reschedules on
+  `-5`↔`-21`, that's the descheduler working, not a fault; it should settle. Also: the triage agent's
+  `directory: disabled` + `0 linked persons` were session-fixed (pod restart + Josh re-linked GitHub/Slack in the
+  Keycloak account console) — the linked-person count is runtime Keycloak OAuth state, survives park, but a fresh
+  agent pod that boots before its DB will show `directory: disabled` again (restart it; #1183 can't catch it since
+  the pod is 1/1 Ready).
+
 - **2026-07-12 (UNPARK) — ⚠️ NEW failure mode: `platctl up` Karpenter apply died on a STALE PROVIDER CACHE
   (`Required plugins are not installed`). Otherwise the healthiest unpark in days — Cilium clean, no cascade.**
   Preprod `up` **failed exit 1** at "Restoring Karpenter NodePool": `Error: Required plugins are not installed —
