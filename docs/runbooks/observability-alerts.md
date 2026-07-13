@@ -251,6 +251,16 @@ scrapeable `/metrics`, so it reads `up==0` while healthy).
   observability get pods -l app.kubernetes.io/name=prometheus-agent-prometheus`), the WAL PVC (#1416 made it
   durable across restarts — a brief blip shouldn't fire this), and the cross-cluster remote-write path
   (Tailscale/TGW connectivity, the Gateway HTTPRoute at `<prefix>-mimir.aws.refplat.org`).
+- **MimirRulerRulesSyncStale** (warning) — the `mimirtool rules sync` CronJob (`{{ $labels.cronjob }}`,
+  schedule `*/15m`) hasn't succeeded in 30m. EVERY SLO/burn-rate alert and the spoke-freshness check above
+  depend on this CronJob actually running — a stale sync means new/changed rules never reach the ruler, and
+  eventually-removed rules never get cleaned up (`rules sync` reconciles add/update/delete, so this is also
+  a slow rule-drift risk, not just "new rules are late"). Check
+  `kubectl -n observability get jobs -l app.kubernetes.io/component=ruler-rules-sync` and the failing pod's
+  logs — usual causes: the ruler API not ready yet (post-unpark — the CronJob's `wait-for-ruler-api` init
+  container should handle this, but a park longer than its ~5m bound will still fail a run) or a malformed
+  rule file (a Terraform template rendering invalid YAML — `mimirtool rules sync` fails the whole run on a
+  parse error, not just the bad file).
 
 ## platform-slos
 

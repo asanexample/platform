@@ -633,6 +633,15 @@ groups:
           summary: "Mimir is returning a high 5xx rate"
           description: "Over 5% of Mimir requests have been 5xx for 15m — metric reads (Grafana + alerting) and/or writes (remote-write ingestion) are failing. Check the mimir component logs (ingester back-pressure, store-gateway/S3, or the distributor)."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#mimir"
+      - alert: MimirRulerRulesSyncStale
+        expr: time() - kube_cronjob_status_last_successful_time{cronjob=~".*ruler-rules-sync.*"} > 1800
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mimir ruler-rules-sync CronJob ({{ $labels.cronjob }}) hasn't succeeded in 30m"
+          description: "The `mimirtool rules sync` CronJob (schedule */15m) reconciles the per-tenant ruler to match the curated rules + app-slos + spoke-freshness ConfigMap — every SLO/burn-rate alert and spoke-freshness check in this repo depends on it actually running. No successful run in 30m (2x the schedule) means new/changed rules aren't reaching the ruler and, longer-term, stale rules never get cleaned up. Check `kubectl -n observability get jobs -l app.kubernetes.io/component=ruler-rules-sync` and the failing pod's logs — the two usual causes are the ruler API not being ready yet (post-unpark) or a malformed rule file (a Terraform template producing invalid YAML)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#mimir"
   # ---------------------------------------------------------------------------
   # Tailscale (#1123) — the PRIMARY private cluster-access path (ADR-010). Not scraped for its own metrics, so
   # these are kube-state-metrics availability signals. "Up but not advertising routes" needs Tailscale's own
