@@ -116,5 +116,11 @@ inputs = {
   # (ADR-077 Layer 1) can export traces. The collector ns otherwise default-denies cross-namespace ingress.
   enable_otlp_ingress = true
 
+  # Crossplane runs HERE too — XEnvironment claims actually reconcile on preprod (ADR-048), not the hub, so
+  # the core-controller SLO (#102 phase 4) and the composed-resource reconcile signal (#1423) both need this
+  # spoke's own PodMonitors, not just the hub's (#1422/#1423).
+  enable_crossplane_pod_monitor          = true
+  enable_crossplane_provider_pod_monitor = true
+
   tags = include.base.locals.tags
 }

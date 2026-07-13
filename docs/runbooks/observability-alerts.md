@@ -200,9 +200,10 @@ Operator reconcile health (#1121). Any controller-runtime operator that silently
 
 - **ControllerReconcileErrors** (warning) — the `{{ $labels.controller }}` controller has been failing
   reconciles for 15m. Map the controller to its operator (Karpenter `disruption`/`nodeclaim…`; ESO
-  `clusterexternalsecret`/`clustersecretstore`; ArgoCD `applicationset`; the ADR-088 activation-operator) and
-  read that pod's logs. The desired state (a grant, a synced secret, a node) isn't being realized even though
-  the pod is up.
+  `clusterexternalsecret`/`clustersecretstore`; ArgoCD `applicationset`; the ADR-088 activation-operator, its
+  own controller-runtime reconcile-LOOP metrics scraped since #1424 — distinct from the
+  `JitActivationOutcome` SLO's mint/revoke OUTCOME signal, `## app-slos` above) and read that pod's logs. The
+  desired state (a grant, a synced secret, a node) isn't being realized even though the pod is up.
 
 ## keycloak
 
@@ -223,13 +224,31 @@ ServiceMonitor, scraped as `job=keycloak-http`.
 ## crossplane
 
 Namespace `crossplane-system`. The provisioner for every environment (XEnvironment claims) and self-service
-cloud resource. Core-controller metrics scraped via the crossplane module's PodMonitor (hub), `metrics.enabled`.
+cloud resource. Runs on BOTH clusters — the hub's own (empty) instance, and preprod, where XEnvironment
+claims actually reconcile (ADR-048). Two separate PodMonitors, on each cluster that runs crossplane:
+
+- **`crossplane`** (core controller, `app=crossplane`, `enable_crossplane_pod_monitor`) — the top-level
+  Composition/claim reconcile loop. Feeds **CrossplaneDown** below.
+- **`crossplane-providers`** (`pkg.crossplane.io/provider` Exists, `enable_crossplane_provider_pod_monitor`,
+  #1423) — the provider pods (`provider-aws-*`, `provider-family-aws`, `provider-kubernetes`) that do the
+  actual AWS/K8s resource provisioning the core controller delegates to. Distinct signal: the core loop can
+  be perfectly healthy while a specific provider is erroring on every apply (e.g. IAM permission drift).
+
+Both require the crossplane module's `metrics.enabled` (core) — providers expose a named `metrics` port by
+default, no equivalent flag needed. **Historical gotcha (#1422):** the hub's `crossplane` PodMonitor was live
+for 5 days selecting a port name (`metrics`) the deployed pod didn't expose at all — not "down", zero scrape
+targets configured — because the `metrics.enabled=true` code change had merged but the crossplane unit's
+`terragrunt apply` was never re-run. If `CrossplaneDown` or `ControllerReconcileErrors` for crossplane ever
+goes silent for a long stretch, check `helm status crossplane -n crossplane-system` for a stale
+`last_deployed` before assuming everything's fine — a live PodMonitor doesn't guarantee the pod behind it
+still matches the selector.
 
 - **CrossplaneDown** (critical) — `up{namespace="crossplane-system"} == 0` for 5m: the core controller is
   down, so claims/Compositions/resources stop reconciling — new provisioning is halted (existing environments
   keep running). Check the `crossplane` deployment pod + logs. Composition/provider reconcile *errors* surface
   separately via **ControllerReconcileErrors** (the crossplane controllers now report to
-  `controller_runtime_reconcile_errors_total` once scraped).
+  `controller_runtime_reconcile_errors_total` once scraped) — now covering BOTH the core controller and
+  providers now that both are scraped.
 
 ## mimir
 

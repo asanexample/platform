@@ -299,3 +299,15 @@ variable "enable_crossplane_pod_monitor" {
   type        = bool
   default     = false
 }
+
+variable "enable_crossplane_provider_pod_monitor" {
+  description = "Create a PodMonitor scraping Crossplane PROVIDER pods (provider-aws-*, provider-family-aws, provider-kubernetes — crossplane-system, any pod carrying `pkg.crossplane.io/provider`, named `metrics` port). Distinct from enable_crossplane_pod_monitor (the core controller only) — this covers the composed-resource reconciliation that actually provisions AWS/K8s resources. No `metrics.enabled`-style flag needed: crossplane-runtime providers expose a named `metrics` port by default. Default off; enable where crossplane + this stack co-reside."
+  type        = bool
+  default     = false
+}
+
+variable "enable_activation_operator_pod_monitor" {
+  description = "Create a PodMonitor scraping the activation-operator's controller-runtime reconcile metrics (activation-system, app.kubernetes.io/name=activation-operator, named `metrics` port) — #1424. Requires the activation-operator chart's --metrics-bind-address/--metrics-secure=false. Distinct from the domain-level mint/revoke OUTCOME metrics (OTLP-pushed, always on) — this covers reconcile-LOOP health. Default off; enable where the operator + this stack co-reside (the hub)."
+  type        = bool
+  default     = false
+}
