@@ -86,20 +86,23 @@ Two gotchas baked into the module:
 
 Enabling is a **rolling Cilium restart**, same as encryption.
 
-**Author an auth-required policy** — the *callee* declares who may call it, authenticated. Example (alpha-checkout
-accepts only alpha-shop, authenticated):
+**Author an auth-required policy** — the *callee* declares who may call it, authenticated. Same-namespace
+example (`checkout` accepts only `storefront`, both inside `alpha-shop-dev` — the real
+`k8s/base/checkout/cnp-ingress-from-storefront.yaml` in the alpha-shop repo):
 
 ```yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: allow-ingress-from-alpha-shop
+  name: allow-checkout-ingress-from-storefront
 spec:
-  endpointSelector: {}
+  endpointSelector:
+    matchLabels:
+      app: checkout
   ingress:
     - fromEndpoints:
         - matchLabels:
-            k8s:io.kubernetes.pod.namespace: alpha-shop-dev
+            app: storefront        # same namespace — no namespace selector needed
       authentication:
         mode: required          # ← the mutual-auth requirement
       toPorts:
@@ -115,47 +118,65 @@ platform default-deny or IMDS `egressDeny`).
 ```bash
 kubectl -n kube-system exec <cilium-pod> -c cilium-agent -- cilium-dbg bpf auth list
 #   SRC IDENTITY   DST IDENTITY   AUTH TYPE   EXPIRATION
-#   <checkout-id>  <shop-id>      spire       <ts>       ← AUTH TYPE=spire = real mutual auth
+#   <checkout-id>  <storefront-id> spire      <ts>       ← AUTH TYPE=spire = real mutual auth
 ```
 
-## The demo — alpha-shop → alpha-checkout
+## The demo — every hop in alpha-shop, plus a real cross-team call
 
-The showcase is a **real multi-service call**, not a synthetic one. `alpha-shop` (a Go service in
-`alpha-shop-dev`) calls `alpha-checkout` (in `alpha-checkout-dev`) on every request and embeds the response:
+The showcase is **real multi-service traffic**, not a synthetic one. Two live pairs, not one:
 
-```bash
-curl https://shop-alpha-dev.preprod.aws.refplat.org/
-# {"app":"app-alpha-shop", "checkout":{"confirmedBy":"app-alpha-checkout","order":"…"}, …}
+**1. Every intra-shop hop** (all inside `alpha-shop-dev`): `storefront → catalog`, `storefront → cart`,
+`storefront → orders`, `storefront → checkout`, `storefront → accounts`, and `orders → payment` all carry
+`authentication.mode: required` ingress CNPs like the one above — six authenticated pairs in one namespace.
+Visiting the storefront and placing an order exercises all of them in one request chain.
+
+**2. A genuinely cross-team call**: `orders` (team **alpha**, `alpha-shop-dev`) calls `intake` (team
+**bravo**, `bravo-dispatch-dev`) to kick off a real shipment on checkout (ADR-101). Unlike the pairs above,
+this one crosses a real team boundary, authorized by a `ServiceGrant` bravo authored for alpha
+(`gitops/grants/bravo/allow-alpha-shop-orders-to-dispatch-intake.yaml`) with
+`capability.network.authentication.mode: required` — the Crossplane `ServiceGrant` Composition renders both
+CNP halves (egress in alpha's namespace, ingress in bravo's) from that one grant, nobody hand-authors either
+side:
+
+```text
+https://shop-alpha-dev.preprod.aws.refplat.org — sign up, add a bike, check out
+# → the order confirmation shows a Bravo Dispatch tracking id once intake accepts the shipment,
+#   proof orders → intake actually happened (checkout requires a signed-in account, so this is a
+#   real browser flow, not a bare curl)
 ```
 
-The `alpha-shop → alpha-checkout` path is secured by the auth-required CNP above:
+Both pairs share the same verification and the same failure mode:
 
-- **Authorized + authenticated:** shop reaches checkout, and `cilium-dbg bpf auth list` shows `AUTH TYPE=spire`
-  for the shop↔checkout identity pair.
-- **Impostor denied:** a workload in any other namespace hitting checkout is `Policy denied DROPPED`
-  (`hubble observe --namespace alpha-checkout-dev`).
+- **Authorized + authenticated:** `cilium-dbg bpf auth list` shows `AUTH TYPE=spire` for every pair above.
+- **Impostor denied:** a workload in any other namespace hitting `checkout` or `intake` is
+  `Policy denied DROPPED` (`hubble observe --namespace alpha-shop-dev` / `--namespace bravo-dispatch-dev`).
 
-That "same-authenticated-identity allowed, everything else denied" is the zero-trust story, on a live app.
+That "same-authenticated-identity allowed, everything else denied" is the zero-trust story — on six live
+pairs in one product, plus a real cross-team one, not a single showcase pair.
 
 ### The cross-namespace networking rule (important)
 
 Environment namespaces are **default-deny both directions** (the Crossplane Composition stamps
 default-deny-ingress + an egress policy that only permits DNS + world). A k8s `ipBlock` allow does **not** cover
-in-cluster pod identities in Cilium — so a cross-namespace service-to-service call needs **both**:
+in-cluster pod identities in Cilium — so a **cross-namespace** service-to-service call needs **both**:
 
-- an **egress allow on the caller** (`alpha-shop` → `alpha-checkout-dev`), and
-- an **ingress allow on the callee** (`alpha-checkout` ← `alpha-shop-dev`).
+- an **egress allow on the caller** (`orders` in `alpha-shop-dev` → `bravo-dispatch-dev`), and
+- an **ingress allow on the callee** (`intake` in `bravo-dispatch-dev` ← `alpha-shop-dev`).
 
-The mutual-auth requirement replaces the *ingress* half (a plain allow would bypass auth, since Cilium unions
-allows). Miss the egress half and the symptom is misleading — Hubble shows the SYN reaching the callee's ingress
-as `Policy denied DROPPED`, so it *looks* like an ingress problem.
+(The `ServiceGrant` Composition renders exactly these two — that's the whole point of the API: neither team
+hand-authors the other's half.) The mutual-auth requirement replaces the *ingress* half (a plain allow would
+bypass auth, since Cilium unions allows). Miss the egress half and the symptom is misleading — Hubble shows
+the SYN reaching the callee's ingress as `Policy denied DROPPED`, so it *looks* like an ingress problem.
+
+**This rule doesn't apply within a single namespace** — `storefront → checkout` (both in `alpha-shop-dev`)
+needs only the one ingress CNP shown above; there's no second, cross-namespace egress half to forget.
 
 ## Current state & what's next
 
 | | State |
 |---|---|
 | **Phase 1 — WireGuard encryption** | Live, fleet-default, **both clusters** |
-| **Phase 2 — mutual auth + SPIFFE/SPIRE** | Live **showcase on preprod** (alpha-shop↔alpha-checkout) |
+| **Phase 2 — mutual auth + SPIFFE/SPIRE** | Live, **preprod**: 6 intra-`alpha-shop` pairs + the cross-team `orders → bravo-dispatch intake` pair (ADR-101) |
 | **Follow-up** | Fleet-wide, **tier-gated** enforcement — generating `authentication.mode: required` policies from the Crossplane Composition per compliance tier (which already has `$tier` in scope) when a regulated tenant exists |
 
 ## References
