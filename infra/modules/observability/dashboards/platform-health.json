@@ -615,6 +615,51 @@
       ]
     },
     {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Kyverno Admission Latency (p99)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.99, sum by (le, cluster) (rate(kyverno_admission_review_duration_seconds_bucket{cluster=~\"$cluster\"}[5m])))",
+          "legendFormat": "{{cluster}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ]
+    },
+    {
       "id": 11,
       "type": "stat",
       "title": "ArgoCD Apps OutOfSync",
