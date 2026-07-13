@@ -659,14 +659,59 @@
       ]
     },
     {
-      "id": 20,
-      "type": "text",
+      "type": "row",
       "title": "Logs & Traces",
-      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 44 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 }
+    },
+    {
+      "id": 20,
+      "type": "logs",
+      "title": "Recent logs",
+      "description": "LogQL: `{k8s_namespace_name=\"__TEAM__-$product-$stage\"}` against `Loki (all clusters)`. Use the Explore → Loki link above for filters, live tail, or a wider time range.",
+      "datasource": { "type": "loki", "uid": "loki-all" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 45 },
       "options": {
-        "mode": "markdown",
-        "content": "Use the **Explore → Loki / Tempo** links at the top of this dashboard (best-effort deep link, prefilled with the current Product/Stage). If a link doesn't land pre-filtered, use these manually in Explore:\n\n- **Logs (LogQL):** `{k8s_namespace_name=\"__TEAM__-$product-$stage\"}`\n- **Traces (TraceQL):** `{resource.k8s.namespace.name=\"__TEAM__-$product-$stage\"}`\n\nDatasources: `Loki (all clusters)` / `Tempo (all clusters)` (or the cluster-specific one if you know which cluster this environment runs on — preprod for all current team products)."
-      }
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": false,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki-all" },
+          "expr": "{k8s_namespace_name=\"__TEAM__-$product-$stage\"}"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Recent traces",
+      "description": "TraceQL search scoped to this namespace via `Tempo (all clusters)`. Click a Trace ID to open the full trace view, or use the Explore → Tempo link above for TraceQL filters.",
+      "datasource": { "type": "tempo", "uid": "tempo-all" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 53 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo-all" },
+          "queryType": "traceqlSearch",
+          "filters": [
+            {
+              "id": "namespace",
+              "tag": "k8s.namespace.name",
+              "operator": "=",
+              "value": ["__TEAM__-$product-$stage"],
+              "valueType": "string"
+            }
+          ],
+          "limit": 20
+        }
+      ]
     }
   ]
 }
