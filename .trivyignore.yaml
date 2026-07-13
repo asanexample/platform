@@ -79,7 +79,7 @@ misconfigurations:
 
   - id: AWS-0132
     paths:
-      - "observability-mimir/main.tf"
+      - "observability-mimir/s3.tf"
     statement: >-
       The Mimir blocks bucket uses SSE-S3 (AES256), not a CMK. AES256 is the right
       fit for a high-churn metrics block store: it avoids per-object KMS
