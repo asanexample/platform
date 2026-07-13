@@ -420,6 +420,28 @@ spec:
                       name: system:serviceaccounts:{{ $ns }}
                       apiGroup: rbac.authorization.k8s.io
             {{- end }}
+            {{- /* Pod-Identity ASSOCIATIONS are keyed by (cluster, namespace, serviceAccount) at the AWS layer —
+                   exactly ONE per SA. Several stateless services intentionally share one SA (ADR-067 §7, e.g.
+                   storefront/payment/checkout on app-alpha): each still gets its OWN IAM Role below (unchanged),
+                   but rendering an ASSOCIATION per SERVICE regardless made N composed resources race to own that
+                   ONE real AWS association — confirmed live: the shared SA ended up bound to an arbitrary
+                   member's role while a later-added, dedicated-SA service (e.g. catalog on app-alpha-catalog)
+                   got no association at all, since AWS silently rejected its create. Pick ONE designated owner
+                   per unique serviceAccount up front — preferring a service that actually declares AWS access
+                   (resources/policyStatements) so the shared association's role carries real permissions if one
+                   sharer ever needs them, else the alphabetically-first sharer (harmless — the others never call
+                   AWS). Only the designated owner's association renders below; every service keeps its Role. */}}
+            {{- $assocOwnerBySA := dict }}
+            {{- range $svc, $svccfg := $spec.services }}
+            {{- if $svccfg.serviceAccount }}
+            {{- $sa := $svccfg.serviceAccount }}
+            {{- $hasAccess := or (gt (len ($svccfg.resources | default dict)) 0) (gt (len ((($svccfg.permissions | default dict).aws | default dict).policyStatements | default list)) 0) }}
+            {{- $existing := index $assocOwnerBySA $sa }}
+            {{- if or (not $existing) (and $hasAccess (not $existing.hasAccess)) }}
+            {{- $assocOwnerBySA = set $assocOwnerBySA $sa (dict "svc" $svc "hasAccess" $hasAccess) }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- /* Per-SERVICE delivery surface. ECR is PRODUCT-scoped — team-<team>/<product>-<service> (ADR-067
                    §7) — built once and promoted across stages. Identity/ECR provision for every declared service
                    regardless of `image` (a no-image service is provisioned-but-not-yet-deployed; the workload is
@@ -520,6 +542,7 @@ spec:
                   {{- if $customer }}
                   Customer: {{ $customer }}
                   {{- end }}
+            {{- if eq (index $assocOwnerBySA $svccfg.serviceAccount).svc $svc }}
             ---
             apiVersion: eks.aws.upbound.io/v1beta1
             kind: PodIdentityAssociation
@@ -535,6 +558,7 @@ spec:
                 namespace: {{ $ns }}
                 serviceAccount: {{ $svccfg.serviceAccount }}
                 roleArn: arn:aws:iam::{{ $cfg.workloadAccountId }}:role/{{ $role }}
+            {{- end }}
             {{- /* IAM for the service Pod-Identity role (ADR-041/047 + ADR-073): explicit policyStatements
                    (deny-set validated upstream) FIRST, then platform-DERIVED least-privilege for each declared
                    cloud resource. Resource ARNs + actions are 100% platform-computed — never author-supplied. */}}
