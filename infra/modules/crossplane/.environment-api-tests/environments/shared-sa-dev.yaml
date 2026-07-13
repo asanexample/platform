@@ -1,0 +1,20 @@
+# Shared-serviceAccount regression (ADR-067 §7): several stateless services share one SA (storefront/checkout/
+# payment on app-x), alongside a resource-owning service on its OWN dedicated SA (catalog on app-x-catalog). AWS
+# allows exactly ONE PodIdentityAssociation per (cluster, namespace, serviceAccount) — the Composition must
+# render exactly one association for the shared SA (not one per sharer) and a separate, un-colliding association
+# for catalog's own SA, while every service still gets its own IAM Role.
+apiVersion: platform.refplat.org/v1beta1
+kind: XEnvironment
+metadata: { name: sharedsa-dev }
+spec:
+  team: alpha
+  product: sharedsa
+  stage: dev
+  services:
+    storefront: { serviceAccount: app-x }
+    checkout: { serviceAccount: app-x }
+    payment: { serviceAccount: app-x }
+    catalog:
+      serviceAccount: app-x-catalog
+      resources:
+        products: { kind: keyvalue, engine: dynamodb, access: readwrite }
