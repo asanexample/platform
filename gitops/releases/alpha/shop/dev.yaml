@@ -18,4 +18,4 @@ spec:
     checkout:
       digest: sha256:bdeccd8f39d75b877f773eac97c9c1063bfb09c4e52dfd03e803e0f3bb8e625b
     accounts:
-      digest: sha256:ad7399476f61510fa55beb8ae701ac5a360992f1578fa97228c762c4f8623def
+      digest: sha256:3204082cfa9f22710c636982c2a3312c14d6f04b2a42dbcf63ea53e136182676
