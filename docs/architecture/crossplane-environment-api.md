@@ -92,8 +92,15 @@ renders, from one claim:
 
 - per service: `Pod-<team>-<product>-[<customer>-]<stage>-<svc>` IAM role (trust `pods.eks.amazonaws.com` +
   `aws:SourceAccount`; capped by the **`environment-permissions-boundary-<cluster>`** boundary; `Team`/`Customer`
-  tags) + its RolePolicy (the service's `permissions.aws.policyStatements`, deny-set-validated)
-- EKS Pod Identity association `(cluster, <ns>, services.<svc>.serviceAccount) → Pod-<team>-<product>-…-<svc>`
+  tags) + its RolePolicy (the service's `permissions.aws.policyStatements`, deny-set-validated) — **one Role
+  per service, unconditionally**
+- EKS Pod Identity association `(cluster, <ns>, serviceAccount) → Pod-<team>-<product>-…-<svc>` — **one per
+  unique `serviceAccount`, not per service.** AWS allows exactly one association per (cluster, namespace,
+  serviceAccount); several services intentionally share one SA (stateless services, ADR-067 §7), so the
+  Composition picks a designated owner per shared SA (preferring a sharer that declares AWS access, else the
+  alphabetically-first) and only that owner gets the association. Rendering one per service regardless of
+  sharing used to make multiple composed resources race over the single real AWS association — confirmed
+  live, fixed PR #1528.
 
 > **Not yet provisioned (#647).** Developer cluster access today is **only** the in-cluster `<ns>:developers`
 > RoleBinding above — the Composition does **not** emit a `DeveloperAccess-<team>` IAM role or EKS access

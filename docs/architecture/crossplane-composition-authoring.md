@@ -80,7 +80,13 @@ One inline Go template renders **every** composed resource. Two output classes s
   (#647); developer cluster access is the in-cluster `<ns>:developers` RoleBinding only. External names are pinned with
   `crossplane.io/external-name` where the AWS name must be deterministic (e.g.
   `Pod-<team>-<product>-[<customer>-]<stage>-<svc>`). Per-service resources (ECR, the Pod-Identity role +
-  association) are rendered by ranging over `spec.services`.
+  association) are rendered by ranging over `spec.services` — **except the association is not truly
+  per-service**: AWS allows exactly one `PodIdentityAssociation` per (cluster, namespace, serviceAccount),
+  so when several services intentionally share one SA (stateless services, ADR-067 §7), the Composition
+  first computes a designated owner per unique `serviceAccount` (preferring a sharer that declares AWS
+  access, else the alphabetically-first) and renders the association only for that owner — every service
+  still gets its own Role unconditionally. Rendering an association per service regardless of sharing used
+  to make N composed resources race over the one real AWS association (fixed PR #1528).
 - **The composite's own status** — see the status loop below.
 
 ### Step 3 — `function-auto-ready`

@@ -108,7 +108,11 @@ in-VPC `platform-infra` runner, which has ArgoCD API access via Pod Identity). F
 - gates on a **health check** — the lower stage's ArgoCD `Application` must be **`Synced` + `Healthy`**, proving
   the lower digest is actually running and settled. Because of this gate the digest climbs **one rung per run**,
   baking at each stage until the next reconcile sees it healthy — a real ladder, not a fan-out;
-- opens (and does not re-open) a single promote-bot Release PR per hop.
+- opens (and does not re-open) a single promote-bot Release PR per hop, on a branch named
+  `auto-promote/<env>-<svc>-<digest>` — content-deterministic, so the push is **forced**: the reconciler is
+  the sole writer of these ephemeral branches (each is deleted immediately after its PR opens), so a same-name
+  branch can only be a leftover from an earlier attempt at promoting that exact digest, never a conflicting
+  change.
 
 The reconciler is the automated sibling of the on-demand path: both produce the *same* promote-bot Release PR that
 the gitops Gate validates and auto-merges (≤ staging), and the delivery ApplicationSet then injects.

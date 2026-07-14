@@ -6,7 +6,7 @@
 > [Crossplane Environment API](../architecture/crossplane-environment-api.md),
 > [Environment Onboarding](environment-onboarding.md)
 >
-> **Last reviewed:** 2026-06-08
+> **Last reviewed:** 2026-07-13
 
 ---
 
@@ -25,7 +25,8 @@ The UI is at `https://argocd.aws.refplat.org` (Tailscale). CLI: `argocd login ar
 3. [AppProject / RBAC denials](#appproject--rbac-denials)
 4. [Per-stage preview hostnames (and the per-PR previews gap)](#per-stage-preview-hostnames)
 5. [selfHeal / prune behavior](#selfheal--prune-behavior)
-6. [XEnvironment claims: ServerSideApply + ignoreDifferences](#xenvironment-claims-serversideapply--ignoredifferences)
+6. [Synced but stale: stuck self-heal retry](#synced-but-stale-stuck-self-heal-retry)
+7. [XEnvironment claims: ServerSideApply + ignoreDifferences](#xenvironment-claims-serversideapply--ignoredifferences)
 
 ---
 
@@ -165,6 +166,47 @@ To pause self-heal for debugging:
 argocd app set alpha-demo --sync-policy none      # stop automated sync (re-enable with --sync-policy automated)
 argocd app sync alpha-demo                         # one-shot manual sync
 ```
+
+---
+
+## Synced but stale: stuck self-heal retry
+
+**Symptom:** the Application repeatedly logs `"successfully synced (all tasks run)"` (both on auto-sync and
+on a manual `argocd app sync`), `status.sync.status` may even briefly read `Synced`, but the **live objects
+never actually change** — a Rollout keeps running an old image digest indefinitely across many reconcile
+cycles, and `status.operationState.message`'s underlying `SyncOperation.SelfHealAttemptsCount` (visible via
+`kubectl get application <app> -n argocd -o json | jq .operation`) is unusually high (tens, not the normal
+handful). This is a stuck internal retry/comparison state, not a webhook rejection, an RBAC denial, or (in
+the one confirmed case) an Argo Rollouts field-manager conflict.
+
+**Rule out the obvious causes first** before assuming this:
+
+- The rendered desired manifest is actually correct: `argocd app manifests <app> --core` (run inside the
+  `argocd-application-controller` pod, or with `--kube-context` set to a working cluster context) and grep
+  the field you expect changed.
+- `argocd-controller` genuinely owns the field in question, not another controller:
+  `kubectl get <kind> <name> -n <ns> --show-managed-fields -o json | jq -r '.metadata.managedFields[] | "\(.manager) \(.operation) \(.time)"'`
+  and search `fieldsV1` for the field name. If a different manager owns it, that's a real field-manager
+  conflict (different fix, not this one) — see the Rollouts `ignoreDifferences` gotchas in the
+  [`argocd-app-delivery`](../../.claude/skills/argocd-app-delivery/SKILL.md) skill first.
+
+**Confirmed fix:** reproduce ArgoCD's own apply directly, by hand, using the exact manifest and field
+manager it uses:
+
+```bash
+argocd app manifests <app> --core > /tmp/manifests.yaml   # pull the correctly-rendered desired state
+# extract just the one resource's YAML doc from /tmp/manifests.yaml, then:
+kubectl apply --server-side --field-manager=argocd-controller -f /tmp/<resource>.yaml
+```
+
+If this single command lands the change immediately (it did, live, for all 7 Rollouts in a stuck
+`alpha-shop-dev`), that confirms the API server itself accepts the change fine — ArgoCD's own sync loop was
+simply not submitting it. Repeat per stuck resource; there's no need to touch `argocd-cm` or the
+Application's `syncOptions`. Once landed, watch a few subsequent reconcile cycles
+(`kubectl logs -n argocd argocd-application-controller-0 --since=10m | grep <app>`) to confirm the fix holds
+— in the confirmed case, no reversion occurred once genuinely `Synced`, consistent with this having been a
+wedged retry state (elevated `SelfHealAttemptsCount`) rather than a persistent structural bug. If it
+recurs immediately after a fresh apply, that's a different, deeper problem — don't keep re-applying blind.
 
 ---
 
