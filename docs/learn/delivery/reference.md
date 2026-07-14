@@ -93,6 +93,11 @@ release-approver (#501). Prod Release PRs never auto-merge.
   (argocd-controller + the rollouts-controller); ArgoCD's default client-side diff mis-reads it as drift.
   Fix with server-side diff (`controller.diff.server.side=true`, #925) — `ignoreDifferences`
   can't fix it.
+- **A Rollout's image can silently stay stale while ArgoCD reports success.** `Rollout` is a CRD without a
+  registered Kubernetes scheme, so a sync that has to reconcile an `ignoreDifferences` rule touching an
+  *array* field on it (`containers[]`, not a scalar like `replicas`) can silently drop the real change
+  instead of applying it — the sync still logs success. `argocd-controller`'s own `managedFields` timestamp
+  is the tell: it won't have moved since before your "successful" sync.
 - **A stuck promotion is usually correct.** The auto-promoter won't advance a rung while the lower stage
   isn't `Synced + Healthy`. That's the health gate, not a bug — fix the unhealthy lower stage.
 - **Prod won't move on its own — by design.** No cron promotes into prod; it always waits on the
