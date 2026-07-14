@@ -737,9 +737,42 @@
       ]
     },
     {
+      "id": 27,
+      "type": "table",
+      "title": "Unhealthy pods",
+      "description": "Pods that are NOT Running, containers stuck waiting on a bad reason (CrashLoopBackOff, ImagePullBackOff, etc. - a container can be waiting even while its pod phase is Running, since phase is pod-level and waiting reasons are container-level), or pods with restarts in the last hour. Empty table = every pod is healthy. Complements the aggregate \"Pod Restarts (1h)\" stat above by naming which pod.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 52 },
+      "fieldConfig": {
+        "defaults": { "unit": "string" },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "kube_pod_status_phase{namespace=\"__TEAM__-$product-$stage\", phase!=\"Running\"} == 1 or kube_pod_container_status_waiting_reason{namespace=\"__TEAM__-$product-$stage\"} == 1 or (sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=\"__TEAM__-$product-$stage\"}[1h])) > 0)"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "prometheus": true, "prometheus_replica": true, "endpoint": true, "service": true, "cluster": true, "uid": true },
+            "renameByName": { "pod": "Pod", "container": "Container", "phase": "Phase", "reason": "Reason" }
+          }
+        }
+      ]
+    },
+    {
       "type": "row",
       "title": "Logs & Traces",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 }
     },
     {
       "id": 20,
@@ -747,7 +780,7 @@
       "title": "Recent logs",
       "description": "LogQL: `{namespace=\"__TEAM__-$product-$stage\", service_name=~\"${service:regex}\"} | detected_level=~\"${level:regex}\" |= \"$search\"`, against `Loki (all clusters)`. Use the Service/Level pickers and Search box above to filter, or the Explore → Loki link for anything more.",
       "datasource": { "type": "loki", "uid": "loki-all" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 53 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 60 },
       "options": {
         "showTime": true,
         "showLabels": false,
@@ -772,7 +805,7 @@
       "title": "Recent traces",
       "description": "TraceQL search scoped to this namespace via `Tempo (all clusters)`. Click a Trace ID to open the full trace view, or use the Explore → Tempo link above for TraceQL filters.",
       "datasource": { "type": "tempo", "uid": "tempo-all" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 61 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 68 },
       "targets": [
         {
           "refId": "A",
@@ -794,7 +827,7 @@
     {
       "type": "row",
       "title": "Dependencies (observed, cross-service calls)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 69 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 76 }
     },
     {
       "id": 24,
@@ -802,7 +835,7 @@
       "title": "Outbound dependency rate",
       "description": "Tempo's service-graph metrics (traces_service_graph_*, derived from real traces - not the XEnvironment claim's declared `dependencies` list, which is schema-only and never reconciled, ADR-101). Shows every OTHER product this one has actually called recently. Caveat: service_name has no stage component, so if two stages of the same product both have live traffic right now, their outbound edges are indistinguishable here - a genuine platform-wide gap (the same one found while wiring Pyroscope's per-stage labels), not specific to this panel.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 70 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 77 },
       "options": {
         "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "multi" }
@@ -825,7 +858,7 @@
       "type": "timeseries",
       "title": "Outbound dependency error rate",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 70 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 77 },
       "options": {
         "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "multi" }
@@ -853,7 +886,7 @@
       "type": "timeseries",
       "title": "Outbound dependency latency (p95)",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 70 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 77 },
       "options": {
         "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "multi" }
