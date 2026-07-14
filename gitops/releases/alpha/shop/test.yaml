@@ -9,3 +9,5 @@ spec:
       digest: sha256:4daea83ac93cb7680b057c5b061ca233dc9ef232b0e9747a32f1ca4b968302cd
     catalog:
       digest: sha256:1264e886d82f53eb54e05dc2428788fef1ab68066ed9441cb4136e7ba81037ae
+    payment:
+      digest: sha256:ede536e1d9322350da2666a7358d04b0f486c2ce15d6318b2b0222714488deb0
