@@ -88,11 +88,24 @@ inputs = {
   single_az                 = include.base.locals.single_az_nodes
   node_arch                 = include.base.locals.node_arch
 
-  # AGGRESSIVE — preprod runs ephemeral tenant workloads (ArgoCD reschedules on disruption). Spot for cheap +
-  # WhenEmptyOrUnderutilized consolidation bin-packs and reclaims, the cost/elasticity win. (ADR-078.)
+  # Spot for cheap + WhenEmptyOrUnderutilized consolidation bin-packs and reclaims, the cost/elasticity win
+  # for preprod's ephemeral tenant workloads (ArgoCD reschedules on disruption). (ADR-078.)
+  #
+  # ⚠️ consolidate_after = 15m — NOT the module default (1m), and NOT the "AGGRESSIVE" 1m this unit ran with
+  # until 2026-07-14. A 1m consolidateAfter races the BYOCNI startup taint (`node.cilium.io/agent-not-ready`,
+  # cleared once Cilium's agent is up on the new node): confirmed LIVE 2026-07-14 — Karpenter provisions a
+  # node for a pending pod (~30s to launch), the node comes up taint-blocked waiting on Cilium, and at the 1m
+  # mark the disruption controller sees "0 pods bound" (true only because the taint is still up) and deletes
+  # the node it JUST built — before the pod it was provisioned for ever got a chance to land. The pod stays
+  # Pending, triggering another provision, repeating the exact cycle every ~10 minutes with zero net progress.
+  # Preprod is the worse case for this race (spot capacity is an extra churn source on top of the taint
+  # timing) — matching platform's already-proven 15m (see its own terragrunt.hcl, fixed for the same failure
+  # mode one day earlier) lets a freshly-provisioned node survive comfortably past Cilium startup + actual
+  # pod scheduling before consolidation ever reconsiders it. 15m of slower reclaim on an idle demo cluster is
+  # a rounding error next to the cost of repeated launch/destroy cycles that were never reclaiming anything.
   capacity_types       = ["spot", "on-demand"]
   consolidation_policy = "WhenEmptyOrUnderutilized"
-  consolidate_after    = "1m"
+  consolidate_after    = "15m"
   # Cost guardrail (deliberately CONSERVATIVE — demo env, a runaway node-count is worse than Pending pods). Real
   # Karpenter usage here is ~1-3 nodes (~3-4 vCPU / 8-24 GiB across the tenant apps + obs spoke). 16 vCPU / 64 GiB
   # is a hard ceiling ~5x over normal — a 3x cut from the old 48/192. When hit, Karpenter STOPS (pods Pending,

@@ -99,6 +99,18 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-14 (later) — the "use a much longer `consolidateAfter`" recommendation below finally landed
+  on preprod, closing a gap left by the platform-only fix.** Platform's `WhenEmpty→WhenEmptyOrUnderutilized`
+  move (referenced below as "PR #1436") did eventually merge, paired with `consolidate_after: 15m` — but
+  only on platform; preprod itself, where this exact failure mode was FIRST observed (below), was never
+  touched and stayed on the module default (`1m`). Confirmed the identical taint-race pattern recurring
+  live tonight, this time from real digest-promotion scheduling pressure rather than a mass pod-delete: a
+  fresh node launches, sits `node.cilium.io/agent-not-ready` tainted past the 1-minute `consolidateAfter`
+  mark, and Karpenter's disruption controller deletes it as "empty" (true only because the taint was still
+  blocking scheduling) before its intended pod ever lands — repeating every ~10 minutes with zero net
+  progress. Fixed by finally raising preprod's `consolidate_after` to `15m` too, matching platform. See
+  `docs/runbooks/karpenter-operations.md`'s "Known gotchas" for the durable writeup.
+
 - **2026-07-14 (UNPARK) — ⚠️ ROUGH one: 3 compounding issues + the single most important lesson yet — during a
   post-unpark node-churn/Cilium-throttle storm, DO NOT mass-delete pods; it FEEDS the loop. STOP and let Karpenter
   - Cilium converge.** (Dated 07-14 by wall clock; the 07-13 park is the entry below.) Three things stacked up:

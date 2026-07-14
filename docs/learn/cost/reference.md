@@ -38,10 +38,14 @@ estimate-vs-actual reconciliation panel.
 ## Optimize — the levers ([deep dive](deep-dive-optimize-the-cost-levers.md))
 
 - **Karpenter** (`aws/karpenter`, [ADR-078](../../adrs/078-cluster-elasticity-karpenter.md)): JIT nodes sized
-  to pending pods, plus consolidation (bin-pack + terminate underutilized). The two clusters differ: hub is
-  on-demand-only + `WhenEmpty` (its stateful singletons would be disrupted by a spot reclaim); preprod runs
-  `["spot","on-demand"]` + `WhenEmptyOrUnderutilized`. "Spot retired" means only the static managed spot
-  *group* — the spot capacity-type is live on preprod. Gotchas: a min 8 GiB node floor (`min_instance_memory_mib
+  to pending pods, plus consolidation (bin-pack + terminate underutilized, both clusters on
+  `WhenEmptyOrUnderutilized` — stateful singletons stay protected via `do-not-disrupt` + PDBs, not the
+  policy choice). The two clusters differ on capacity types: hub is on-demand-only; preprod runs
+  `["spot","on-demand"]`. "Spot retired" means only the static managed spot *group* — the spot
+  capacity-type is live on preprod. Gotchas: `consolidateAfter` must clear the BYOCNI
+  `node.cilium.io/agent-not-ready` startup-taint window (both clusters run `15m`, not the module's `1m`
+  default — a shorter value races the taint and Karpenter deletes its own freshly-provisioned node as
+  "empty" before the pod it was built for ever lands); a min 8 GiB node floor (`min_instance_memory_mib
   = 6144`; the DaemonSet slab is ~3.2 GiB); an SCP exemption is mandatory (`<cluster>-eks-karpenter-*`, anchored
   per-cluster, not a leading-wildcard, in `exempt_roles`) or DenyTeamTagTampering/require-tagging 403s every
   launch; and the BYOCNI `node.cilium.io/agent-not-ready` startup taint.
