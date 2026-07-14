@@ -185,7 +185,7 @@ both `sts:AssumeRole` and `sts:TagSession`:
 # main.tf — cost_reader_assumer policy
 # TagSession, not just AssumeRole: the Pod-Identity-issued session already carries transitive
 # session tags (added by pods.eks.amazonaws.com), and AWS requires TagSession permission on the
-# target role to propagate them through a further AssumeRole call — confirmed live (#668):
+# target role to propagate them through a further AssumeRole call — confirmed live:
 # AssumeRole-only produced "not authorized to perform: sts:TagSession on resource: cost_reader".
 Action = ["sts:AssumeRole", "sts:TagSession"]
 ```
@@ -208,7 +208,7 @@ The two meters attribute to a team by two entirely different mechanisms.
 
 - **OpenCost (speedometer)** joins on the in-cluster `platform.refplat.org/team` namespace label — see the
   PromQL above. Instant, but only sees *pod* cost.
-- **The CUR exporter (odometer)** groups on the activated `Team` cost-allocation tag (#673) that AWS stamps
+- **The CUR exporter (odometer)** groups on the activated `Team` cost-allocation tag that AWS stamps
   onto CUR rows. Its Athena query:
 
   ```sql
@@ -229,8 +229,7 @@ retroactively, so the tag was activated early on purpose.
 
 A big share of a small platform's bill genuinely can't be pinned to a tenant: the EKS control planes, the NAT
 gateways (a real big-ticket item), the Transit Gateway, the whole LGTM+P observability stack and its S3,
-ArgoCD, Crossplane. FinOps calls this the platform-shared Scope, and
-[ADR-092](../../adrs/092-platform-finops-practice.md) **D2** makes it a first-class thing:
+ArgoCD, Crossplane. FinOps calls this the platform-shared Scope, and the platform makes it a first-class thing:
 
 > The platform-shared cost bucket is a first-class Scope, surfaced honestly — *allocate what is allocatable,
 > show the rest plainly. It is never silently spread across tenant budgets.*
@@ -261,9 +260,8 @@ Three surfaces, and one honest "not yet":
   `max(platform_true_cost_compute_monthly_usd_total)` (post-discount actual). A persistent gap between the
   lines *is* your discount — the reconciliation this panel makes visible.
 - **The Backstage cost tab — built, but verify in the right place.** A developer-portal "Cost" page renders
-  per-team spend-vs-budget from the hub Mimir (platform#1051, merged; the `mimir` unit admits `backstage` to
-  the query API via `query_consumer_namespaces`). Watch the trap:
-  [ADR-091](../../adrs/091-cost-guardrails.md) still lists it as remaining (stale, like #668), and grepping the
+  per-team spend-vs-budget from the hub Mimir (the `mimir` unit admits `backstage` to
+  the query API via `query_consumer_namespaces`). Watch the trap: grepping the
   infra `backstage` module finds no cost plugin — because a Backstage plugin ships in the app image, not the
   deployment module. The code is the proof, but check the right code.
 
@@ -271,7 +269,7 @@ Three surfaces, and one honest "not yet":
 
 ## Gotchas
 
-- **`max`, never `sum`, on the true-cost gauges (#668, commit `53dc4f65`).** The exporter's metrics carry a
+- **`max`, never `sum`, on the true-cost gauges.** The exporter's metrics carry a
   per-pod label, so every exporter restart mints a fresh series, and each pod reports the same monthly total.
   Aggregate with `sum` and during the brief pod-overlap window on a restart you count the same dollars twice;
   sum across historical pods and you count them many times. The fix is purely query-side: `max` (and `max by
@@ -285,12 +283,8 @@ Three surfaces, and one honest "not yet":
 - **Legacy CUR, not CUR 2.0.** OpenCost's `cloudCost` expects the legacy schema; a CUR 2.0 / Data Export would
   silently not line up.
 - **`python3 -u` (unbuffered).** Without it, Python block-buffers stdout when not on a tty, so the refresh logs
-  never appear in `kubectl logs` even though the exporter is working (confirmed live, #668). A silent-but-
+  never appear in `kubectl logs` even though the exporter is working (confirmed live). A silent-but-
   healthy pod is the most confusing kind.
-- **The ADRs undersell the status.** ADR-091 and ADR-092 still describe the CUR→Athena true-cost work (#668)
-  as "unbuilt" and the cost-allocation tag (#673) as "not applied". Both are stale — #668 is built and running
-  (the pods above, the merged reconciliation dashboard), and the `Team` tag is active. Primary source beats
-  secondary source; the ADR text is the lead, the cluster is the truth.
 
 ---
 
@@ -308,10 +302,8 @@ Three surfaces, and one honest "not yet":
   (the CUR pipeline),
   [`dashboards/platform-cost.json`](https://github.com/asanexample/platform/blob/main/infra/modules/observability/dashboards/platform-cost.json)
   (both meters + reconciliation).
-- **ADRs & runbook:** [ADR-091](../../adrs/091-cost-guardrails.md) (tenant Scope + attribution join, D2),
-  [ADR-092](../../adrs/092-platform-finops-practice.md) (the platform-shared Scope, D2/D3), and
-  [`docs/runbooks/cost-true-spend.md`](../../runbooks/cost-true-spend.md) (apply + the day-after verification of
-  the CUR pipeline).
+- **Runbook:** [`docs/runbooks/cost-true-spend.md`](../../runbooks/cost-true-spend.md) (apply + the day-after
+  verification of the CUR pipeline).
 - **External substrate** (all official, verified reachable):
   - [OpenCost — AWS configuration](https://www.opencost.io/docs/configuration/aws) — how the model prices AWS
     nodes and the `cloudCost` integration (~10 min).

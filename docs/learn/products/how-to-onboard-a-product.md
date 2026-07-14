@@ -51,7 +51,7 @@ registry file — it creates your application:
      shared build-sign pipeline, so your first push builds, signs, and attests with zero setup;
    - the owning GitHub team's `push` on the repo is granted later, by the `github-teams` derived unit on
      reconcile, not at repo creation. The `<team>-` prefix is also the supply chain's unspoofable team
-     identity ([ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md));
+     identity;
    - it opens a platform PR with your `Product` registry file and a first dev Environment claim.
 4. Review and merge that PR → [What happens on merge](#what-happens-on-merge). Because the CI is pre-wired
    and a dev Environment is claimed, you're moments from a running app, not just a registry entry.
@@ -89,7 +89,7 @@ Field notes (full schema in the [reference](reference.md)):
 - `spec.defaultIsolation.compute` — the floor; most products want `dedicated-namespace`. Regulated tiers
   force higher.
 - `spec.domains` — leave `[]` to start; add `{host: shop.example.com, dns: managed}` later when you have a
-  custom hostname (ADR-061).
+  custom hostname.
 
 ### Step 2 — open the PR
 
@@ -118,7 +118,7 @@ Either way `registry-reconcile` runs, and out of it come:
 - a keyless CI push role federated to `spec.repo` (your pipeline can now push images, no stored keys),
 - the `verify-images-product-<p>` / `verify-attestations-product-<p>` Kyverno policies,
 - one AppProject plus ApplicationSet ready to deliver your Environments,
-- the owning org-Team `push` grant on the `<team>-<product>` repo (ADR-072).
+- the owning org-Team `push` grant on the `<team>-<product>` repo.
 
 The per-Service ECR repositories (`team-<team>/<product>-<svc>`) aren't part of this apply — they're
 provisioned by the Crossplane Environment Composition when you *claim an Environment*, not by
@@ -195,8 +195,6 @@ it's getting the *identity* fields wrong. A typo'd `repo` breaks the trust ancho
 - Next steps: `supply-chain-onboarding` + `environment-onboarding` skills;
   [Supply chain](../supply-chain/orientation.md) · [Environment API](../environment-api/orientation.md) ·
   [Delivery](../delivery/orientation.md).
-- Why it's shaped this way: [ADR-069](../../adrs/069-delivery-source-of-truth-product-environment.md) ·
-  [ADR-067](../../adrs/067-idp-domain-model.md).
 - Substrate: [GitOps principles](https://opengitops.dev/) ·
   [GitHub OIDC](https://docs.github.com/en/actions/concepts/security/openid-connect) ·
   [Backstage software templates](https://backstage.io/docs/features/software-templates/).

@@ -23,8 +23,3 @@ Read the [domain model](../domain-model/orientation.md) (Team / Product) first, 
 
 - The security framing: [The Security Model](../spine/the-security-model.md).
 - Architecture (north star): [Identity & Access Strategy](../../architecture/identity-and-access-strategy.md).
-- Why it's shaped this way: [ADR-053](../../adrs/053-identity-and-cross-system-authorization-strategy.md)
-  (strategy), [ADR-059](../../adrs/059-identity-topology-pluggable-idp-seam.md) (Keycloak seam),
-  [ADR-088](../../adrs/088-temporary-power-activation.md) (temporary power),
-  [ADR-041](../../adrs/041-pod-identity-for-tenant-workloads.md) (Pod Identity),
-  [ADR-089](../../adrs/089-governance-registry-topology.md) (the registry).

@@ -13,7 +13,7 @@
 
 A team wants somewhere to run a new service. Not just a namespace — they need the *whole* footprint: a
 namespace with sensible limits, an image registry scoped to them, AWS permissions for the app, network
-rules, the policy guardrails. The old way to get all that is a pile of tickets and a week of waiting.
+rules, the policy guardrails. Getting all that by hand is a pile of tickets and a week of waiting.
 
 On this platform you write one short YAML file, open a pull request, and a few minutes after it merges
 the whole footprint exists — and stays correct afterward. The machine that makes that true is the
@@ -406,5 +406,3 @@ the [environment onboarding runbook](../../runbooks/environment-onboarding.md).
 - [Reference](reference.md) — full mechanism, glossary, gotchas, and curated Crossplane learning links.
 - [Crossplane Environment API](../../architecture/crossplane-environment-api.md) — the as-built
   architecture doc.
-- [ADR-067](../../adrs/067-idp-domain-model.md) (the Team/Product/Service/Environment model) and
-  [ADR-048](../../adrs/048-federated-per-cluster-crossplane.md) (why it's federated per cluster).

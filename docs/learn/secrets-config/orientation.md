@@ -59,7 +59,7 @@ assumes a role and before any workload exists: the AWS account ID per environmen
 the state bucket and role, some SSO endpoints. On a public repo, committing those in plaintext is a
 non-starter — but they're exactly what the IaC must read at plan/apply.
 
-The answer ([ADR-066](../../adrs/066-sops-encrypted-config-secrets.md)): encrypt the file with
+The answer: encrypt the file with
 [SOPS](https://github.com/getsops/sops) and commit the *encrypted* form (`infra/live/aws/secrets.enc.yaml`),
 decrypting it in memory at config-load via a dedicated KMS key (`platform-sops`). Terragrunt calls
 `sops_decrypt_file` inline — no CI fetch step, no plaintext ever written to disk. The KMS key's policy is the
@@ -92,7 +92,7 @@ Kubernetes `Secret` is just base64 in etcd; the security question is where it co
 SOPS-sealed, is the wrong home for a *rotating* credential: to change it you'd re-encrypt and re-commit, and
 the ciphertext is copied everywhere the repo is.
 
-The answer ([ADR-019](../../adrs/019-external-secrets-operator.md)): AWS Secrets Manager is the source of
+The answer: AWS Secrets Manager is the source of
 truth, and the External Secrets Operator (ESO) syncs a named secret out of it into a normal Kubernetes Secret
 that any pod mounts unmodified. Two small pieces:
 
@@ -114,7 +114,7 @@ Kyverno cross-tenant backstop are part of the designed tenant road below, not ye
 
 **The honest caveat:** the platform's own services use this heavily, but the tenant self-service paved road —
 a developer setting an app's secrets through Backstage and having the Environment claim wire the ExternalSecret
-automatically ([ADR-070](../../adrs/070-tenant-app-config-and-secrets.md)) — is designed, not built. Today only
+automatically — is designed, not built. Today only
 the claim's `config`/`secrets` schema is reserved (inert); the write-through API and per-tenant wiring are a
 deferred phase. The [runtime-secrets deep dive](deep-dive-runtime-secrets.md) walks the mechanism, a worked
 example, and that designed tenant road.
@@ -124,8 +124,8 @@ example, and that designed tenant road.
 ## Stop 3 — rotation: by class, not by timer
 
 A secret that never rotates is a standing risk. But naïvely rotating everything on a timer is worse — a
-rotated secret a running pod cached becomes an outage. So rotation is classification-driven
-([ADR-094](../../adrs/094-secret-rotation-strategy.md)), and the hard half is already solved: most credentials
+rotated secret a running pod cached becomes an outage. So rotation is classification-driven,
+and the hard half is already solved: most credentials
 are keyless (the *eliminate* move), so there's nothing to rotate. What remains is a bounded set of static
 values, sorted into four classes:
 
@@ -146,7 +146,7 @@ per secret — never let Terraform and a rotation Lambda fight over the same val
 > *Changing the locks.* Re-keying isn't just cutting a new key — it's cutting the new key *and* handing it to
 > every tenant at the same moment, or you've locked people out. Reloader is that simultaneous hand-off.
 
-**The honest status: this is mostly a design.** ADR-094 is Proposed; today rotation is a classification plus a
+**The honest status: this is mostly a design.** Today rotation is a classification plus a
 manual runbook for a handful of secrets. Reloader isn't deployed, there's no age metric, the refresh tiers
 aren't wired — an authored-but-not-yet-built next phase. And, deliberately, no Vault: ESO, Secrets Manager, and
 Pod Identity already cover it, and keyless-first keeps shrinking the problem, so a whole new Tier-0 secrets
@@ -160,8 +160,8 @@ exactly this line.
 - **Live and in use:** keyless-everywhere (Pod Identity, OIDC, cosign — the eliminated majority); SOPS
   config-in-git (the platform's bootstrap identifiers); ESO + Secrets Manager for the platform's own runtime
   secrets (16 ExternalSecrets syncing).
-- **Designed, not built:** the tenant config/secrets self-service paved road (ADR-070 — only the schema is
-  reserved); automated rotation (ADR-094 — the classification is decided, the primitives aren't deployed).
+- **Designed, not built:** the tenant config/secrets self-service paved road (only the schema is
+  reserved); automated rotation (the classification is decided, the primitives aren't deployed).
 
 The through-line holds either way: have fewer secrets, keep the ones you must on two clean planes, and never
 let a rotating credential end up somewhere it can't rotate.

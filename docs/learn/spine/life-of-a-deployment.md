@@ -102,7 +102,7 @@ identity (the GitHub Actions run proving "I am the `build-sign` workflow of this
 signature, and records it in a public transparency log. Then a *separate, isolated* provenance workflow writes a
 [**SLSA provenance**](https://slsa.dev/) attestation — a signed statement describing *how and where this
 image was built* (which repo, which commit, which workflow). Keeping provenance in its own workflow and identity
-is what earns the SLSA L3 "isolated builder" guarantee (ADR-042).
+is what earns the SLSA L3 "isolated builder" guarantee.
 
 ![Supply-chain trust: the CI build emits a signed image and a SLSA provenance attestation, each bound to the build's own identity — the repo, the commit, the isolated workflow. The signature proves the image wasn't altered; the provenance proves exactly how and where it was built.](images/supply-chain-trust.svg)
 
@@ -117,7 +117,7 @@ Nothing is deployed yet. This stage's only job is to turn your merge into a **tr
 its **digest** — a value we're about to lean on hard.
 
 *Its own module: **[Supply chain](../supply-chain/orientation.md)** — keyless signing, isolated SLSA
-provenance, the thin-caller model, verify-at-admission (ADR-042/050).*
+provenance, the thin-caller model, verify-at-admission.*
 
 ## 3 · The digest is promoted — into a *different* repo
 
@@ -154,8 +154,7 @@ Why go to all that trouble to write a digest into a *foreign* repo? Two reasons,
   *un*-protect the branch you most want protected. So the deployed digest lives elsewhere.
 - **One auditable source of truth for "what is running where."** That `Release` file *is* the record of the
   deployed version of `acme-shop`'s `web` in dev. Not a dashboard, not a log — a version-controlled file
-  with a full git history of every promotion. ([ADR-071](../../adrs/071-digest-promotion-via-control-plane.md)
-  has the full rationale.)
+  with a full git history of every promotion.
 
 ## 4 · The Gate merges it (the promotion ladder)
 
@@ -182,8 +181,7 @@ Our `dev` change is at the bottom rung, so it auto-merges. The digest is now com
 repo's `main`. Which means: **git has changed.** And something is always watching git.
 
 *Its own module, later: **Promotion & release** — the full ladder, Release-keyed delivery, the approver
-role. Source: [Promotion & Release](../../architecture/promotion-and-release.md),
-[ADR-071](../../adrs/071-digest-promotion-via-control-plane.md).*
+role. Source: [Promotion & Release](../../architecture/promotion-and-release.md).*
 
 ## 5 · ArgoCD notices, and syncs (delivery)
 
@@ -209,7 +207,7 @@ model.)
 ![Provision once, deploy many: the environment's namespace, image registry, scoped AWS permissions, network policies, and quotas were all provisioned earlier — when the Environment was first declared. This deploy just drops the workload into the already-built, furnished namespace.](images/provision-once-deploy-many.svg)
 
 *Its own module: **[Delivery](../delivery/orientation.md)** — ArgoCD, ApplicationSets, the promotion
-ladder, and Rollouts, in depth (ADR-021/069).*
+ladder, and Rollouts, in depth.*
 
 ## 6 · Kyverno admits it (policy)
 
@@ -242,7 +240,7 @@ This is **policy as code**: the rules that used to live in a wiki page nobody re
 head, are executable and enforced identically every time, on every cluster.
 
 *Its own module: **[Policy & admission](../policy/orientation.md)** — Kyverno, the three verbs
-(validate/mutate/generate), the catalog, audit→enforce (ADR-014).*
+(validate/mutate/generate), the catalog, audit→enforce.*
 
 ## 7 · The Rollout canaries it (progressive delivery)
 
@@ -271,7 +269,7 @@ safety system bolted on — it's *built out of* the observability the platform a
 Rollout runs on every stage, by the time a change reaches prod its canary logic has already rehearsed at
 dev, test, uat, and staging. Prod is the *last* performance, never the dress rehearsal.
 
-*Its own module, later: **Progressive delivery** (Argo Rollouts, metric analysis, auto-rollback — ADR-056).*
+*Its own module, later: **Progressive delivery** (Argo Rollouts, metric analysis, auto-rollback).*
 
 ## 8 · It gets a machine to run on (the substrate)
 
@@ -285,7 +283,7 @@ more planes engage, each watching for its own cue.
   and clears it when they leave.* Just-in-time capacity instead of a standing, costly reservation. (What
   *made* the pods unschedulable? Often the service's **default HPA** scaling replicas up under load — more
   pods than the current nodes can hold. When load falls the HPA scales them back down, and Karpenter
-  consolidates the now-idle node away: the same loop run in reverse — ADR-078 Phase 2.)
+  consolidates the now-idle node away: the same loop run in reverse.)
 - **A network to speak on.** [**Cilium**](https://docs.cilium.io/en/stable/overview/intro/), the cluster's
   CNI (Container Network Interface), wires the new pod into the pod network — assigns it an address, and
   enforces which other pods it's allowed to talk to. *It's the switchboard: it connects your pod's line
@@ -297,8 +295,8 @@ more planes engage, each watching for its own cue.
   secret. *It's a visitor badge, not a copied master key* — issued on arrival, scoped to exactly what this
   workload may touch, and it expires. Nothing to leak, nothing to rotate, nothing to steal from a repo.
 
-*Their own modules, later: **Nodes & compute** (Karpenter — ADR-078), **The cluster & CNI** (Cilium —
-ADR-008), **Workload identity** (Pod Identity — ADR-041).*
+*Their own modules, later: **Nodes & compute** (Karpenter), **The cluster & CNI** (Cilium),
+**Workload identity** (Pod Identity).*
 
 ## 9 · Traffic finds it (ingress)
 
@@ -321,8 +319,7 @@ pods.
 
 The fix is now live — reachable, encrypted, routed only to healthy pods.
 
-*Its own module, later: **Ingress & traffic** (Gateway API, cert-manager, the hostname convention —
-ADR-017/060).*
+*Its own module, later: **Ingress & traffic** (Gateway API, cert-manager, the hostname convention).*
 
 ## 10 · Everything watches it (observability & on-call)
 
@@ -350,8 +347,8 @@ discipline; the platform bakes it in.)
 
 The loop never truly closes. Long after your merge, every thermostat is still running, still watching.
 
-*Their own modules, later: **Observability** (the stack, the four signals, SLOs — ADR-043/077),
-**On-call & owner routing** (PagerDuty, the triage copilot — ADR-084/080).*
+*Their own modules, later: **Observability** (the stack, the four signals, SLOs),
+**On-call & owner routing** (PagerDuty, the triage copilot).*
 
 ---
 
@@ -428,11 +425,7 @@ control plane): [The Life of a Request](life-of-a-request.md).
 - [Foundations](../foundations/orientation.md) — the substrate (accounts · network · cluster · nodes · access) *(built)*. [Observability](../observability/orientation.md) *(built)*.
 
 **Source of truth (as-built):**
-[Promotion & Release](../../architecture/promotion-and-release.md) ·
-[ADR-071 digest promotion](../../adrs/071-digest-promotion-via-control-plane.md) ·
-[ADR-056 progressive delivery](../../adrs/056-progressive-delivery-and-safe-rollback.md) ·
-[ADR-014 Kyverno](../../adrs/014-kyverno-as-policy-engine.md) ·
-[ADR-021 ArgoCD](../../adrs/021-argocd-for-gitops.md).
+[Promotion & Release](../../architecture/promotion-and-release.md).
 
 **Learn the substrate itself (optional depth, never required to follow the story above):**
 [GitOps](https://opengitops.dev/) · [ArgoCD](https://argo-cd.readthedocs.io/en/stable/) ·

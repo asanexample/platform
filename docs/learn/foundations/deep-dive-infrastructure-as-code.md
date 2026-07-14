@@ -22,7 +22,7 @@ awscli 2.35.1
 ```
 
 `root.hcl` sets `terraform_binary = "tofu"`, so every `terragrunt` invocation shells out to OpenTofu 1.12.1 —
-never HashiCorp Terraform ([ADR-016](../../adrs/016-opentofu-over-terraform.md)). Bump a version *here* and
+never HashiCorp Terraform. Bump a version *here* and
 your laptop, CI, and the self-hosted runner can't drift apart. That's the whole point of a canonical pin.
 
 The sous-chef never cooks. Terragrunt generates the backend and provider config, wires units in dependency
@@ -260,8 +260,7 @@ from ever rewriting another environment's state.
 The trick: this is a **public repository**, yet the account IDs, emails, SSO URLs, state-bucket name, and
 state-role ARN are committed *right in git*. They live in `infra/live/aws/secrets.enc.yaml`, encrypted
 per-value with [SOPS](https://github.com/getsops/sops) against a dedicated
-[AWS KMS](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html) key
-([ADR-066](../../adrs/066-sops-encrypted-config-secrets.md)). A raw line looks like this:
+[AWS KMS](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html) key. A raw line looks like this:
 
 ```yaml
 account_ids:
@@ -298,14 +297,14 @@ alias/platform-sops
 
 *This is the locked glass case in the public square.* Anyone can clone the repo and see the ciphertext; only a
 principal the KMS key policy trusts — the SSO `AdministratorAccess` roles, and the ARC runner role — can
-decrypt it, and **every decrypt is a CloudTrail event**. The *why* is worth stating plainly, because ADR-066
-weighed and rejected the tempting alternatives:
+decrypt it, and **every decrypt is a CloudTrail event**. The *why* is worth stating plainly, because the
+design weighed and rejected the tempting alternatives:
 
 - **Single source of truth, zero drift.** The config is *in git*. There is no second copy in a secrets store
   to fall out of sync with each operator's laptop — the drift problem that disqualified the "materialize it in
   CI" option.
 - **No plaintext on disk, ever.** `sops_decrypt_file` decrypts to memory; nothing is written on a laptop or a
-  runner. Compare the old gitignored `secrets.hcl`, which lived in cleartext on every machine.
+  runner. Compare a gitignored plaintext `secrets.hcl`, which would live in cleartext on every machine.
 - **IAM-gated + audited, KMS not `age`.** Access is a KMS key policy, so every principal that needs to decrypt
   *already has an AWS identity* — no key material to distribute (the exact problem `age` reintroduces).
   Revoking an operator is a policy edit.
@@ -324,8 +323,7 @@ do you create the bucket and the key, when creating them would itself require…
 ![The bootstrap chicken-and-egg. Every unit's config load writes state to the S3 bucket and decrypts secrets with the KMS key — so creating the bucket and key can't itself go through the normal flow that needs them. Two escape hatches break the deadlock: the `state-bootstrap` unit overrides the S3 backend with local state (it can't store state in the bucket it's creating), and `TG_SOPS_BOOTSTRAP=1` flips secrets to a plaintext gitignored file so KMS is never called before the key exists. After bootstrap, the bucket and key are standing prerequisites — foundations poured before the walls.](images/bootstrap-chicken-egg.svg)
 
 You can't — from a normal unit. So both are **bootstrap-tier**: created once, outside the secrets-reading
-flow, before anything else exists ([ADR-006](../../adrs/006-state-bootstrap-pattern.md) for state; ADR-066 §6
-for the SOPS key). Two escape hatches make this work:
+flow, before anything else exists. Two escape hatches make this work:
 
 - **Local state for the bootstrap unit.** `root.hcl`'s comment notes the `state-bootstrap` module overrides
   the S3 backend with a *local* backend — it can't store its state in the bucket it's busy creating.
@@ -344,11 +342,10 @@ locked yourself out of everything above.
   an account ID in the map disagrees with the env file. Fix the directory or the account binding — disabling
   the assert is disabling the one check that stops a cross-account apply.
 - **The `versions` fallback in `root.hcl` is dead code on purpose.** Its generated `versions.tf` is set to
-  `if_exists = "skip"`, because every shared module now ships its own `versions.tf`
-  ([ADR-083](../../adrs/083-provider-version-constraint-standardization.md)). An earlier version pinned
-  `aws = "6.47.0"` *exactly* here and it was silently ignored — units resolved the module's looser bound
-  instead. Lesson: a generated file that "looks" authoritative may be skipped; the module's own `versions.tf`
-  wins.
+  `if_exists = "skip"`, because every shared module ships its own `versions.tf`. A generated `versions.tf`
+  that pinned `aws = "6.47.0"` *exactly* here would be silently skipped — units resolve the module's looser
+  bound instead. Lesson: a generated file that "looks" authoritative may be skipped; the module's own
+  `versions.tf` wins.
 - **`role_arn` on state is not the deployer role.** Reaching state assumes `TerraformStateAccess` (management);
   touching AWS assumes `PlatformDeployer` (per-env). Two different identities in the same run — by design, so
   state lives behind a separate wall.
@@ -362,16 +359,6 @@ locked yourself out of everything above.
 
 ## Go deeper
 
-- [ADR-001 — multi-cloud Terragrunt structure](../../adrs/001-multi-cloud-terragrunt-structure.md) · the
-  original cascade decision.
-- [ADR-002 — AWS state storage](../../adrs/002-aws-state-storage.md) and
-  [ADR-006 — state bootstrap pattern](../../adrs/006-state-bootstrap-pattern.md) · the S3+DynamoDB backend and
-  its chicken-and-egg.
-- [ADR-016 — OpenTofu over Terraform](../../adrs/016-opentofu-over-terraform.md) · why `terraform_binary = "tofu"`.
-- [ADR-066 — SOPS-encrypted config secrets](../../adrs/066-sops-encrypted-config-secrets.md) · the full
-  design, alternatives, and KMS-vs-`age` rationale.
-- [ADR-083 — provider version constraint standardization](../../adrs/083-provider-version-constraint-standardization.md)
-  · why the `root.hcl` version fallback is skipped.
 - Source: `infra/root.hcl`, `infra/live/aws/{common,_base,_versions}.hcl`, `infra/live/aws/secrets.enc.yaml`,
   `.sops.yaml`, and any leaf `infra/live/aws/**/terragrunt.hcl`.
 - House skills: **terragrunt-units** (authoring units), **terraform-style** (module `.tf`), **apply-and-destroy**

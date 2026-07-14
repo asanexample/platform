@@ -35,7 +35,7 @@ $ AWS_PROFILE=management aws organizations list-accounts --query 'Accounts[].Nam
 ]
 ```
 
-Five accounts, and each is a distinct role in the design ([ADR-004](../../adrs/004-account-management-strategy.md)):
+Five accounts, and each is a distinct role in the design:
 
 - **The management account** — governance only. It owns the AWS Organization, holds the org-wide SCPs,
   and runs the [Terraform state backend](deep-dive-infrastructure-as-code.md) (the S3 state bucket +
@@ -52,7 +52,7 @@ The estate as a tree: the Org root, the accounts by role, the SCP ceiling over t
 
 ![The account estate: the AWS Org root branches into a Platform OU (platform hub, test sandbox) and a Workloads OU (preprod, prod, empty regulated). Org SCPs form a permission ceiling over the member accounts; the management account sits apart, SCP-exempt, holding governance and state. The only way across a wall is a logged assume of PlatformDeployer / PlatformAdmin.](images/account-estate-tree.svg)
 
-The accounts hang off a deliberate two-branch tree ([ADR-005](../../adrs/005-ou-hierarchy-design.md)). Live:
+The accounts hang off a deliberate two-branch tree. Live:
 
 ```console
 $ aws organizations list-organizational-units-for-parent --parent-id <root>
@@ -90,7 +90,7 @@ IAM: IAM is a soft wall you maintain; the account boundary is a hard wall AWS ma
 SCPs operate *above* the account. An IAM policy **grants**, and is enforced inside an account by that
 account's own admins (who can rewrite it). A [Service Control
 Policy](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html) is
-the opposite in three ways ([ADR-003](../../adrs/003-scp-design-philosophy.md)):
+the opposite in three ways:
 
 1. **It's a ceiling, not a grant.** An SCP never *gives* a permission — it only *removes* one from the
    maximum. The actual granting is the implicit `FullAWSAccess` policy AWS attaches everywhere (it
@@ -226,16 +226,15 @@ short roster of licensed pyrotechnicians* who are permitted, on file, to light t
 ## The IAM role model — who may do what, and the bridge across accounts
 
 SCPs set the ceiling; IAM roles are the *grants* that operate underneath it. Four purpose-built roles carry
-the whole platform ([ADR-007](../../adrs/007-iam-role-model.md), refined by
-[ADR-040](../../adrs/040-platform-engineer-access-model.md)):
+the whole platform:
 
 | Role | Lives in | Grants | The point |
 | --- | --- | --- | --- |
 | **PlatformDeployer** | platform, preprod, test | `AdministratorAccess` | The **apply** identity. Terragrunt providers assume it; it's SCP-exempt. Machine, never a human's interactive role. |
-| **PlatformAdmin** | platform, preprod | `ReadOnlyAccess` + explicit Denies on secret/data exfil + SSM-bastion scope | **Operate, not author** (ADR-040). `kubectl` uses it: debug/exec/drain/restart, but no `create`, no cluster-admin, no secret *values*. |
+| **PlatformAdmin** | platform, preprod | `ReadOnlyAccess` + explicit Denies on secret/data exfil + SSM-bastion scope | **Operate, not author.** `kubectl` uses it: debug/exec/drain/restart, but no `create`, no cluster-admin, no secret *values*. |
 | **TerraformStateAccess** | management | inline S3 (state bucket) + DynamoDB (`terraform-locks`) only | The **state** identity. Assumed by the operator's management SSO session (in parallel with `PlatformDeployer`, not chained under it) to read/write S3 state + the DynamoDB lock — matching the bridge diagram below. |
 | **OrganizationAccountAccessRole** | all accounts | full admin | **Break-glass only.** SCP-exempt, and itself protected by the `ProtectOrganizationRole` SCP statement. |
-| **DeveloperAccess-\<team\>** | preprod (design) | namespace-scoped kubectl | **Designed, not built** (ADR-039 / [#647](https://github.com/asanexample/platform/issues/647)). The v3 Environment Composition emits only the in-cluster RoleBinding; the per-team IAM role + EKS access entry aren't provisioned. Use `platctl kubeconfig` / `PlatformAdmin` today. (A grep will turn up a *generic* `DeveloperAccess` role live in the **platform** account — assumable by SSO PowerUser/Admin holders — but that's a legacy/v2 role, distinct from the per-team paved path described here; preprod has no `DeveloperAccess` role live.) |
+| **DeveloperAccess-\<team\>** | preprod (design) | namespace-scoped kubectl | **Designed, not built.** The Environment Composition emits only the in-cluster RoleBinding; the per-team IAM role + EKS access entry aren't provisioned. Use `platctl kubeconfig` / `PlatformAdmin` today. (A grep will turn up a *generic* `DeveloperAccess` role live in the **platform** account — assumable by SSO PowerUser/Admin holders — but that's a separate generic role, distinct from the per-team paved path described here; preprod has no `DeveloperAccess` role live.) |
 
 The key split is `PlatformDeployer` vs. `PlatformAdmin`. The role a human's `kubectl` uses carries no
 standing authoring power — you can operate the running platform all day and still not be able to create a
@@ -316,11 +315,6 @@ is made impossible by construction, not by care.
 
 ## Go deeper
 
-- **ADRs (source of truth):** [ADR-003 SCP design philosophy](../../adrs/003-scp-design-philosophy.md) ·
-  [ADR-004 account management](../../adrs/004-account-management-strategy.md) ·
-  [ADR-005 OU hierarchy](../../adrs/005-ou-hierarchy-design.md) ·
-  [ADR-007 IAM role model](../../adrs/007-iam-role-model.md) ·
-  [ADR-040 operate-not-author access](../../adrs/040-platform-engineer-access-model.md).
 - **The code:** the `organizations` module
   ([`scps.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/organizations/scps.tf),
   [`main.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/organizations/main.tf)),

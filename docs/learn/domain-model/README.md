@@ -18,5 +18,4 @@ governance and automation hang off. No prior platform knowledge needed.
 
 - [Environment API](../environment-api/) — how a single Environment (one grid cell) becomes real
   infrastructure. The natural next module.
-- Source of truth: [Platform Domain API](../../architecture/platform-domain-api.md) ·
-  [ADR-067](../../adrs/067-idp-domain-model.md).
+- Source of truth: [Platform Domain API](../../architecture/platform-domain-api.md).

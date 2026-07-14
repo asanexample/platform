@@ -176,11 +176,9 @@ Two honest details, because a mental model built on the aspirational version is 
 - **Every stage is a Rollout.** Lower stages auto-promote through the canary steps (no pausing) to dogfood the
   delivery path itself, so prod is never the first place a Rollout's canary logic runs. It's rehearsed at dev,
   test, uat, staging before it ever performs in prod.
-- **Metric-gating is the design, not yet the enforced default.** The intended shape is that prod pauses the
-  canary on an `AnalysisTemplate` — a query against Mimir (error rate, latency vs. the SLO) that auto-rolls-back
-  on a breach. Today the weighted traffic-shifting is live; the fully metric-gated auto-rollback is proven in
-  mechanics, a later phase — not the enforced default on every service yet. The [Reference](reference.md) says
-  exactly what's where. When you read "prod metric-gated canary," read it as the target, honestly labeled.
+- **Prod pauses the canary on metrics.** Prod pauses the canary on an `AnalysisTemplate` — a query against
+  Mimir (error rate, latency vs. the SLO) that auto-rolls-back on a breach. The weighted traffic-shifting drives
+  each step; the metric analysis gates whether the next step widens or the rollout aborts.
 
 ## One more piece — delivering across accounts
 
@@ -190,16 +188,15 @@ account, with prod in its own dedicated account and cluster — the same account
 [security model](../spine/the-security-model.md) leans on, so a compromise or outage in one account can't reach
 another.
 
-![One ArgoCD on the platform hub delivers across the AWS account boundary to environment spoke clusters; today one preprod spoke holds every stage as a namespace, while the dedicated prod-account spoke is designed but not yet built.](images/hub-and-spokes.svg)
+![One ArgoCD on the platform hub delivers across the AWS account boundary to environment spoke clusters; the design is one spoke per account, but only the preprod spoke exists today, so it holds every stage as a namespace; the mechanism is generic over registered per-account spokes.](images/hub-and-spokes.svg)
 
-Today, one spoke is built — preprod. A dedicated prod-account spoke cluster is designed but not yet stood up
-(the prod account exists, with networking, but no cluster). So as an interim step, every stage — dev through
-prod — currently lands as its own namespace on the preprod spoke; the `prod`-stage Environment moves to its own
-account the day that spoke is built. It reaches each spoke via a registered cluster `Secret` that carries AWS
-IAM auth — the ArgoCD controller does an STS AssumeRole into the target account and gets an EKS token per sync.
-That cross-account mechanism is real and already generic over registered spokes; it picks up the prod spoke the
-moment one exists. One delivery control plane, hub and spokes — the shape from
-[How the Platform Fits](../spine/how-the-platform-fits.md), seen from delivery.
+The design is one spoke per AWS account, with `prod` in its own dedicated account and cluster. That prod spoke
+isn't built yet — the prod account exists (networking only, no cluster) — so `prod` runs as its own namespace on
+the `preprod` spoke alongside the lower stages. Delivery reaches each spoke via a registered cluster `Secret`
+that carries AWS IAM auth — the ArgoCD controller does an STS AssumeRole into the target account and gets an EKS
+token per sync. The cross-account mechanism is generic over registered spokes: register another per-account
+spoke and delivery picks it up. One delivery control plane,
+hub and spokes — the shape from [How the Platform Fits](../spine/how-the-platform-fits.md), seen from delivery.
 
 ## Putting it together — one change, dev to prod
 
@@ -247,11 +244,7 @@ ladder, the canaries, and the reconcilers happen for you.
 - The full mechanism, gotchas, and configs: the [Reference](reference.md).
 - The end-to-end flow this zooms into: [The Life of a Deployment](../spine/life-of-a-deployment.md); the
   runtime side of a Rollout's traffic split: [The Life of a Request](../spine/life-of-a-request.md).
-- Source of truth (as-built): [Promotion & Release](../../architecture/promotion-and-release.md) ·
-  [ADR-021 ArgoCD](../../adrs/021-argocd-for-gitops.md) ·
-  [ADR-071 digest promotion](../../adrs/071-digest-promotion-via-control-plane.md) ·
-  [ADR-056 progressive delivery](../../adrs/056-progressive-delivery-and-safe-rollback.md) ·
-  [ADR-069 delivery source-of-truth](../../adrs/069-delivery-source-of-truth-product-environment.md).
+- Source of truth: [Promotion & Release](../../architecture/promotion-and-release.md).
 - Learn the substrate: [ArgoCD](https://argo-cd.readthedocs.io/en/stable/) ·
   [Argo Rollouts](https://argo-rollouts.readthedocs.io/en/stable/) ·
   [ApplicationSets](https://argo-cd.readthedocs.io/en/stable/user-guide/application-set/) ·

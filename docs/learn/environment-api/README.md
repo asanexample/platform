@@ -39,5 +39,3 @@ Depth on one hard mechanism, once you have the model:
 - Onboard/operate an environment: the `environment-onboarding` skill +
   [runbook](../../runbooks/environment-onboarding.md)
 - Change the machine itself: the `crossplane-composition-authoring` skill
-- Why it's shaped this way: [ADR-067](../../adrs/067-idp-domain-model.md) (domain model),
-  [ADR-048](../../adrs/048-federated-per-cluster-crossplane.md) (federated per cluster)

@@ -7,8 +7,7 @@ reconciled. For the wider picture, see the [agentic orientation](orientation.md)
 the [Reference](reference.md).
 
 **Status, up front and honest.** Everything here is checked against the repo code — the `agent-api`
-chart, the Composition, the XRD, `gitops/agents/`, `argocd-apps/agents.tf` — and the ADR-082 status
-header (Accepted 2026-06-25, built and live 2026-06-26, epic #718). The hub cluster is parked this
+chart, the Composition, the XRD, `gitops/agents/`, `argocd-apps/agents.tf`. The hub cluster is parked this
 session, so I couldn't `kubectl` the running objects; where a live-behavior claim matters, I lean on
 the code path that produces it. There is exactly one `XAgent` today, the triage copilot. This is not a
 fleet.
@@ -67,9 +66,9 @@ metadata:
   name: triage-copilot          # → ns platform-agent-triage-copilot; SA + IAM role named from it
 spec:
   team: platform                # required — join key to gitops/products/<team>/<product>.yaml
-  product: triage-copilot       # required — image/ECR scope + signing identity (supply chain, ADR-081)
-  placement: { cluster: platform }              # enum ["platform"] — hub-only (ADR-082 D2)
-  model: { provider: bedrock, id: us.anthropic.claude-sonnet-4-6 }   # id PINNED (ADR-074)
+  product: triage-copilot       # required — image/ECR scope + signing identity (supply chain)
+  placement: { cluster: platform }              # enum ["platform"] — hub-only
+  model: { provider: bedrock, id: us.anthropic.claude-sonnet-4-6 }   # id PINNED
   obsRead: true                 # bind the read-only obs ClusterRole to the agent's SA — NO Secrets
   awsPermissions:
     policyStatements:           # extra IAM, deny-set validated + boundary-capped
@@ -82,7 +81,7 @@ spec:
 
 Every field earns its place, and the absences teach as much as the presences. `team` and `product` are
 the only required fields; they join to the `Product` registry so the agent's image, ECR scope, and
-signing identity come from the same supply chain as any tenant workload (ADR-081, unchanged — more below).
+signing identity come from the same supply chain as any tenant workload.
 `placement.cluster` is an `enum: ["platform"]`, so the schema cannot express running an agent anywhere but
 the hub. `model.id` is a pinned string — no floating "latest"; a model change is a new release.
 `autonomy.mode` is an `enum: ["propose-only"]` with exactly one member: the API can't even represent an
@@ -168,9 +167,9 @@ on it.
 ## The GitOps control plane: a commit is the only verb
 
 Provisioning is IaC, so you might expect adding an agent to be a `terragrunt apply`. It isn't — and that's
-the GitOps-native promise of ADR-082 D4. The chart is installed once on the hub by the `crossplane` module
+the GitOps-native promise. The chart is installed once on the hub by the `crossplane` module
 (`enable_agent_api = true` on the hub unit; note `enable_environment_api` stays off there — the hub
-provisions agents, not tenants, so ADR-048 holds). After that one apply, adding an agent is a git commit.
+provisions agents, not tenants). After that one apply, adding an agent is a git commit.
 Two ArgoCD pieces, both in `argocd-apps/agents.tf`, make that true, and both target the hub, unlike tenant
 delivery which targets a workload cluster:
 
@@ -180,7 +179,7 @@ delivery which targets a workload cluster:
   and `namespaceResourceWhitelist` is `[]`. That sync road can create `XAgent`s and nothing else — a
   compromised registry commit can't project some rogue ClusterRole onto the hub.
 - **A per-agent workload ApplicationSet** (`agent-<name>`) fans over `gitops/releases/<team>/<product>/*.yaml`
-  — the promoted, signed image digest (ADR-071) — and delivers the Deployment/Service into the
+  — the promoted, signed image digest — and delivers the Deployment/Service into the
   Composition-made namespace. Its `AppProject` has `clusterResourceWhitelist: []` — no cluster-scoped writes
   at all — and its namespaced whitelist notably excludes ServiceAccount: the Composition owns the SA, so the
   app must drop its own SA manifest. Delivery physically cannot forge identity.
@@ -198,27 +197,23 @@ second agent is: write `gitops/agents/<name>.yaml`, add the `agent-<name>` proje
 
 ---
 
-## Why the hub, and why Bedrock needed an SCP change
+## Why the hub, and why Bedrock touches an SCP
 
-Two decisions here are scar tissue from a real mistake, and they teach better than the happy path.
+Two placement decisions explain the shape of the runtime.
 
-**Why the hub, not preprod.** ADR-081 reached for one delivery road — correct for the supply chain — but
-over-corrected and unified runtime placement too, routing the agent through the tenant `XEnvironment` model
-as a `platform`-team product. With per-environment placement deferred, the agent landed on preprod, a
-workload cluster, where its observability (Loki/Mimir/Tempo) and its trigger (Alertmanager) are all
-hub-resident and unreachable. The agent ran but was blind, correctly abstaining on every alert. ADR-082
-fixes exactly that: runtime forks by workload type. A tenant gets an `XEnvironment` on a workload cluster; a
-platform agent gets an `XAgent` on the hub, where the signals already live. The `platformTrust` envelope
-ADR-081 invented to force a platform-infra tool into a tenant shape became vestigial — the tell that the
-shoe never fit.
+**Why the hub, not a workload cluster.** The signals the agent reads — cross-tenant observability
+(Loki/Mimir/Tempo) and its Alertmanager trigger — are all hub-resident. An agent placed on a workload
+cluster like preprod couldn't reach them: it would run but be blind, abstaining on every alert. So runtime
+forks by workload type. A tenant gets an `XEnvironment` on a workload cluster; a platform agent gets an
+`XAgent` on the hub, where the signals already live. A platform-infra tool doesn't fit the tenant shape — it
+belongs on the hub.
 
-**Why Bedrock touched an org SCP (D8).** The pinned model `us.anthropic.claude-sonnet-4-6` is a
+**Why Bedrock touches an org SCP.** The pinned model `us.anthropic.claude-sonnet-4-6` is a
 cross-region inference profile — it routes invocations across `us-east-1`, `us-east-2`, and `us-west-2`.
-The org `deny-regions` SCP would block the out-of-primary-region calls, so its `NotAction` was broadened for
-the Bedrock data-plane actions only; management actions stay region-pinned. It's recorded in the ADR
-precisely so it reads as a deliberate, scoped decision and not a silent SCP edit. (Bedrock access is
-per-account too: the model grant is minted in the agent's own account, and requires a model-access agreement
-there.)
+The org `deny-regions` SCP would block the out-of-primary-region calls, so its `NotAction` is broadened for
+the Bedrock data-plane actions only; management actions stay region-pinned — a deliberate, scoped exception,
+not a blanket one. (Bedrock access is per-account too: the model grant is minted in the agent's own account,
+and requires a model-access agreement there.)
 
 ---
 
@@ -259,12 +254,9 @@ whole safety argument in one render.
 
 ## Go deeper
 
-- **Back to the journey:** the [agentic orientation](orientation.md), and its sibling deep dives —
+- **Back to the whole picture:** the [agentic orientation](orientation.md), and its sibling deep dives —
   [bounding the agent](deep-dive-bounding-the-agent.md) (the identity/network/data safety in full) and
   [the triage copilot](deep-dive-the-triage-copilot.md) (the one live agent, end to end).
-- **Source of truth (ADRs):** [ADR-082](../../adrs/082-platform-agent-runtime-xagent.md) (this runtime),
-  [ADR-081](../../adrs/081-platform-service-delivery.md) (the supply-chain/runtime split it resolves),
-  [ADR-074](../../adrs/074-agentic-workloads-platform.md) (agents as a governed workload class).
 - **The code:**
   [`xagent-xrd.yaml`](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/agent-api/templates/xagent-xrd.yaml),
   [`files/composition.yaml`](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/agent-api/files/composition.yaml),

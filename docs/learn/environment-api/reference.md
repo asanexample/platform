@@ -16,11 +16,11 @@ XR). Defined by the [XRD](https://github.com/asanexample/platform/blob/main/infr
 | `stage` | yes | `dev` \| `test` \| `uat` \| `staging` \| `prod`. |
 | `customer` | conditional | Required only for per-customer Products at prod/uat; appended to the namespace. |
 | `tier` | — (`standard`) | `standard` \| `elevated` \| `pci` \| `hipaa` — the hardening profile. |
-| `preview` | — (`false`) | Opt into PR-preview delivery (ADR-032). |
+| `preview` | — (`false`) | Opt into PR-preview delivery. |
 | `isolation.compute` | — | `shared-namespace` … `dedicated-account`; resolved from Product/tier if unset. |
 | `residency.allowedLocations` | — (`["*"]`) | Must be a subset of the Team's allowed locations. |
 | `quota` | — (defaults) | `cpu`, `memory`, `pods`, `services`, `loadbalancers`, `pvcs`, `storage`. |
-| `domains` | — (`[]`) | **An array of plain host strings** (see the gotcha below — the older docs described objects). |
+| `domains` | — (`[]`) | **An array of plain host strings** (see the gotcha below). |
 | `services.<svc>` | — | Per-service: `serviceAccount`, `image`, `preview`, `permissions.aws.policyStatements[]`, and `resources.<name>` (self-service cloud deps). |
 | `lifecycle.phase` | — (`active`) | `active` \| `suspended` \| `decommissioning`. Suspend zeroes the ResourceQuota (reversible). |
 | `platformTrust.clusterRoles` | — (`[]`) | Extra platform ClusterRoles to bind in the namespace. |
@@ -64,7 +64,7 @@ service:
   scan-on-push, `deletionPolicy: Orphan`), a cross-account `RepositoryPolicy` (pull for preprod/prod),
   and a `LifecyclePolicy`.
 
-**Self-service cloud resources** (`services.<svc>.resources`, ADR-073 — its own
+**Self-service cloud resources** (`services.<svc>.resources` — its own
 [module](../self-service-resources/orientation.md)):
 [S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html) /
 [SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html) /
@@ -99,7 +99,7 @@ sequenceDiagram
   `environments` app syncs them (`selfHeal` + `prune` + ServerSideApply). ArgoCD applies as a platform
   IAM role — the only principal allowed to create `XEnvironment`s.
 - **Topology:** federated — one Crossplane per cluster; the Environment API runs on **preprod**
-  (`enable_environment_api = true` there only), not the hub (ADR-048). The single cross-account hop is
+  (`enable_environment_api = true` there only), not the hub. The single cross-account hop is
   ECR.
 - **Lifecycle:** `lifecycle.phase: suspended` zeroes the quota (reversible pause); `decommissioning`
   begins teardown; removing the YAML (a gated, decommission-first PR) prunes the `XEnvironment` and the
@@ -172,14 +172,14 @@ admin approval that isn't the author (plus the release-approver for a `prod` bun
   objects*; a breaking in-place change can make Crossplane treat live `XEnvironment`s as invalid and tear
   down their footprints. Follow the safe-apply procedure in the `crossplane-composition-authoring` skill —
   never treat an XRD edit as routine.
-- **`domains` is a list of strings.** Older prose described `{host, canonical, dns}` objects; the XRD
-  defines plain host strings, and the Composition ranges over them as hosts. Trust the XRD.
+- **`domains` is a list of strings.** The XRD defines plain host strings, and the Composition ranges
+  over them as hosts. Trust the XRD.
 - **`status.domains` doesn't have a live state machine.** Every bound host is written `Active`
   immediately; the `Pending → Active` transition is designed but not built. The *real* ingress gate is
   the `restrict-route-hostnames-$ns` Kyverno policy, not the status.
 - **Developer cluster access is only the in-cluster RoleBinding today.** The Composition renders a
-  `PodIdentityAssociation` but **no** `AccessEntry` / `DeveloperAccess-<team>` IAM role (#647). Use
-  `platctl kubeconfig` / PlatformAdmin for cluster access until the OIDC-native path (ADR-068) is built.
+  `PodIdentityAssociation` but **no** `AccessEntry` / `DeveloperAccess-<team>` IAM role. Use
+  `platctl kubeconfig` / PlatformAdmin for cluster access until the OIDC-native path is built.
 - **The Composition ships raw.** It's delivered via `.Files.Get` so Helm doesn't try to process its
   inline `{{ }}` go-template. If you edit it, you're editing the go-template the *cluster's*
   `function-go-templating` runs, not a Helm template.

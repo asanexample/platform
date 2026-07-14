@@ -26,5 +26,4 @@ building the existing four. Using a resource is easy; extending the catalog is t
 
 - The claim this extends: [The Environment API](../environment-api/orientation.md); where the derived IAM
   lands: [Identity & Access](../identity/orientation.md).
-- Why it's shaped this way: [ADR-073 Self-Service Cloud Resources](../../adrs/073-self-service-cloud-resources.md).
 - Provision one: the `environment-onboarding` skill.

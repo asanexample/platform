@@ -91,9 +91,8 @@ credentials it got from Pod Identity (short-lived, scoped, no static keys). If i
 service* — say it calls a `checkout` API — that's an east-west hop, allowed or denied by Cilium network
 policy between pods, encrypted on the wire (WireGuard) and, where a policy sets
 `authentication.mode: required`, mutually authenticated so the two services cryptographically prove who
-they are (SPIFFE identity via SPIRE). This is the live `acme-shop → acme-checkout` showcase —
-[ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md); fleet-wide enforcement is the
-remaining step.
+they are (SPIFFE identity via SPIRE). This is the live `acme-shop → acme-checkout` showcase;
+fleet-wide enforcement is the remaining step.
 
 **Observed the whole time — the envelope around every step, not one of them.** The request is being watched without
 anyone instrumenting it by hand. [OpenTelemetry](https://opentelemetry.io/docs/) / eBPF

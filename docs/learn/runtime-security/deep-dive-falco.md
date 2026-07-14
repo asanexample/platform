@@ -11,8 +11,8 @@ why the alarm is wired to no one on purpose.
 
 Walk the platform's security layers as gates in time. [Kyverno admission](../policy/orientation.md) runs once,
 at `kubectl apply`: it inspects the pod's *config* — image registry, probes, `securityContext`, hostPath mounts —
-rejects it or lets it in, and steps aside. [Supply chain](../supply-chain/orientation.md) (cosign / SLSA,
-[ADR-042](../../adrs/042-isolated-build-provenance-slsa-l3.md)) runs once, at image *pull*: it verifies the
+rejects it or lets it in, and steps aside. [Supply chain](../supply-chain/orientation.md) (cosign / SLSA)
+runs once, at image *pull*: it verifies the
 signature and provenance of the *bytes*, and steps aside. Both are point-in-time gates on static properties.
 
 Once the container is running, its behavior is something no manifest can describe. A signed,
@@ -20,8 +20,7 @@ fully-admission-compliant container — exactly the kind both gates wave through
 app vulnerability and then spawn a shell, read `/etc/shadow`, write a new binary under `/usr/bin`, call `setuid(0)`
 to escalate, or open an outbound connection to somewhere it has no business talking to. None of that is
 expressible as pod *config*, so none of it is checkable at admission. That's the blind spot Falco
-([ADR-045](../../adrs/045-falco-runtime-threat-detection.md), **Accepted**) fills — the complement to the gates,
-not a replacement.
+fills — the complement to the gates, not a replacement.
 
 In the [4 Cs of cloud-native security](https://kubernetes.io/docs/concepts/security/overview/) (Cloud, Cluster,
 Container, Code), Falco owns the Container-runtime-behavior layer: the continuous watcher on what a running
@@ -59,11 +58,11 @@ every AMI upgrade. And it coexists with [Cilium](../foundations/deep-dive-the-cl
 *also* eBPF: they attach to different hook points (Cilium at the networking datapath; Falco at the syscall
 tracepoints), so there's no collision — two eBPF tenants, one kernel, no fight.
 
-Why Falco and not the near-misses? [ADR-045](../../adrs/045-falco-runtime-threat-detection.md) weighed the field:
+Why Falco and not the near-misses? The alternatives each fall short:
 **Tetragon** (also eBPF, same Cilium project — but a low-level primitive that needs heavy policy authoring to reach
 Falco's out-of-box detection parity); **GuardDuty Runtime Monitoring** (managed and easy, but per-vCPU priced, an
 opaque non-tunable ruleset, and AWS-locked — wrong for an OSS-default platform); **Tracee** (similar approach,
-smaller ecosystem). Falco won on a mature curated ruleset out of the box, the falcosidekick routing ecosystem,
+smaller ecosystem). Falco wins on a mature curated ruleset out of the box, the falcosidekick routing ecosystem,
 CNCF-graduated status, and rules-as-code you actually control.
 
 ### Why a privileged DaemonSet
@@ -166,10 +165,9 @@ $ AWS_PROFILE=platform kubectl --context platform -n falco logs deploy/falco-fal
 `Enabled Outputs: []`. Both live units pass only `enable_falcosidekick = true` and no `falcosidekick_config`,
 so falcosidekick has zero output destinations. It receives every event Falco produces and logs it to
 stdout — and stops there. Nothing goes to Slack, no SNS topic, no dashboard. Falco sees everything on both
-clusters right now, and tells no one. [ADR-045](../../adrs/045-falco-runtime-threat-detection.md) says this in as
-many words: *"until falcosidekick → SNS/observability lands, nobody is paged."*
+clusters right now, and tells no one: until falcosidekick → SNS/observability lands, nobody is paged.
 
-Where the alerts will go is designed but deferred (tracked under #116 / #102):
+Where the alerts will go is designed but deferred:
 
 - **SNS** → the shared platform-alerts topic. The
   [`aws/sns-notifications`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/sns-notifications/main.tf)
@@ -188,8 +186,7 @@ The two threads tie together here. The default ruleset catches the genuinely bad
 `/etc/shadow`, a write below a binary dir, a `setuid` privilege escalation, an unexpected outbound connection, a
 container escape, contact-the-API-from-a-container — each MITRE-tagged. But out of the box it also flags
 legitimate platform behavior, as the live stream proves every second. Tuning that ruleset to each cluster's real
-behavior is the actual operational cost of Falco — and [ADR-045](../../adrs/045-falco-runtime-threat-detection.md)
-lists it as an explicit Negative and an open follow-up.
+behavior is the actual operational cost of Falco — an explicit trade-off and an open follow-up.
 
 That's why the rollout sequences detection before routing. You run to stdout first, watch what actually
 fires, and tune the known-good patterns before you point the alarm at a human. Wire SNS to an untuned firehose
@@ -227,8 +224,6 @@ chosen for.
 
 **Source of truth (this platform):**
 
-- [ADR-045 — Falco for Runtime Threat Detection](../../adrs/045-falco-runtime-threat-detection.md) — the decision,
-  the rejected alternatives (Tetragon / GuardDuty / Tracee), and the honest staged rollout.
 - The [`falco` module](https://github.com/asanexample/platform/blob/main/infra/modules/falco/main.tf) —
   `main.tf` (values), [`variables.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/falco/variables.tf)
   (`driver_kind`, `falcosidekick_config`). Live units:

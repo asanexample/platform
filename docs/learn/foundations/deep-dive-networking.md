@@ -89,7 +89,7 @@ it's slower, it costs NAT data charges, and it's visible on the street.
 The addresses themselves are planned by deterministic math. Here is that math, because it's the reason
 the corridor in §4 can exist at all.
 
-The scheme has **three nested levels** ([ADR-015](../../adrs/015-cidr-allocation-strategy.md)):
+The scheme has **three nested levels**:
 
 - **Cloud → /14.** AWS owns `10.100.0.0/14` (four contiguous /16s). Azure and GCP have reserved /14s
   for the day they land; today only AWS is deployed.
@@ -133,11 +133,10 @@ bound for `10.100.5.5` has no way to know whether that's *its own* `10.100.5.5` 
 routing table can't hold two entries for the same destination. The Transit Gateway in §4 is *impossible*
 on overlapping ranges; disciplined CIDRs are its precondition, not a nicety.
 
-This isn't hypothetical — ADR-015 records a real caught collision. Earlier Azure/GCP scaffolding put
-**GCP at `10.102.0.0/16`, colliding with AWS prod's `10.102.0.0/16`**. It was caught and removed before
-it could break cross-cloud routing. The strategy is what surfaced it; an ad-hoc "pick a range that looks
-free" approach is exactly how that collision ships unnoticed and detonates the first time someone tries
-to connect the two.
+The hazard is concrete: put **GCP at `10.102.0.0/16`** and it collides with AWS prod's `10.102.0.0/16`,
+breaking cross-cloud routing. The disciplined strategy is what surfaces such a collision; an ad-hoc
+"pick a range that looks free" approach is exactly how it ships unnoticed and detonates the first time
+someone tries to connect the two.
 
 ### The pod overlay is a *different* address space
 
@@ -159,9 +158,8 @@ shouldn't. You route to the **Service**, or to the node's VPC address, never to 
 
 ## 4. The Transit Gateway: one corridor, not a maze of tunnels
 
-The VPCs are non-overlapping, so now they can be joined. The join is a single **[Transit Gateway](https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html)**
-([ADR-034](../../adrs/034-transit-gateway-cross-account-connectivity.md)) — the corridor — living in
-the platform account and *shared* to the spoke accounts. It's live right now:
+The VPCs are non-overlapping, so now they can be joined. The join is a single **[Transit Gateway](https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html)** —
+the corridor — living in the platform account and *shared* to the spoke accounts. It's live right now:
 
 ```console
 $ AWS_PROFILE=platform aws ec2 describe-transit-gateways \
@@ -217,9 +215,9 @@ linear beats quadratic well before you have many spokes.
 The corridor gives the platform account an IP *path* to the preprod cluster. It does **not** give it a
 working *name* — and that gap is a whole module. This is the subtlest piece of the networking layer.
 
-The preprod EKS API endpoint is **private-only** ([ADR-010](../../adrs/010-private-eks-api-endpoint.md)). AWS *does* create a Route53 private hosted
+The preprod EKS API endpoint is **private-only**. AWS *does* create a Route53 private hosted
 zone that resolves its DNS name to its real private ENI IPs — but that zone is **managed internally by
-EKS and is invisible to the Route53 API** ([ADR-035](../../adrs/035-cross-vpc-dns-resolution.md)). You can't list it, export it, or associate it with
+EKS and is invisible to the Route53 API**. You can't list it, export it, or associate it with
 another VPC. So ArgoCD in the platform account, resolving the preprod API hostname, gets the *public*
 DNS answer — which points at IPs it has no route to. The name resolves; the packet dies. The room has an
 internal number, but its address isn't in any directory the neighbour can read.
@@ -270,7 +268,7 @@ fi
 It also fails loud on a denied `assume-role`, with the actual reason: the cross-account lookup can only
 be done by an identity in the target role's trust policy, so it must run with a profile that can assume
 it (e.g. `management`). Run it with the platform-account profile and it *isn't* trusted by preprod's
-`PlatformDeployer` — historically that would fall through to the wrong account and find zero ENIs. The
+`PlatformDeployer` — it falls through to the wrong account and finds zero ENIs. The
 hardened script turns "silent zero, severed access" into a plan-time stop with the fix printed. The
 general lesson: a control-plane lookup that can return "nothing" must treat nothing as an **error**, not
 as data.
@@ -291,15 +289,11 @@ as data.
   can, e.g. `management`), or the target cluster is down. The script prints the exact fix — don't work
   around it by making the failure silent.
 - **"Two environments' CIDRs overlap and TGW routing is broken."** There is no fix at the routing layer —
-  overlap makes routing *undecidable*. Re-IP one environment onto its correct /16 (this is the class of
-  bug ADR-015's caught GCP/prod collision was).
+  overlap makes routing *undecidable*. Re-IP one environment onto its correct /16 (the CIDR-collision
+  class of bug the disciplined scheme prevents).
 
 ## Go deeper
 
-- **ADRs (source of truth):** [ADR-015 CIDR allocation](../../adrs/015-cidr-allocation-strategy.md) ·
-  [ADR-034 Transit Gateway](../../adrs/034-transit-gateway-cross-account-connectivity.md) ·
-  [ADR-035 cross-VPC DNS](../../adrs/035-cross-vpc-dns-resolution.md) ·
-  [ADR-010 private EKS endpoint](../../adrs/010-private-eks-api-endpoint.md).
 - **The modules:**
   [`infra/modules/aws/networking/`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/networking) ·
   [`transit-gateway/`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/transit-gateway) ·

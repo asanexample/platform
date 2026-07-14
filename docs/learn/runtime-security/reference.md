@@ -17,7 +17,7 @@ operate at runtime, and this module owns them. The first two live in [Policy](..
 | fleet/tier mTLS enforcement | per-`regulated`-tier | auth-policies wired into the Environment Composition | **designed, not built** (no regulated tenant) |
 | behavioral detection | Falco | eBPF syscall monitoring, per-node DaemonSet | **LIVE both — detecting; routing deferred** |
 
-## Falco — runtime threat detection ([ADR-045](../../adrs/045-falco-runtime-threat-detection.md), Accepted)
+## Falco — runtime threat detection
 
 - **Idea:** Kyverno gates config at admission; cosign gates the image; Falco watches runtime behavior — a
   shell in a container, a read of `/etc/shadow`, a write below a binary dir, priv-esc, an unexpected
@@ -31,15 +31,15 @@ operate at runtime, and this module owns them. The first two live in [Policy](..
   real events (e.g. rule `Contact K8S API Server From Container`, priority `Notice`, tag `T1565`).
 - **falcosidekick — routing (DEFERRED):** deployed (2 replicas) but `Enabled Outputs: []`, so it logs to
   stdout only and nobody is paged. SNS/Slack/observability outputs are a one-var change
-  (`falcosidekick_config = { sns = { topicarn = … } }`) tracked by #116/#102. The `aws/sns-notifications`
+  (`falcosidekick_config = { sns = { topicarn = … } }`). The `aws/sns-notifications`
   module names Falco as a future publisher; no Falco alert reaches the observability stack yet.
 - **Tuning is the real cost:** the stock ruleset is noisy — it flags the Tailscale operator, Beyla, and
   external-dns legitimately contacting the K8s API as "unexpected". The sequence is detect-to-stdout, observe,
   tune, then wire outputs. Tuning means adding an exception or allowlist macro via a custom-rules ConfigMap, a
   module extension that isn't wired today.
-- **Deployed:** preprod (#116/#134) + platform (2026-07-06, #149).
+- **Deployed:** preprod + platform (2026-07-06).
 
-## East-west zero-trust ([ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md))
+## East-west zero-trust
 
 Two layers sit on top of the Cilium default-deny NetworkPolicy floor, both Cilium-native with no sidecar mesh.
 A mesh is only justified by L7 east-west traffic management, which isn't needed here.
@@ -69,7 +69,7 @@ A mesh is only justified by L7 east-west traffic management, which isn't needed 
 - **Proof (preprod):** the real `acme-shop → acme-checkout` call is SPIRE-mutually-authenticated; a cross-team
   impostor is DROPPED at checkout's ingress. The auth-required CNP lives in the `acme-shop` app repo, not
   `gitops/`.
-- **Decision resolved:** embedded SPIRE, which attests via k8s PSAT and stays clean on the overlay+WireGuard
+- **Embedded SPIRE, not standalone:** attests via k8s PSAT and stays clean on the overlay+WireGuard
   stack. Standalone SPIRE only earns its keep if identity is needed beyond Cilium — app-level mTLS or
   cross-cluster federation.
 - **Status:** a live showcase, one pair, preprod. Fleet-wide, `regulated`-tier-gated enforcement (wiring
@@ -78,9 +78,9 @@ A mesh is only justified by L7 east-west traffic management, which isn't needed 
 - **Gotchas:** (1) `authentication.enabled: true` is mandatory; off denies auth-required traffic. (2) it needs
   a rolling Cilium restart, since the config is read at startup. (3) cross-namespace needs both netpol halves —
   env namespaces default-deny egress too, and a k8s `ipBlock` doesn't cover in-cluster identities. (4) the
-  delivery AppProject must permit tenant `(Cilium)NetworkPolicy` (#1207). (5) SPIRE's PVC datastore hits the
-  EBS-encryption SCP, so it needs an encrypted StorageClass (the preprod encrypted-gp3 default fix
-  #1202/#1203); `spire_persistence=false` is ephemeral, fine for a spike but not a showcase.
+  delivery AppProject must permit tenant `(Cilium)NetworkPolicy`. (5) SPIRE's PVC datastore hits the
+  EBS-encryption SCP, so it needs an encrypted StorageClass (the preprod encrypted-gp3 default);
+  `spire_persistence=false` is ephemeral, fine for a spike but not a showcase.
 
 ## Where the runtime hardening also comes from (cross-refs)
 

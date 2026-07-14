@@ -19,29 +19,29 @@ the admission walk, SSO groups and roles — read the [domain model](../domain-m
 
 ## `spec.envelope` — the bound on every Product/Environment the Team may author
 
-| field | required | type / enum | bounds | ADR |
-| --- | --- | --- | --- | --- |
-| `allowedTiers` | ✅ | array, `standard`\|`elevated`\|`pci`\|`hipaa` | compliance tier an Environment may request | [013](../../adrs/013-compliance-tier-model.md) |
-| `allowedStages` | ✅ | array, `dev`\|`test`\|`uat`\|`staging`\|`prod` | stage an Environment may deploy to | [067](../../adrs/067-idp-domain-model.md) |
-| `allowedLocations` | | array of string, default `["*"]` | data-residency regions an Environment may pick | [067](../../adrs/067-idp-domain-model.md) |
-| `quotaCap` | ✅ | `cpu` (str), `memory` (str), `pods` (int) | per-Environment `ResourceQuota` ceiling (absent dim = effectively unlimited) | [067](../../adrs/067-idp-domain-model.md) |
-| `budget.monthlyUSD` | | number ≥ 0 | cost guardrail — surfaced/alerted only, **not read by the Composition**; absent = surfaced-but-unbounded | [091](../../adrs/091-cost-guardrails.md) |
-| `maxDedicatedIsolation` | | `cluster` (int≥0), `account` (int≥0), default `{cluster:0, account:0}` | how many Environments may dial the expensive isolation rungs; `0` = pooled only | [067](../../adrs/067-idp-domain-model.md) · [033](../../adrs/033-defer-vcluster-tenant-support.md) |
-| `maxCrossTeamGrantsPerProduct` | | int, default `10`, min 0 | cap on active inbound AccessGrants per Product | [068 §9](../../adrs/068-product-scoped-and-cross-team-access-model.md) |
-| `resources.allowedEngines` | | array, `s3`\|`sqs`\|`sns`\|`dynamodb`, default `[]` | self-service cloud engines the Team may declare; empty = none (**default-deny**) | [073](../../adrs/073-self-service-cloud-resources.md) |
-| `resources.maxPerEnvironment` | | int, default `0`, min 0 | max self-service resources per Environment | [073](../../adrs/073-self-service-cloud-resources.md) |
-| `resources.isolationFloor` | | `shared`\|`dedicated`, default `shared` | lowest data-isolation rung requestable | [073](../../adrs/073-self-service-cloud-resources.md) |
+| field | required | type / enum | bounds |
+| --- | --- | --- | --- |
+| `allowedTiers` | ✅ | array, `standard`\|`elevated`\|`pci`\|`hipaa` | compliance tier an Environment may request |
+| `allowedStages` | ✅ | array, `dev`\|`test`\|`uat`\|`staging`\|`prod` | stage an Environment may deploy to |
+| `allowedLocations` | | array of string, default `["*"]` | data-residency regions an Environment may pick |
+| `quotaCap` | ✅ | `cpu` (str), `memory` (str), `pods` (int) | per-Environment `ResourceQuota` ceiling (absent dim = effectively unlimited) |
+| `budget.monthlyUSD` | | number ≥ 0 | cost guardrail — surfaced/alerted only, **not read by the Composition**; absent = surfaced-but-unbounded |
+| `maxDedicatedIsolation` | | `cluster` (int≥0), `account` (int≥0), default `{cluster:0, account:0}` | how many Environments may dial the expensive isolation rungs; `0` = pooled only |
+| `maxCrossTeamGrantsPerProduct` | | int, default `10`, min 0 | cap on active inbound AccessGrants per Product |
+| `resources.allowedEngines` | | array, `s3`\|`sqs`\|`sns`\|`dynamodb`, default `[]` | self-service cloud engines the Team may declare; empty = none (**default-deny**) |
+| `resources.maxPerEnvironment` | | int, default `0`, min 0 | max self-service resources per Environment |
+| `resources.isolationFloor` | | `shared`\|`dedicated`, default `shared` | lowest data-isolation rung requestable |
 
 ## Identity, routing, and status (not envelope)
 
-| field | type | meaning | ADR |
-| --- | --- | --- | --- |
-| `spec.ssoGroup` | string, ✅ | upstream IdP/Keycloak group the Team maps to (e.g. `Dev-acme`) — root of both authz planes | [063](../../adrs/063-team-as-first-class-git-object.md) |
-| `spec.slack.channel` | string | incident channel the owner-routing agent posts to | [084 D6](../../adrs/084-platform-identity-directory-and-owner-resolution.md) |
-| `spec.pagerduty.escalationPolicyId` | string | live on-call pointer (Phase 2) | [084 D7](../../adrs/084-platform-identity-directory-and-owner-resolution.md) |
-| `spec.oncall.{primary,fallback}` | arrays of GitHub logins | static accountable-contact fallback | [084 D7](../../adrs/084-platform-identity-directory-and-owner-resolution.md) |
-| `spec.platformTrust` | `clusterRoles[]`, `allowedIamActions[]`, default `{}` | **platform-owned Teams only** — cluster-read roles + IAM actions past the deny-set that tenants can't request | [081](../../adrs/081-platform-service-delivery.md) |
-| `status.productCount` / `environmentCount` / `dedicatedIsolationInUse` | int / int / obj `{cluster, account}` | controller-written rollup. The `kubectl get teams` printer columns are **SSO Group** (`.spec.ssoGroup`), **Stages** (`.spec.envelope.allowedStages`), and **Environments** (`.status.environmentCount`) | — |
+| field | type | meaning |
+| --- | --- | --- |
+| `spec.ssoGroup` | string, ✅ | upstream IdP/Keycloak group the Team maps to (e.g. `Dev-acme`) — root of both authz planes |
+| `spec.slack.channel` | string | incident channel the owner-routing agent posts to |
+| `spec.pagerduty.escalationPolicyId` | string | live on-call pointer |
+| `spec.oncall.{primary,fallback}` | arrays of GitHub logins | static accountable-contact fallback |
+| `spec.platformTrust` | `clusterRoles[]`, `allowedIamActions[]`, default `{}` | **platform-owned Teams only** — cluster-read roles + IAM actions past the deny-set that tenants can't request |
+| `status.productCount` / `environmentCount` / `dedicatedIsolationInUse` | int / int / obj `{cluster, account}` | controller-written rollup. The `kubectl get teams` printer columns are **SSO Group** (`.spec.ssoGroup`), **Stages** (`.spec.envelope.allowedStages`), and **Environments** (`.status.environmentCount`) |
 
 ## Where each field is enforced
 
@@ -75,7 +75,7 @@ coordinate, not a per-Team fan-out.
 | per-**Product** | CI ECR-push role, `verify-images`/`verify-attestations` policies, ApplicationSet, per-Service Pod-Identity + ECR repos | `github-oidc` / `policy` / `argocd-apps` / Composition | `spec.repo` / `<team>-<product>` (from the **Product** registry) |
 
 > Org-team membership is **not** in the Actions OIDC token, so it never carries the cosign/Kyverno
-> supply-chain identity — that anchors on repo name + per-Product role ([072](../../adrs/072-app-repo-naming-and-team-ownership.md)).
+> supply-chain identity — that anchors on repo name + per-Product role.
 
 ## Drift flags (designed-not-built / stale)
 
@@ -89,17 +89,12 @@ coordinate, not a per-Team fan-out.
 - **Per-team kubectl isn't built.** The group→role mapping exists in Keycloak, but the
   `DeveloperAccess-<team>` IAM role + EKS access entry is deferred; the Composition emits only the
   in-cluster `developers` RoleBinding. Use `platctl kubeconfig` / PlatformAdmin until built.
-- **`platformTrust` is unset on every real Team.** Platform agents now get cluster-read + Bedrock from
+- **`platformTrust` is unset on every real Team.** Platform agents get cluster-read + Bedrock from
   the `XAgent` Composition on the hub, not by a tenant Environment requesting a Team's `platformTrust`.
-- **`spec.roles` is retired.** Approver holding moved to `gitops/people`; `roles` is no longer a valid
-  Team key.
+- **Approver holding lives in `gitops/people`, not on the Team.** `spec.roles` is not a valid Team key.
 
 ## Go deeper
 
 - The model: [domain model](../domain-model/orientation.md) · [identity](../identity/orientation.md).
 - The consumers: [Environment API](../environment-api/orientation.md) · [Policy](../policy/orientation.md) ·
   [Self-service resources](../self-service-resources/orientation.md).
-- Why it's shaped this way: [ADR-063 Team as a git object](../../adrs/063-team-as-first-class-git-object.md) ·
-  [ADR-067 domain model](../../adrs/067-idp-domain-model.md) ·
-  [ADR-068 access model](../../adrs/068-product-scoped-and-cross-team-access-model.md) ·
-  [ADR-072 ownership](../../adrs/072-app-repo-naming-and-team-ownership.md).

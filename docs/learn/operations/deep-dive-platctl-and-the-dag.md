@@ -13,7 +13,7 @@ It is built and in daily use — `make build-platctl` compiles it to `./bin/plat
 `discover_test`, `hooks_test`, `validate_test`). Eight verbs hang off the root command
 ([`main.go`](https://github.com/asanexample/platform/blob/main/cmd/platctl/main.go)): `bootstrap`,
 `teardown`, `validate`, `kubeconfig`, `status`, `down`/`up` (park), and `access` (short-lived
-elevation, ADR-088). This dive is about the first three and the engine underneath them.
+elevation). This dive is about the first three and the engine underneath them.
 
 ## The graph is discovered, not hardcoded
 
@@ -141,11 +141,10 @@ flowchart TD
   POL --> XP
 ```
 
-**The floor is below `platctl` (ADR-006).** The S3 state backend can't be created by something that uses
+**The floor is below `platctl`.** The S3 state backend can't be created by something that uses
 the S3 state backend — you can't store your state in a bucket that doesn't exist yet. So `state-bootstrap`
 uses a local backend for its first apply, creating the bucket + the `terraform-locks` DynamoDB table that
-every other unit then uses for remote state. (Migrating `state-bootstrap`'s own state into that bucket is a
-tracked ADR-006 follow-up; until it lands, this unit's state stays local — see the status note below.)
+every other unit then uses for remote state. (`state-bootstrap`'s own state stays local.)
 This floor (`state-bootstrap` / `state-access` / `sops-kms`) lives under `infra/live/aws/mgmt/global/`,
 outside both environment trees, precisely so `platctl` never discovers it — the seed vault that must
 survive every fire; `sops-kms` carries `prevent_destroy` as a second belt. Two greenfield escapes exist
@@ -155,15 +154,15 @@ and `TG_FORCE_DEPLOYER=1` (an in-VPC CI runner).
 **The cluster spine — and why EKS is deliberately split.** The core chain is `iam-roles` + `networking` →
 `eks` → `cilium` → `node-groups` → `eks-addons` (with `karpenter` off `node-groups`). It's a
 subfloor-before-carpet rule made concrete. The cluster runs [Cilium](https://docs.cilium.io/) as
-bring-your-own CNI instead of the AWS VPC CNI (ADR-008), and the ordering is brutal: the cluster must exist
+bring-your-own CNI instead of the AWS VPC CNI, and the ordering is brutal: the cluster must exist
 before Cilium installs; Cilium must be running before a node group joins (a node with no CNI comes up
 `NotReady`); [CoreDNS](https://coredns.io/) and the other add-ons can't schedule until both CNI and nodes
 are ready. A single monolithic EKS module cannot express "create the cluster, wait for an external Helm
-install, then add nodes" — so EKS is split into four units (ADR-009), and the ordering is structural
+install, then add nodes" — so EKS is split into four units, and the ordering is structural
 (separate units wired by `dependency` blocks), not a `depends_on` inside one module. The dry-run above
 shows it: `eks` in Wave 3, `cilium` in Wave 4.
 
-**Bootstrap-then-lockdown for the private endpoint (ADR-010).** The EKS API is private-only by design —
+**Bootstrap-then-lockdown for the private endpoint.** The EKS API is private-only by design —
 `endpoint_public_access` defaults to `false`. But during a from-scratch build there is no in-VPC path yet
 (Tailscale isn't up), so `platctl` applies `eks` with a bootstrap override — `.platctl.yaml` sets
 `bootstrap_args: ["-var", "endpoint_public_access=true"]` on both `platform/eks` and `preprod/eks` — brings
@@ -173,7 +172,7 @@ is the only time the public endpoint is ever on, and `platctl` owns the toggle e
 **The platform-services layer (~60 units).** Above the spine, the graph encodes the real service
 dependencies: `external-secrets` → `secret-stores` (the `ClusterSecretStore` before any `ExternalSecret`
 consumer); `keycloak` → `keycloak-config` → `argocd`, because ArgoCD brokers OIDC directly to Keycloak
-(Dex retired, ADR-053/059) so the client secret must land before anyone signs in; `policy` (Kyverno) before
+so the client secret must land before anyone signs in; `policy` (Kyverno) before
 `crossplane`, because Kyverno policies match on Crossplane CRDs. None of this is in the Go — it's all
 `dependency` blocks the discovery step read off disk.
 
@@ -183,8 +182,8 @@ consumer); `keycloak` → `keycloak-config` → `argocd`, because ArgoCD brokers
 can't create — a Cloudflare API token before `cloudflare-dns`, a Tailscale API key before
 `tailscale-admin` — each with a check (e.g. `secret_exists` in Secrets Manager) that auto-skips the step
 when already satisfied. `--yes` skips the prompting, but a hard-failed check still aborts the run
-(`bootstrap.go` returns an error rather than proceed). There is deliberately no ArgoCD SSO manual step
-anymore — OIDC-via-Keycloak is fully IaC.
+(`bootstrap.go` returns an error rather than proceed). ArgoCD SSO needs no manual step — OIDC-via-Keycloak
+is fully IaC.
 
 **Hooks** are per-unit wrappers the engine invokes instead of a bare `terragrunt apply`
 ([`hooks/hooks.go`](https://github.com/asanexample/platform/blob/main/cmd/platctl/internal/hooks/hooks.go)).
@@ -292,13 +291,13 @@ all 31 validate tests run with zero real AWS or kubectl calls.
 
 - **Never run `platctl`/terragrunt from a git worktree.** The highest-stakes gotcha in the system.
   Several teardown/drain `null_resource`s (Crossplane orphan-sweeps; namespace-drain/CNPG-cleanup in
-  `backstage`/`keycloak`/`platform-directory`/`tailscale`/`observability`) used to bake an absolute
-  `scripts/*.sh` path into their `triggers`. From a worktree the path differs → Terraform sees a changed
-  trigger → replaces the resource → fires its `when = destroy` provisioner, force-deleting live environment
-  IAM roles + ECR repos on what looks like a routine apply. It's fixed — the path is now resolved at run
-  time via `git rev-parse --show-toplevel`, never baked into `triggers` (verify:
-  [`infra/modules/platform-directory/main.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/platform-directory/main.tf))
-  — but the rule stays until the fix proves out across real worktree applies. Operate from the main checkout.
+  `backstage`/`keycloak`/`platform-directory`/`tailscale`/`observability`) key their `triggers` off a
+  `scripts/*.sh` path. A worktree's differing absolute path could make Terraform see a changed
+  trigger → replace the resource → fire its `when = destroy` provisioner, force-deleting live environment
+  IAM roles + ECR repos on what looks like a routine apply. The path is resolved at run
+  time via `git rev-parse --show-toplevel`, never baked into `triggers` (see
+  [`infra/modules/platform-directory/main.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/platform-directory/main.tf)),
+  so it's guarded — but the rule stays as defense-in-depth. Operate from the main checkout.
 - **The graph won't warn you about an ordering it can't see.** If two units are related but neither
   declares a `dependency`, discovery finds no edge and the engine may run them in the same wave. That's what
   `implicit_deps` in `.platctl.yaml` is for — ordering that's real but not expressed as a Terragrunt
@@ -313,17 +312,11 @@ all 31 validate tests run with zero real AWS or kubectl calls.
 ## The honest status
 
 Everything above is built and in daily use: bootstrap, teardown, validate, park (`down`/`up`), the hooks,
-unlock/lockdown, resume, and the per-package test suites. The one designed-but-incomplete thread that
-touches this area is the ADR-006 follow-up to migrate the bootstrap units' own state into S3 — until that
-lands, the floor's state is local + gitignored. That's orthogonal to `platctl`, which by design never
-manages that floor unit at all.
+unlock/lockdown, resume, and the per-package test suites. The bootstrap floor's own state is local +
+gitignored — orthogonal to `platctl`, which by design never manages that floor unit at all.
 
 ## Go deeper
 
-- **ADRs (source of truth):** [ADR-006 state bootstrap](../../adrs/006-state-bootstrap-pattern.md) ·
-  [ADR-008 Cilium as CNI](../../adrs/008-cilium-as-cross-cloud-cni.md) ·
-  [ADR-009 EKS component separation](../../adrs/009-eks-component-separation.md) ·
-  [ADR-010 private EKS endpoint](../../adrs/010-private-eks-api-endpoint.md).
 - **Code:** [`cmd/platctl/ARCHITECTURE.md`](https://github.com/asanexample/platform/blob/main/cmd/platctl/ARCHITECTURE.md)
   (the contributor design doc) · [`internal/config/discover.go`](https://github.com/asanexample/platform/blob/main/cmd/platctl/internal/config/discover.go)
   · [`internal/engine/engine.go`](https://github.com/asanexample/platform/blob/main/cmd/platctl/internal/engine/engine.go)

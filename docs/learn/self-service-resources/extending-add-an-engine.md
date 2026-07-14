@@ -321,9 +321,8 @@ security invariants, and review those two things hardest.
 The engines above are reached with IAM — no password. A database is different, and it changes two things:
 
 - **Access isn't (only) IAM — it's a credential.** Instead of (or as well as) deriving IAM, you compose an
-  explicit Kubernetes `Secret` with the connection details and surface it via
-  [External Secrets](../../adrs/019-external-secrets-operator.md) rather than the plaintext ConfigMap. (In
-  Crossplane v2 you compose the Secret yourself — the old auto connection-details path is gone; see
+  explicit Kubernetes `Secret` with the connection details and surface it via External Secrets rather than
+  the plaintext ConfigMap. (In Crossplane v2 you compose the Secret yourself; see
   [function-go-templating on v2 connection details](https://github.com/crossplane-contrib/function-go-templating).)
 - **There's networking.** RDS/ElastiCache need a subnet group and security group, so the engine block emits
   more MRs. Model the safety floor accordingly (private subnets only, encryption, no public endpoint).
@@ -369,5 +368,4 @@ security rules.
 - **AWS:** [Kinesis](https://docs.aws.amazon.com/streams/latest/dev/introduction.html) +
   [its IAM](https://docs.aws.amazon.com/streams/latest/dev/controlling-access.html) ·
   [IAM resource scoping](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_resource.html).
-- Why it's shaped this way: [ADR-073](../../adrs/073-self-service-cloud-resources.md) · authoring
-  Compositions in-house: the `crossplane-composition-authoring` skill.
+- Authoring Compositions in-house: the `crossplane-composition-authoring` skill.

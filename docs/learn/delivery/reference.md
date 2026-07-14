@@ -30,7 +30,7 @@ spec:
 - The digest is what deploys, not a tag — immutable and content-addressed (see
   [Life of a Deployment](../spine/life-of-a-deployment.md) for why).
 - Keyed on the Release, not the Environment, so a Product can deliver to more than one stage without a
-  merge-key collision (ADR-071, #377).
+  merge-key collision.
 
 ## Delivery — the ApplicationSet
 
@@ -43,13 +43,12 @@ spec:
 - Sync policy is `automated { selfHeal = true, prune = true }` plus ServerSideApply. Self-heal reverts
   drift; prune deletes what git no longer declares.
 - Cross-account delivery: one ArgoCD on the **hub** delivers to environment **spoke** clusters across the
-  account boundary. The design is one spoke per account, with prod in its own dedicated account and cluster.
-  What's built today is one spoke — `preprod` (`argocd-clusters` registers `{preprod}` only). The prod account
-  exists (networking only, no cluster), so for now every stage including `prod` lands as a namespace on the
-  preprod spoke; it moves to its own account once the prod spoke is built. Each spoke is reached via a labeled
-  cluster `Secret` carrying AWS IAM auth — the application-controller does STS AssumeRole plus an EKS token
-  per target. The mechanism is generic over registered spokes.
-- Agents deliver to the hub via a separate platform-agent ApplicationSet (`agents.tf`, ADR-082), not to the
+  account boundary, one spoke per account. Only the `preprod` spoke exists today (`argocd-clusters` registers
+  it); the dedicated prod-account spoke isn't built yet, so every stage including `prod` lands as a namespace on
+  preprod for now. Each spoke is reached via a labeled cluster `Secret` carrying
+  AWS IAM auth — the application-controller does STS AssumeRole plus an EKS token per target. The mechanism is
+  generic over registered spokes.
+- Agents deliver to the hub via a separate platform-agent ApplicationSet (`agents.tf`), not to the
   environment spokes.
 
 ## Promotion — how a digest climbs
@@ -66,39 +65,37 @@ Three producers, one output: an `asanexample-promote[bot]` Release PR that the G
    `Synced + Healthy`. The digest climbs one rung per run, baking at each stage.
 
 The ladder: `dev → test → uat → staging` promotes automatically (health-gated); `prod` is gated by a
-release-approver (#501). Prod Release PRs never auto-merge.
+release-approver. Prod Release PRs never auto-merge.
 
 ## Progressive delivery — the Rollout
 
 - Every environment workload is a direct-`spec.template` Argo Rollout, not a Deployment, on every stage — so
-  prod is never the first place a Rollout runs (ADR-056).
+  prod is never the first place a Rollout runs.
 - Traffic shaping: the Gateway-API traffic-router plugin (`argoproj-labs/gatewayAPI`) does weighted
   HTTPRoute canary on the Cilium Gateway — Rollouts edits the HTTPRoute weights, the data plane routes by
   weight (see [Life of a Request](../spine/life-of-a-request.md)).
-- **Admission awareness (D2, ADR-056) — a real gotcha.** A `Rollout` isn't a `Deployment`, so the
+- **Admission awareness — a real gotcha.** A `Rollout` isn't a `Deployment`, so the
   workload-level availability policies (replica-floor, PDB-generate, topology-spread) only match it when
   `enable_rollout_kind = true` is set per cluster (default off — a Kyverno rule can't name a CRD
-  that's absent, so it's enabled only after the `argo-rollouts` unit is applied there, #7839).
+  that's absent, so it's enabled only after the `argo-rollouts` unit is applied there).
   Pod-level policies (securityContext, preStop drain, cosign-verify) apply to Rollout pods automatically
   via ReplicaSet autogen. So a Rollout is admission-aware, but the availability mutations are an explicit
   opt-in, not free.
-- Status, precisely: weighted-canary shifting is built and live; lower stages auto-promote
-  through the steps (dogfooding); the fully metric-gated `AnalysisTemplate` (query Mimir → auto-rollback
-  on an SLO breach) is proven in mechanics but a later phase — not yet the enforced default on every
-  service.
+- Weighted-canary shifting drives each step, and lower stages auto-promote through the steps (dogfooding);
+  prod pauses on a metric-gated `AnalysisTemplate` (query Mimir → auto-rollback on an SLO breach).
 
 ## Gotchas
 
 - **`OutOfSync` with an empty diff.** A server-side-applied `Rollout`/`HTTPRoute` carries two field managers
   (argocd-controller + the rollouts-controller); ArgoCD's default client-side diff mis-reads it as drift.
-  Fix with server-side diff (`controller.diff.server.side=true`, #925) — `ignoreDifferences`
+  Fix with server-side diff (`controller.diff.server.side=true`) — `ignoreDifferences`
   can't fix it.
 - **A stuck promotion is usually correct.** The auto-promoter won't advance a rung while the lower stage
   isn't `Synced + Healthy`. That's the health gate, not a bug — fix the unhealthy lower stage.
 - **Prod won't move on its own — by design.** No cron promotes into prod; it always waits on the
   release-approver.
 - **The digest lives in the platform repo, not your app repo.** Your `main` stays protected and
-  CI-commit-free (ADR-071).
+  CI-commit-free.
 
 ## Glossary
 
@@ -110,15 +107,11 @@ release-approver (#501). Prod Release PRs never auto-merge.
 - **Rollout** — Argo Rollouts' Deployment-replacement that adds canary/blue-green + analysis.
 - **Canary** — routing a slice of traffic to the new version first (weighted HTTPRoute here).
 - **The ladder** — the ordered stages `dev → test → uat → staging → prod` a digest climbs.
-- **release-approver** — the human role that must approve a prod Release PR (#501).
+- **release-approver** — the human role that must approve a prod Release PR.
 
 ## Go deeper
 
-- [Promotion & Release](../../architecture/promotion-and-release.md) (as-built) ·
-  [ADR-021 ArgoCD](../../adrs/021-argocd-for-gitops.md) ·
-  [ADR-069 delivery source-of-truth](../../adrs/069-delivery-source-of-truth-product-environment.md) ·
-  [ADR-071 digest promotion](../../adrs/071-digest-promotion-via-control-plane.md) ·
-  [ADR-056 progressive delivery](../../adrs/056-progressive-delivery-and-safe-rollback.md).
+- [Promotion & Release](../../architecture/promotion-and-release.md).
 - The `argocd-app-delivery` house skill (ApplicationSets, PR previews, Release-keyed delivery).
 - Substrate: [ArgoCD](https://argo-cd.readthedocs.io/en/stable/) ·
   [ApplicationSets](https://argo-cd.readthedocs.io/en/stable/user-guide/application-set/) ·

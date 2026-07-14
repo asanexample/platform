@@ -19,8 +19,8 @@ design.
 Cost governance here is built in the same shape the platform uses for [policy](../policy/orientation.md):
 **Audit before Enforce**. You make a limit visible first, then you alert on it, and only last do you
 enforce it — and even then the enforcement ships in Audit mode (it records what it *would* have blocked)
-until the record is clean. [ADR-091](../../adrs/091-cost-guardrails.md) names the three rungs — surface →
-alert → enforce — and the whole thing hangs off a single number in git.
+until the record is clean. The three rungs — surface →
+alert → enforce — hang off a single number in git.
 
 ```mermaid
 flowchart LR
@@ -42,7 +42,7 @@ A team's cost budget lives in exactly one place — its envelope in the git regi
 spec:
   envelope:
     budget:
-      monthlyUSD: <demo budget>   # ADR-091 cost guardrails
+      monthlyUSD: <demo budget>   # cost guardrails
 ```
 
 The schema is deliberately tiny. In the env-API `Team` CRD, `budget` is an optional object with a single
@@ -55,7 +55,7 @@ From there it's projected, never re-authored. [kube-state-metrics](https://kuber
 runs a **CustomResourceState** config that reads the `Team` CR and emits a gauge —
 `team_budget_monthly_usd{team="acme"}` — straight from `spec.envelope.budget.monthlyUSD`, with the team
 label pulled from the CR's name. That one metric is the join key for all three rungs. There's no second
-budget store to drift against — the ADR calls this *decide-once-in-git, project-everywhere*, the same
+budget store to drift against — this is *decide-once-in-git, project-everywhere*, the same
 coherence move the platform makes for roles and quotas.
 
 ### Surface — the meter reads the rating
@@ -80,16 +80,14 @@ and evaluated there. Two rungs on one ladder:
 
 Both use `for: 1h` (cost is slow-moving; no point paging on a one-scrape blip) and both compute projected
 month-end spend as current allocation × 730 hours. The `team` label rides through the query so the alert
-lands in the right team's Slack/PagerDuty via the [owner-routing fabric](../identity/orientation.md)
-([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)) — warnings to the team's
-channel, criticals escalated. Verified loaded and `health=ok`, correctly not firing (no team is near
-budget).
+lands in the right team's Slack/PagerDuty via the [owner-routing fabric](../identity/orientation.md) —
+warnings to the team's channel, criticals escalated. Verified loaded and `health=ok`, correctly not firing
+(no team is near budget).
 
 One real inconsistency, flagged rather than papered over: the *alert* rule derives a team from the
 namespace name prefix (`^([a-z0-9]+)-.*`), while the *enforcer* below derives it from the namespace
 label. The label approach is the better one — the prefix would mint fake "teams" out of `kube-system`
-and friends, and the enforcer's comment says as much. The alert predates that fix and still uses the
-prefix.
+and friends, and the enforcer's comment says as much.
 
 ## Enforce — and why it can't run where you'd expect
 
@@ -161,20 +159,20 @@ Error from server (NotFound): customresourcedefinitions … "teams.platform.refp
 ```
 
 No `Team` CRD, no enforcer CronJob, no policy. That's not a gap — the env-API (`Team`, `XEnvironment`)
-is enabled on preprod, not the platform hub ([ADR-048](../../adrs/048-federated-per-cluster-crossplane.md)),
+is enabled on preprod, not the platform hub,
 so the tenant guardrail correctly lives only where tenants live. Its absence on the hub is the design,
 not a hole to fill.
 
 ## The bill-level tripwires: Budgets + Anomaly Detection
 
 The per-team guardrail watches tenants. The whole **bill** — including the big shared slice no team owns
-— needs its own watch, and that's [ADR-092](../../adrs/092-platform-finops-practice.md)'s
+— needs its own watch, and that's the
 [`aws/cost-monitoring`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/cost-monitoring)
-module (#1054, closed/built). It lives in the payer/management account, because Budgets, Cost Anomaly
+module. It lives in the payer/management account, because Budgets, Cost Anomaly
 Detection, and Cost Explorer are organization-level billing services that only exist there.
 
 Why a separate delivery path? The owner of the bill is the platform team, not a tenant. So these alerts
-deliberately do not ride the ADR-084 owner-routing fabric (which resolves which tenant owns a problem).
+deliberately do not ride the owner-routing fabric (which resolves which tenant owns a problem).
 They fan out through a dedicated **SNS topic → AWS Chatbot (Slack) + email**. Two distinct instruments
 hang off that topic:
 
@@ -194,20 +192,19 @@ that learns the baseline.
 email (`aws sns list-subscriptions-by-topic` shows `PendingConfirmation` until then). The Slack/Chatbot
 path is gated off: the live unit sets `slack_team_id = ""`, so `create_chatbot` evaluates false and no
 Chatbot resources are created. Turning it on needs a one-time manual authorization of the AWS Chatbot app
-in the Slack workspace (tracked as **#1063, open**).
+in the Slack workspace.
 
-## The practice above the mechanisms (ADR-092, Proposed)
+## The practice above the mechanisms
 
-The controls above are things. [ADR-092](../../adrs/092-platform-finops-practice.md) (**Proposed** — the
-operating model, not all of it built) is the practice that gives them a home: adopt the
+The controls above are things. The practice that gives them a home: adopt the
 [FinOps Foundation Framework](https://www.finops.org/framework/) wholesale — the Inform → Optimize →
 Operate phases run iteratively, Domains/Capabilities tracked **Crawl → Walk → Run** rather than as a
-one-off project, and the 2025 **Scopes** addition: **platform-shared** (D2, a scope in its own right,
-surfaced honestly and never socialized onto teams), **per-team/tenant** (that's ADR-091, above), and
+one-off project, and the **Scopes** addition: **platform-shared** (a scope in its own right,
+surfaced honestly and never socialized onto teams), **per-team/tenant** (above), and
 **AI/GenAI** named as the emerging third (agent inference spend). These are the house rules and the
 thermostat — how cost is run, not just measured.
 
-The firm constraint (D6): **free OSS + AWS-native tools only**, because this reference platform has no
+The firm constraint: **free OSS + AWS-native tools only**, because this reference platform has no
 spend budget. That splits "no" into two kinds. **Savings Plans/RIs** and **Infracost Cloud** are deferred
 on budget (a real company should adopt them; the path is documented, just not bought), while a **vended
 FinOps SaaS is rejected on principle** — a second cost control plane would contradict the whole
@@ -223,7 +220,7 @@ build-it-in-our-own-fabric demonstration, budget or not. The tool verdicts:
 
 One adopted piece is worth seeing, because it's the **shift-left** analogue of the tenant guardrail —
 cost governance moved into the PR. [`infracost.yml`](https://github.com/asanexample/platform/blob/main/.github/workflows/infracost.yml)
-(#1056, closed/built) prices an infrastructure change in the pull request with the free self-hosted
+prices an infrastructure change in the pull request with the free self-hosted
 [Infracost](https://www.infracost.io/docs/) CLI. The as-built scope is narrower than you'd guess: it
 prices the shared **modules** (`infra/modules/**`), not the live Terragrunt units — Infracost's own
 Terragrunt evaluator can't parse this repo's unit hierarchy (the `env.hcl` conditional + SOPS
@@ -231,10 +228,9 @@ decryption). Acceptable, because the cost-bearing resources (NAT, EKS, node grou
 modules; unit-level precision is a deferred follow-up. Until the free API key is set, the job is a clean
 no-op — it never fails a PR.
 
-**Epic status** (#1052, the FinOps epic): **#1054** (Budgets + Anomaly) and **#1056** (Infracost) are
-closed. Still open: #1053 (platform-shared cost view), #1055 (Compute Optimizer), #1057 (kube-green
-spike), #1058 (Cloud Custodian spike), #1059 (FinOps cadence/forecasting), #1063 (Slack delivery).
-Crawl → Walk, honestly.
+**Status.** Budgets + Anomaly and Infracost are built. Still designed but not built: a platform-shared
+cost view, Compute Optimizer, the kube-green and Cloud Custodian spikes, FinOps cadence/forecasting, and
+Slack alert delivery. Crawl → Walk, honestly.
 
 ## Gotchas
 
@@ -255,17 +251,10 @@ Crawl → Walk, honestly.
 - **The SNS topic is unencrypted, by design.** The AWS-managed `alias/aws/sns` key can't grant the
   `budgets.amazonaws.com` / `costalerts.amazonaws.com` principals publish access (its policy isn't
   editable) and Chatbot can't read a CMK-encrypted topic. Payloads are low-sensitivity (account ids +
-  amounts); a customer-managed CMK admitting those principals is the **#118** upgrade path, not a defect.
-- **Doc drift to flag.** Both ADR-091 and ADR-092 still describe the CUR → Athena true-spend work (#668)
-  as unbuilt / remaining. It's since closed and built — the odometer is live (see the
-  [Inform deep dive](deep-dive-inform-the-two-meters.md)). The ADRs are stale on that one line; the
-  running system is the source of truth.
+  amounts); a customer-managed CMK admitting those principals is the upgrade path, not a defect.
 
 ## Go deeper
 
-- [ADR-091 — Cost guardrails](../../adrs/091-cost-guardrails.md) (the tenant surface→alert→enforce
-  model) and [ADR-092 — Platform FinOps practice](../../adrs/092-platform-finops-practice.md) (the
-  operating model, Scopes, tool verdicts).
 - Module source:
   [`observability-opencost/budget-enforcer.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-opencost/budget-enforcer.tf)
   (the CronJob),

@@ -88,7 +88,7 @@ The "no standing key" instinct is the same one behind Pod Identity in [Identity 
 A signature proves who made it. The attestations prove how and from what, and there are two:
 
 - **SLSA provenance** — a signed statement of the build: which repo, which commit, which workflow produced
-  this exact digest. It's SLSA Build L3 ([ADR-042](../../adrs/042-isolated-build-provenance-slsa-l3.md)): the
+  this exact digest. It's SLSA Build L3: the
   provenance is generated in an isolated workflow the app team cannot write to, so the build can't forge its
   own paperwork. That isolation is the difference between "the build says it's fine" and "an independent,
   tamper-resistant process attests it." ([SLSA](https://slsa.dev/spec/v1.0/levels) grades this on a ladder —
@@ -113,8 +113,8 @@ whole defense.
 ## The thin-caller model — teams don't build this, they call it
 
 Developers find this part surprising: `shop`'s CI doesn't implement any of the above. The signer earlier was
-`asanexample/trusted-ci/build-sign.yml`, not a workflow in the shop repo. That's the design
-([ADR-050](../../adrs/050-shared-build-sign-reusable-workflow.md)): the entire supply-chain backbone — build →
+`asanexample/trusted-ci/build-sign.yml`, not a workflow in the shop repo. That's the design: the entire
+supply-chain backbone — build →
 push to ECR → cosign-sign → provenance → SBOM — lives in one shared, reusable workflow the platform owns, and
 each app's CI is a thin caller of it.
 
@@ -200,9 +200,6 @@ can't accidentally ship an unverifiable image. You never touch a signing key, be
   [The Life of a Deployment](../spine/life-of-a-deployment.md); the threat framing:
   [The Security Model](../spine/the-security-model.md).
 - Onboard your app (the thin-caller snippet): the `supply-chain-onboarding` skill.
-- Why it's shaped this way: [ADR-042 isolated provenance (SLSA L3)](../../adrs/042-isolated-build-provenance-slsa-l3.md) ·
-  [ADR-050 shared build-sign](../../adrs/050-shared-build-sign-reusable-workflow.md) ·
-  [ADR-036 GitHub OIDC](../../adrs/036-github-actions-oidc-federation.md).
 - The concepts, explained well (none of this is obvious the first time — these are the on-ramps):
   - [How Sigstore's keyless trust works](https://docs.sigstore.dev/about/security/) — the Fulcio + Rekor +
     OIDC trust root, and why a ~10-minute cert needs no revocation.

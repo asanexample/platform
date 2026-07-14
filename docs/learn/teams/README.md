@@ -29,6 +29,3 @@ Team *materializes* into — and, just as important, what it doesn't.
 
 - The concept this module builds on: [the domain model](../domain-model/orientation.md) · the
   people-and-roles half: [Identity](../identity/orientation.md).
-- Why it's shaped this way: [ADR-063](../../adrs/063-team-as-first-class-git-object.md) (Team as a
-  first-class git object) · [ADR-067](../../adrs/067-idp-domain-model.md) (the domain model) ·
-  [ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md) (org-Team ownership).

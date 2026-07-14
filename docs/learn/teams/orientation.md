@@ -63,7 +63,7 @@ Two halves, and that's the whole shape worth holding in your head. `spec.ssoGrou
 identity-provider group whose members are the team (see [Identity](../identity/orientation.md)).
 `spec.envelope` is *what the team may do* — the fence. Nearly everything the platform builds for the team
 derives from those two fields; a couple of optional records — incident routing (`spec.slack` / `spec.pagerduty`,
-which drive the triage agent and the team's PagerDuty on-call, ADR-084) — ride on the same object.
+which drive the triage agent and the team's PagerDuty on-call) — ride on the same object.
 
 `kind: Team` is a real cluster CRD — cluster-scoped and data-only; it provisions nothing, it's just the
 admission-relevant mirror of the envelope. But the file in git is the source of truth: ArgoCD syncs it into the
@@ -78,7 +78,7 @@ Merge that file and the platform converges a handful of things off it, each keye
 - **A Keycloak group** — one group per Team (`Dev-acme`), the SSO identity the team signs in as; apps read the
   bare group name from the token. (Plumbing: [Identity](../identity/orientation.md).)
 - **A GitHub org team** — the human *ownership* grant. When the team owns a Product, this org team is granted
-  `push` on that product's repo ([ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md)). One caveat
+  `push` on that product's repo. One caveat
   worth keeping: org-team membership never rides in the CI token, so it carries **no** supply-chain authority —
   image trust always anchors on the repo, never on team membership.
 - **A Backstage group** — the Team projected into the developer portal's catalog, so ownership shows up where
@@ -131,6 +131,3 @@ rejected if the envelope doesn't allow it.
 - The `Team` CR schema, field by field, with the honest gotchas: the [Reference](reference.md).
 - The concept this module builds on: [the Team as an envelope](../domain-model/orientation.md#the-team-is-an-envelope) ·
   the people-and-roles half: [Identity](../identity/orientation.md).
-- Why it's shaped this way: [ADR-063](../../adrs/063-team-as-first-class-git-object.md) (Team as a first-class
-  git object) · [ADR-067](../../adrs/067-idp-domain-model.md) (the domain model) ·
-  [ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md) (org-Team ownership).

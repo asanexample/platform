@@ -61,7 +61,7 @@ The tour follows the stack: the two east-west moves — encrypt, then authentica
 
 Start with the cheapest, broadest win. Cilium NetworkPolicy already decides who may talk to whom, but the
 traffic itself — pod-to-pod across the nodes — is plaintext on the wire. Cilium transparent encryption with the
-WireGuard backend ([ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md)) fixes that: in-kernel
+WireGuard backend fixes that: in-kernel
 WireGuard encrypts all pod-to-pod traffic, transparently, with **no app change**. It slots under the existing
 overlay tunnel and makes the bytes ciphertext.
 
@@ -108,7 +108,7 @@ does today). So: encryption everywhere, identity proven but narrow. The
 
 Encryption and identity protect the network. But what about the workload's own behavior — a hijacked container
 spawning a shell, reading a secret file, escalating privileges? No manifest can describe "don't do that," so
-admission is blind to it. Falco ([ADR-045](../../adrs/045-falco-runtime-threat-detection.md)) is the answer: it
+admission is blind to it. Falco is the answer: it
 taps the kernel syscall boundary (via modern eBPF) from a privileged DaemonSet on every node, and matches each
 syscall against a rules-as-code ruleset — alerting on a shell in a container, a read of `/etc/shadow`, an
 unexpected outbound connection, a privilege escalation, each tagged with its MITRE ATT&CK technique.

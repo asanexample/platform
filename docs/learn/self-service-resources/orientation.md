@@ -22,7 +22,7 @@ security liability — and how does the platform keep "self-service" from meanin
 
 ## The one idea: declare intent above the claim; the platform derives safety below it
 
-This is the model ADR-073 is built around:
+This is the model the paved road is built around:
 
 > **Abstraction lives *above* the claim; safety lives *below* it.** You declare the resource you want as
 > abstract intent in your Environment claim — *what*, not *how*. The platform provisions it
@@ -228,5 +228,4 @@ is a floor, not a ceiling. That's the producer side of this module: the how-to
 - The claim this extends: [The Environment API](../environment-api/orientation.md); where the derived IAM
   lands: [Identity & Access](../identity/orientation.md); the safe-by-default framing:
   [The Security Model](../spine/the-security-model.md).
-- Why it's shaped this way: [ADR-073 Self-Service Cloud Resources](../../adrs/073-self-service-cloud-resources.md).
 - Provision one yourself: the `environment-onboarding` skill.

@@ -21,7 +21,7 @@ portal renders, and the one prerequisite here.
 ## Go deep
 
 - **[The Backstage portal](deep-dive-the-backstage-portal.md)** — the catalog as a projection of git
-  (Team→Group, Product→System, Environment), direct Keycloak OIDC (Dex retired), the read-only scoped
+  (Team→Group, Product→System, Environment), direct Keycloak OIDC, the read-only scoped
   plugins (Kubernetes / ArgoCD / Cost), and the app-vs-infra split that trips everyone up.
 - **[The scaffolder golden paths](deep-dive-the-scaffolder-golden-paths.md)** — the ten templates, three
   of them traced form → PR → registry → provision (new-product, new-environment, request-promotion), the

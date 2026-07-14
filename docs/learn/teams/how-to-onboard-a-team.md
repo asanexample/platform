@@ -83,7 +83,7 @@ metadata:
 spec:
   ssoGroup: Dev-acme               # the Keycloak/IdP group this team maps to (identity)
   slack:
-    channel: "C0XXXXXXXXX"         # incident channel id — the triage agent posts here (ADR-084)
+    channel: "C0XXXXXXXXX"         # incident channel id — the triage agent posts here
   envelope:                        # the bound on every Product/Environment this team may author
     allowedTiers: ["standard"]     # compliance tiers an Environment may request
     allowedStages: ["dev", "test", "staging", "prod"]  # stages it may deploy to
@@ -127,9 +127,9 @@ bound; [the domain model](../domain-model/orientation.md#the-team-is-an-envelope
 The non-envelope fields are identity and routing, not bounds: `spec.slack.channel` is the incident channel
 the triage agent posts to, and `spec.pagerduty` / `spec.oncall` point at on-call. A **platform-owned** Team
 may also carry `spec.platformTrust` (cluster-read ClusterRoles + IAM actions past the deny-set) — a
-capability tenants can't request. It's still defined in the Team CRD but is **unused by any live Team today**:
-ADR-082 moved platform agents to the XAgent runtime, which grants their cluster-read/model access directly,
-so the platform Team no longer sets `platformTrust`. Leave it unset for a tenant Team.
+capability tenants can't request. It's defined in the Team CRD but **unused by any live Team**: platform
+agents get their cluster-read/model access directly from the XAgent runtime, not from a Team's
+`platformTrust`. Leave it unset for a tenant Team.
 
 > The Team **CRD does not bound** `quotaCap`, `maxDedicatedIsolation`, or `ssoGroup` — nothing in the
 > schema stops you writing `cpu: "9999"`. The **Teams Gate** (below) is what enforces platform maximums and
@@ -157,7 +157,7 @@ github-teams**. Out of that one file come:
 - **A GitHub org team** — `github-teams` creates the org team (named for the slug) and later grants it
   `push` on each of the team's `<team>-<product>` repos. This is **human ownership only** — org-team
   membership is *not* in the Actions OIDC token, so it never carries supply-chain identity (that anchors on
-  repo name, [ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md)).
+  repo name).
 - **A projected cluster `Team` CR** — ArgoCD's `teams` Application syncs the file into `crossplane-system`
   (at an early sync-wave, so Teams land *before* the environments that reference them). This is the copy
   **Kyverno** reads at `XEnvironment` admission to enforce the envelope.
@@ -248,10 +248,5 @@ must not get wrong — and what a human must check.
 - The concept: [the domain model — Team as envelope](../domain-model/orientation.md#the-team-is-an-envelope) ·
   identity and the SSO group: [identity](../identity/orientation.md).
 - Onboarding what lives *under* a Team: [onboard a Product](../products/how-to-onboard-a-product.md).
-- Why it's shaped this way: [ADR-063](../../adrs/063-team-as-first-class-git-object.md) (Team as a git
-  object) · [ADR-067](../../adrs/067-idp-domain-model.md) (the domain model) ·
-  [ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md) (org-team ownership) ·
-  [ADR-073](../../adrs/073-self-service-cloud-resources.md) (self-service resources) ·
-  [ADR-091](../../adrs/091-cost-guardrails.md) (budget guardrails).
 - Substrate: [GitOps principles](https://opengitops.dev/) ·
   [Backstage software templates](https://backstage.io/docs/features/software-templates/).

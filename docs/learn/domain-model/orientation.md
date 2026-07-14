@@ -253,5 +253,4 @@ the model when they need it. Git is the source of truth; the cluster holds a liv
 - [Environment API](../environment-api/orientation.md) — how a single Environment (grid cell) gets
   provisioned.
 - Reference (this module): the [full noun-by-noun schema, relationships, and naming](reference.md).
-- Source of truth: [Platform Domain API](../../architecture/platform-domain-api.md) (the normative schema)
-  and [ADR-067](../../adrs/067-idp-domain-model.md) (the decision + rationale).
+- Source of truth: [Platform Domain API](../../architecture/platform-domain-api.md) (the normative schema).

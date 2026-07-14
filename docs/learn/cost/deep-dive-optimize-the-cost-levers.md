@@ -18,18 +18,18 @@ In that order.
 Karpenter is a valet who re-parks the whole lot continuously, picks the right-sized space for each car,
 and closes empty aisles. The machinery under that metaphor:
 
-**JIT provisioning — a NodePool is requirements, not a shape.** The old world (ADR-023) was
-statically-sized [EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html):
-a fixed `desired` count of a fixed instance type, inert until a human edited it. [Karpenter](https://karpenter.sh/)
-replaces that with a `NodePool` that expresses *requirements* — arch, capacity type, instance family, a
-memory floor — and lets Karpenter pick the cheapest sufficient instance for the actual pending pods, in
+**JIT provisioning — a NodePool is requirements, not a shape.** Rather than statically-sized
+[EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html) —
+a fixed `desired` count of a fixed instance type, inert until a human edits it — [Karpenter](https://karpenter.sh/)
+uses a `NodePool` that expresses *requirements* — arch, capacity type, instance family, a
+memory floor — and picks the cheapest sufficient instance for the actual pending pods, in
 seconds. The [NodePool template](https://github.com/asanexample/platform/blob/main/infra/modules/aws/karpenter/charts/nodepool/templates/nodepool.yaml)
 is rendered by a small local Helm chart so the custom resources don't need the CRD present at plan time.
 
 **Consolidation is the cost part.** Provisioning right-sized nodes saves money going up; the bigger
 continuous win is coming down. The NodePool's `disruption` block carries two knobs —
 `consolidationPolicy` and `consolidateAfter` — and those two enums are the whole lever, tuned oppositely
-per cluster ([ADR-078](../../adrs/078-cluster-elasticity-karpenter.md) D4):
+per cluster:
 
 | | **platform (hub)** | **preprod** |
 | --- | --- | --- |
@@ -44,10 +44,8 @@ databases), and a valet who re-parks occupied cars would be moving a database mi
 fewer nodes and reclaims the underutilized ones. Preprod runs ephemeral tenant workloads that ArgoCD
 simply reschedules, so the churn is free money.
 
-**The spot correction — not "spot retired".** You will see the phrase "spot retired" (ADR-092's table
-even uses it). Read it precisely: what ADR-078 D2 retired was the static managed spot node *group* — the
-frozen ASG. Spot as a capacity type is very much live. Preprod's NodePool lists `spot`, and right now
-it is running a spot node:
+**Spot capacity on preprod.** Spot is a live capacity type on preprod. Preprod's NodePool lists `spot`,
+and right now it is running a spot node:
 
 ```text
 # AWS_PROFILE=preprod kubectl --context preprod get nodeclaims
@@ -79,11 +77,10 @@ default-…             r6g.medium   on-demand   us-east-1c   True    7h…
   leading-wildcard `*-karpenter-*`) is in `exempt_roles`, alongside the Crossplane provisioners. Karpenter
   is a trusted platform provisioner that tags via the launch template, so it earns the exemption the same
   way they do.
-- **The BYOCNI startup taint.** A fresh node is not `Ready` until Cilium is on it (the cluster is BYOCNI,
-  ADR-009). Pods scheduled before the CNI would land with no networking. The NodePool stamps a
+- **The BYOCNI startup taint.** A fresh node is not `Ready` until Cilium is on it (the cluster is BYOCNI).
+  Pods scheduled before the CNI would land with no networking. The NodePool stamps a
   `node.cilium.io/agent-not-ready:NoSchedule` startup taint; Cilium removes it once its agent is up, and
-  only then do application pods schedule (ADR-078 D5). Same Cilium-first constraint the old static groups
-  had — just expressed in the NodePool instead of the managed-group bootstrap.
+  only then do application pods schedule. The Cilium-first constraint is expressed in the NodePool itself.
 
 ---
 
@@ -109,13 +106,13 @@ Karpenter's own nodes. `platctl down` (per the `cluster-parking` skill) does it 
 ### Parking gotchas
 
 - **After a park, `kubectl` is unreachable — and that's correct.** Scaling to zero also drops the in-cluster
-  Tailscale subnet router that advertises the VPC CIDR, so the private EKS API (ADR-010) is no longer
+  Tailscale subnet router that advertises the VPC CIDR, so the private EKS API is no longer
   reachable and `kubectl` times out. This is not a failed park. Verify a park via the AWS EKS API
   (`aws eks describe-nodegroup … --query nodegroup.scalingConfig` → `desiredSize: 0`), never kubectl.
-- **The down/up asymmetry trap.** `down` used to delete only the NodePool; on `up`, a leftover
-  finalizer'd EC2NodeClass could lose a Terminating race and leave the NodePool present-but-not-ready with
-  zero workload capacity (`karpenter logs: ignoring nodepool, not ready`). The fix was to delete both CRs
-  symmetrically on down and assert both present on up — a reminder that lifecycle operations must be
+- **The down/up symmetry requirement.** `down` deletes the **NodePool and EC2NodeClass together**, and
+  `up` asserts both present. Delete only the NodePool and, on `up`, a leftover finalizer'd EC2NodeClass can
+  lose a Terminating race and leave the NodePool present-but-not-ready with zero workload capacity
+  (`karpenter logs: ignoring nodepool, not ready`) — a reminder that lifecycle operations must be
   symmetric or they rot.
 - **Unpark is a fresh admission of every pod.** Every workload re-schedules from cold, so `up` re-runs every
   admission webhook and re-derives every IAM/Pod-Identity binding — which exposes latent bugs that a
@@ -135,7 +132,7 @@ and never moves it. The platform's node set, though, is deliberately dynamic —
 consolidates. So consider a fleet of single-replica platform controllers (argo-rollouts, external-dns,
 kube-state-metrics, the prometheus-agent operator). Each independently picks "the emptiest node" at
 schedule time — which, right after an unpark, is the *same* first node up. They all pile onto it. And
-`topologySpreadConstraints` (ADR-085) do not help: those spread the replicas of one workload, not
+`topologySpreadConstraints` do not help: those spread the replicas of one workload, not
 independent workloads, so a hundred one-replica Deployments still converge on one node.
 
 The descheduler is the restaurant host who re-seats guests so one table isn't crammed while another sits
@@ -144,9 +141,9 @@ runs the [kubernetes-sigs descheduler](https://github.com/kubernetes-sigs/desche
 (a periodic sweep, not a hot loop — the right shape for post-churn correction), running one strategy,
 **`LowNodeUtilization`**: evict pods off nodes above the overutilized threshold so they reschedule onto
 nodes below the underutilized threshold. Every eviction goes through the **`DefaultEvictor`** safety
-envelope (ADR-093):
+envelope:
 
-- **Respects PodDisruptionBudgets** — the ADR-085 workload PDBs and the CNPG database PDBs hold.
+- **Respects PodDisruptionBudgets** — the workload PDBs and the CNPG database PDBs hold.
 - **`nodeFit: true`** — a pod is evicted only if it could actually schedule elsewhere right now, so
   rebalancing never strands a pod `Pending` (the failure a naive `kubectl delete` hits).
 - **`evictLocalStoragePods: false`** — never evict a pod with emptyDir/hostPath data.
@@ -220,8 +217,7 @@ teach S3 tiering as a cost lever here; it isn't one.
 ## The lever we deliberately don't pull — Savings Plans vs. parking
 
 The biggest steady-state lever a real company has is a commitment purchase — **Savings Plans / RIs**,
-a year of discounted compute. The platform defers it, for two independent reasons
-([ADR-092](../../adrs/092-platform-finops-practice.md) D6): there's no spend budget to commit, and — the
+a year of discounted compute. The platform defers it, for two independent reasons: there's no spend budget to commit, and — the
 teaching point — it is in direct tension with lever 2.
 
 > **The gym-membership metaphor.** A Savings Plan is an annual gym membership: cheaper per visit *only if
@@ -229,14 +225,14 @@ teaching point — it is in direct tension with lever 2.
 > annual pass for a gym you lock overnight — committing to compute you then deliberately park means paying
 > for it while it's turned off. **Where it breaks:** the two aren't wholly exclusive. There's a genuine
 > **24/7 floor** — the always-on system pieces that never park (the control planes, the hub's stateful
-> core). The resolution ADR-092 records: if ever budgeted, commit only to that un-parkable floor, never the
+> core). The resolution: if ever budgeted, commit only to that un-parkable floor, never the
 > elastic part that parks and consolidates away.
 
 ### Named but not built
 
 All four levers above are built and running. For completeness, three Optimize items are adopted in the
-FinOps framework but not built: AWS **Compute Optimizer** (#1055), **kube-green** for per-namespace
-off-hours scaling (#1057), and **Cloud Custodian** the account-janitor (#1058) — plus **Savings Plans**,
+FinOps framework but not built: AWS **Compute Optimizer**, **kube-green** for per-namespace
+off-hours scaling, and **Cloud Custodian** the account-janitor — plus **Savings Plans**,
 documented-but-unbought (above). Crawl→Walk, honestly — see the
 [Operate deep dive](deep-dive-operate-guardrails-and-the-practice.md) for the full tool verdicts.
 
@@ -244,9 +240,6 @@ documented-but-unbought (above). Crawl→Walk, honestly — see the
 
 ## Go deeper — source of truth
 
-- **ADRs:** [ADR-078 Cluster Elasticity — Karpenter](../../adrs/078-cluster-elasticity-karpenter.md) ·
-  [ADR-093 Descheduler for node rebalancing](../../adrs/093-descheduler-node-rebalancing.md) ·
-  [ADR-092 Platform FinOps practice](../../adrs/092-platform-finops-practice.md) (D6 the SP/parking tension).
 - **Module + unit code:**
   [`infra/modules/aws/karpenter`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/karpenter/main.tf)
   (+ the [nodepool chart](https://github.com/asanexample/platform/blob/main/infra/modules/aws/karpenter/charts/nodepool/templates/nodepool.yaml)) ·
