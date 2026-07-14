@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: platform-pulse-dev
+spec:
+  environmentRef: platform-pulse-dev
+  services:
+    generator:
+      digest: sha256:0d43253f305f5e41e8c1bc7e21b257c40d62803c0a33ecd9d0799a15edd4549f
