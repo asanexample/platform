@@ -13,3 +13,5 @@ spec:
       digest: sha256:5748f5fc5034308ee8a5c0201f4a2e5c92820d56638dc9190933242c131754a0
     orders:
       digest: sha256:acfd5d0a76cc6b70bc2f21c4aae94e5afeb0d0e6deba8181ec1aadf00504e5ce
+    payment:
+      digest: sha256:ede536e1d9322350da2666a7358d04b0f486c2ce15d6318b2b0222714488deb0
