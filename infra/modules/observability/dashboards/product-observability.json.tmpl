@@ -506,20 +506,37 @@
       "id": 13,
       "type": "state-timeline",
       "title": "Rollout phase by service",
+      "description": "One row per service, colored by its currently-active Argo Rollouts phase. rollout_phase is 6 separate 0/1 gauges (one per phase) per service - the query collapses them into a single numeric code per service (sum by (name) of each phase's gauge x its code) so each service gets exactly one row instead of one row per (service, phase) pair it has ever been in.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
       "options": {
-        "legend": { "showLegend": true }
+        "legend": { "showLegend": true },
+        "showValue": "never"
       },
       "fieldConfig": {
-        "defaults": { "custom": { "lineWidth": 0, "fillOpacity": 70 } },
+        "defaults": {
+          "custom": { "lineWidth": 0, "fillOpacity": 70 },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Completed", "color": "green" },
+                "1": { "text": "Progressing", "color": "blue" },
+                "2": { "text": "Paused", "color": "yellow" },
+                "3": { "text": "Timeout", "color": "orange" },
+                "4": { "text": "Error", "color": "red" },
+                "5": { "text": "Abort", "color": "dark-red" }
+              }
+            }
+          ]
+        },
         "overrides": []
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\"} == 1",
-          "legendFormat": "{{name}} — {{phase}}",
+          "expr": "sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Completed\"} * 0) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Progressing\"} * 1) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Paused\"} * 2) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Timeout\"} * 3) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Error\"} * 4) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Abort\"} * 5)",
+          "legendFormat": "{{name}}",
           "datasource": { "type": "prometheus", "uid": "${datasource}" }
         }
       ]
