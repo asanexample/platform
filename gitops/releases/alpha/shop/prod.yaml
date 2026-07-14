@@ -7,3 +7,5 @@ spec:
   services:
     storefront:
       digest: sha256:5456c8148ed42db08ef27c35622d5d650f85f5b71b04c53d609dc98ae0606eb7
+    orders:
+      digest: sha256:57b18414de620b609ec4ef422d7077800581a0c919459f8c3089bc439711ec1b
