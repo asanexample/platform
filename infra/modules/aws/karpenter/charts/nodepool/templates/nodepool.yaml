@@ -35,6 +35,14 @@ spec:
           operator: Gt
           values: [{{ .Values.minInstanceMemoryMib | quote }}]
         {{- end }}
+        {{- if gt (int .Values.minInstanceCpu) 0 }}
+        # CPU floor — the same fixed per-node DaemonSet slab (~410m) is dead weight on every node, so tiny
+        # 1-2 vCPU nodes waste 20-43% of their CPU on it and can't fit per-node DaemonSets once packed. Require
+        # more vCPU so Karpenter picks fewer, bigger nodes that amortize the overhead (cheaper per usable vCPU).
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: Gt
+          values: [{{ .Values.minInstanceCpu | quote }}]
+        {{- end }}
       # BYOCNI: block pods until Cilium is ready on the node; Cilium removes this taint (D5).
       startupTaints:
         - key: {{ .Values.startupTaintKey }}
