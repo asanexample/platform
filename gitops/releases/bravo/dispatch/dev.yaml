@@ -14,4 +14,4 @@ spec:
     notify:
       digest: sha256:a8577ab746ee188a054075decc8b01d040df6cdbd7f66c2137f62880ec92b1dc
     dispatch-worker:
-      digest: sha256:fa263c8b04db7b5f883184a74817ea7be0d525d9e973a5c6d7804c352849df95
+      digest: sha256:191706fe7c7a4ca54203cdfbf37be9ab9ee981026335f93263e971b9e4b69542
