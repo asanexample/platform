@@ -1,0 +1,15 @@
+# Regression fixture for the ingress-CNP name collision (caught live via platform-pulse's intake+tracker
+# grants): the SAME subject (alpha/shop/orders, matching l4-only.yaml) granted access to a SECOND, DIFFERENT
+# service (shipments, not intake) owned by the SAME target team+namespace (bravo-dispatch-dev). Rendered
+# together with l4-only.yaml, the two ingress CNPs must have DISTINCT names — before the fix, both rendered
+# as `allow-orders-alpha-ingress` and the second silently clobbered the first at the Kubernetes API level.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata: { name: allow-orders-to-shipments }
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: shipments }
+  subject: { team: alpha, product: shop, stage: dev, service: orders }
+  capability:
+    network:
+      ports: [8080]
+      protocol: TCP

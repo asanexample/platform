@@ -107,6 +107,16 @@ spec:
             # matched by BOTH namespace AND app label — tighter than the flagship/allow-sync-ingress.yaml
             # precedent (namespace-only), deliberately: it would be inconsistent to nail down the exact HTTP
             # path/method the subject may call while leaving the door open to ANY other pod in its namespace.
+            #
+            # The name MUST include target.service, not just subject: one subject commonly needs grants to
+            # SEVERAL services owned by the same target team (e.g. a caller granted both `intake` and
+            # `tracker` in the same target namespace) — without target.service in the name, those two
+            # ServiceGrants would render two composed Objects with the SAME namespace+name, and Kubernetes
+            # (which has no notion of Crossplane's per-XR resource bookkeeping) would just let the second
+            # apply silently clobber the first, dropping one grant's ingress rule entirely. Caught live via
+            # platform-pulse's intake+tracker grants (both subject platform/pulse/generator) — the intake
+            # ingress rule never survived, egress worked, symptom was a silent connection timeout with no
+            # error anywhere in the stack.
             apiVersion: kubernetes.crossplane.io/v1alpha2
             kind: Object
             metadata:
@@ -120,7 +130,7 @@ spec:
                   apiVersion: cilium.io/v2
                   kind: CiliumNetworkPolicy
                   metadata:
-                    name: allow-{{ $subject.service }}-{{ $subject.team }}-ingress
+                    name: allow-{{ $subject.service }}-{{ $subject.team }}-to-{{ $target.service }}-ingress
                     namespace: {{ $targetNs }}
                   spec:
                     endpointSelector:
