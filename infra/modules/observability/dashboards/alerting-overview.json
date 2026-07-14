@@ -262,12 +262,30 @@
               "Time": true,
               "__name__": true,
               "Value": true,
+              "__tenant_id__": true,
               "instance": true,
               "pod": true,
               "container": true,
               "endpoint": true,
               "prometheus": true,
-              "prometheus_replica": true
+              "prometheus_replica": true,
+              "dest_server": true,
+              "repo": true,
+              "uid": true
+            },
+            "indexByName": {
+              "alertname": 0,
+              "severity": 1,
+              "alertstate": 2,
+              "cluster": 3,
+              "namespace": 4,
+              "exported_namespace": 5,
+              "job": 6,
+              "service": 7,
+              "sloth_service": 8,
+              "sloth_severity": 9,
+              "sloth_id": 10,
+              "sloth_slo": 11
             }
           }
         }
@@ -276,15 +294,15 @@
     {
       "id": 6,
       "title": "Firing history",
-      "description": "When each alert transitioned firing/resolved over the selected time range.",
+      "description": "One row per severity (not per alert — the per-alert breakdown is in the table above). Shows when the fleet's error budget was actually burning, at a glance.",
       "type": "state-timeline",
       "datasource": { "type": "prometheus", "uid": "mimir-all" },
       "gridPos": { "x": 0, "y": 14, "w": 24, "h": 8 },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "mimir-all" },
-          "expr": "ALERTS{alertstate=\"firing\", cluster=~\"$cluster\", severity=~\"$severity\"}",
-          "legendFormat": "{{alertname}} ({{severity}})",
+          "expr": "max by (severity) (ALERTS{alertstate=\"firing\", cluster=~\"$cluster\", severity=~\"$severity\"})",
+          "legendFormat": "{{severity}}",
           "format": "time_series",
           "instant": false,
           "refId": "A"
@@ -292,9 +310,25 @@
       ],
       "fieldConfig": {
         "defaults": {},
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "critical" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "warning" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "info" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }]
+          }
+        ]
       },
-      "options": {}
+      "options": {
+        "rowHeight": 0.7,
+        "showValue": "never"
+      }
     }
   ]
 }
