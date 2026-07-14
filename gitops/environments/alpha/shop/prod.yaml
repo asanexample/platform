@@ -19,8 +19,14 @@ spec:
   # 7-service parity shape needs 6 CPU steady-state (3 replicas x 250m for 6 services + 3x500m storefront) with
   # zero headroom for canary overlap — orders/payment couldn't schedule ANY pods at the default. Set to team
   # alpha's cap (gitops/teams/alpha.yaml quotaCap.cpu: "8"), leaving 2 CPU of headroom for canary transitions.
+  #
+  # Same story for pod count: the default (pods: 20) was ALSO sized for the original smaller shape. Steady
+  # state alone is 21 pods (7 services x 3 replicas) — the cpu bump alone (#1669) unblocked scheduling on CPU
+  # but immediately hit the pod-count ceiling instead (orders stuck at 2/3, FailedCreate: exceeded quota
+  # ... pods=20, limited: pods=20). Set to team alpha's pod cap too, for the same canary-headroom reasoning.
   quota:
     cpu: "8"
+    pods: 40
   # Cross-team dependency (ADR-101), same as dev: orders calls bravo's dispatch/intake to kick off a real
   # shipment on checkout. Consented to by bravo's stage-scoped ServiceGrant (gitops/grants/bravo/
   # allow-alpha-shop-orders-to-dispatch-intake-prod.yaml) — restrict-environment-dependencies admits this
