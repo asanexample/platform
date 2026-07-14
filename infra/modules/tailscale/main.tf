@@ -57,18 +57,16 @@ resource "kubernetes_manifest" "proxy_class" {
       statefulSet = {
         pod = {
           # STABLE PLACEMENT for the subnet router — it is THE access path to the private EKS API (ADR-010), so it
-          # must not move. Riding ephemeral Karpenter nodes meant every consolidation/replacement/disruption
-          # bounced this pod, and each move drops+re-establishes the tailnet connection = the router "flapping"
-          # offline (observed repeatedly 2026-07-10..14, wedging kubectl access to preprod). Two guards:
-          #  - karpenter.sh/do-not-disrupt: Karpenter never voluntarily disrupts the node while this pod is on it.
-          #  - nodeSelector -> the managed 'system' node group: keep it on stable managed compute (which Karpenter
-          #    doesn't consolidate) rather than an ephemeral Karpenter node — also avoids do-not-disrupt pinning a
-          #    reclaimable Karpenter node (cost). The system group always has >=1 node (desired 1-2).
+          # must not be bounced. Riding ephemeral Karpenter nodes meant every consolidation/replacement/disruption
+          # moved this pod, and each move drops+re-establishes the tailnet connection = the router "flapping"
+          # offline (observed repeatedly 2026-07-10..14, wedging kubectl access to preprod).
+          # karpenter.sh/do-not-disrupt tells Karpenter never to voluntarily disrupt the node while this pod is on
+          # it — which is what stops the flapping. (An earlier revision ALSO pinned it via nodeSelector to the
+          # managed 'system' node group; that was reverted because preprod's single small system node runs ~99%
+          # CPU and Karpenter can't provision a `nodegroup=system`-labelled node, so the router got stuck Pending.
+          # do-not-disrupt alone is the safe fix — the pod stays wherever it fits and Karpenter leaves it be.)
           annotations = {
             "karpenter.sh/do-not-disrupt" = "true"
-          }
-          nodeSelector = {
-            "eks.amazonaws.com/nodegroup" = var.system_nodegroup_name
           }
           tailscaleContainer = {
             # Kernel-mode subnet routing conflicts with Cilium's eBPF datapath; userspace mode avoids the conflict
