@@ -138,7 +138,12 @@ for prod_file in gitops/products/*/*.yaml; do
 
       git checkout -q -b "$branch"
       git commit -q -m "promote: ${env_name} ${svc} -> sha256:${short}"
-      git push -q -u origin "$branch"
+      # Force-push (#1528 follow-up): the branch name is content-deterministic (env+svc+digest), so a same-name
+      # branch already existing remotely can only be a leftover from an earlier attempt at promoting this EXACT
+      # digest (e.g. a closed promote PR whose branch delete silently failed) — never a different, unrelated
+      # change. Force is always safe here: this script is the sole writer of these branches (each pushed branch
+      # is deleted immediately below), so there is nothing else to clobber.
+      git push -q -f -u origin "$branch"
       pr_title="promote: ${env_name} ${svc} -> ${short:0:12} (auto ${lower}→${upper})"
       pr_body="Auto-promotion (#377 Phase 2): \`${lower}\` is Synced+Healthy on \`${lower_digest}\`, advancing the same signed digest to \`${upper}\`. The gitops Gate validates + auto-merges; the per-Product ApplicationSet injects it. The app repo's main is untouched."
       api -X POST "https://api.github.com/repos/${REPO}/pulls" \
