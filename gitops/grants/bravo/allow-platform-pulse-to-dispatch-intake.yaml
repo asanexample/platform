@@ -1,0 +1,20 @@
+# Team bravo consents to the platform's `pulse` synthetic-traffic generator calling `intake` to create real
+# shipments (POST /shipments), driving the full intake->shipments->dispatch-worker (SQS)->notify (SNS)
+# chain continuously for demo traffic. Authored in bravo's own directory (the grantor/producer owns the
+# file — gitops/grants/<target.team>/), consumed by platform's spec.dependencies on its own XEnvironment
+# claim (gitops/environments/platform/pulse/dev.yaml).
+#
+# L4-port-only on purpose — see gitops/grants/alpha/allow-platform-pulse-to-shop-storefront.yaml for the
+# full rationale (this platform has only ever verified exact-literal Cilium/Envoy http.path enforcement;
+# granting at the documented L4 level avoids relying on unverified regex/prefix matching).
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata:
+  name: allow-platform-pulse-to-dispatch-intake
+spec:
+  target: { team: bravo, product: dispatch, stage: dev, service: intake }
+  subject: { team: platform, product: pulse, stage: dev, service: generator }
+  capability:
+    network:
+      ports: [8080]
+      protocol: TCP
