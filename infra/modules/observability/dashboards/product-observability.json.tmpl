@@ -1,7 +1,7 @@
 {
   "uid": "product-observability-__TEAM__",
   "title": "Product Observability — __TEAM__",
-  "description": "Single pane of glass for operating one of __TEAM__'s products/environments reliably: SLO burn, golden signals (RED), deploy/rollout status, resource headroom, cost, active alerts, and log/trace/profile jump-off points. Pick Product → Stage above.",
+  "description": "Single pane of glass for operating one of __TEAM__'s products/environments reliably: SLO burn, golden signals (RED), deploy/rollout status, resource headroom, cost, active alerts, observed cross-service dependencies, and log/trace/profile jump-off points. Pick Product → Stage above.",
   "tags": [
     "product",
     "sre",
@@ -788,6 +788,86 @@
             }
           ],
           "limit": 20
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Dependencies (observed, cross-service calls)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 69 }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Outbound dependency rate",
+      "description": "Tempo's service-graph metrics (traces_service_graph_*, derived from real traces - not the XEnvironment claim's declared `dependencies` list, which is schema-only and never reconciled, ADR-101). Shows every OTHER product this one has actually called recently. Caveat: service_name has no stage component, so if two stages of the same product both have live traffic right now, their outbound edges are indistinguishable here - a genuine platform-wide gap (the same one found while wiring Pyroscope's per-stage labels), not specific to this panel.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 70 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (client, server) (rate(traces_service_graph_request_total{client=~\"$product-.*\", server!~\"$product-.*|user\"}[5m]))",
+          "legendFormat": "{{client}} → {{server}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Outbound dependency error rate",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 70 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 10 },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.05 } ] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (client, server) (rate(traces_service_graph_request_failed_total{client=~\"$product-.*\", server!~\"$product-.*|user\"}[5m])) / sum by (client, server) (rate(traces_service_graph_request_total{client=~\"$product-.*\", server!~\"$product-.*|user\"}[5m]))",
+          "legendFormat": "{{client}} → {{server}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "Outbound dependency latency (p95)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 70 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, client, server) (rate(traces_service_graph_request_client_seconds_bucket{client=~\"$product-.*\", server!~\"$product-.*|user\"}[5m])))",
+          "legendFormat": "{{client}} → {{server}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
         }
       ]
     }
