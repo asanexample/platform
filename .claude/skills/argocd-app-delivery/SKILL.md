@@ -213,7 +213,8 @@ Composition (`crossplane/charts/agent-api/`), and their delivery is **hub-target
 
 ## References
 
-- `docs/runbooks/debug-argocd-sync.md` — sync status, cross-account, AppProject, previews
+- `docs/runbooks/debug-argocd-sync.md` — sync status, cross-account, AppProject, previews,
+  stuck self-heal retry (repeated "successfully synced" with no live convergence)
 - `docs/runbooks/promote-a-release.md` — promotion (auto ≤ staging, prod gated)
 - `docs/runbooks/backstage-argocd.md` — ArgoCD token lifecycle
 - `infra/modules/argocd-apps/delivery.tf`, `gitops/{products,environments,releases}/`

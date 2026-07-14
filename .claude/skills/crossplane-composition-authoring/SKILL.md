@@ -65,7 +65,18 @@ ResourceQuota (ADR-062 reversible suspend).
   service an IAM role `Pod-<team>-<product>-…-<svc>` (truncated+hashed to 64) with the
   cluster permissions-boundary, an inline RolePolicy from the service's
   `permissions.aws.policyStatements` (deny-set-validated) + derived least-priv for any
-  declared cloud resource (ADR-073), and the EKS PodIdentityAssociation.
+  declared cloud resource (ADR-073). **The Role is unconditional (every service gets
+  one) — the PodIdentityAssociation is not.** AWS allows exactly ONE association per
+  (cluster, namespace, serviceAccount); several stateless services intentionally share
+  one SA (e.g. storefront/payment/checkout on `app-alpha`, ADR-067 §7). The Composition
+  dedupes: one designated owner per unique `serviceAccount`, preferring a service that
+  actually declares AWS access (`resources`/`permissions.aws.policyStatements`) so the
+  shared association's role carries real permissions if a sharer ever needs them, else
+  the alphabetically-first sharer. Rendering an association per SERVICE regardless of
+  sharing used to make N composed resources race to own the one real AWS association —
+  confirmed live: the shared SA ended up bound to an arbitrary member's role while a
+  dedicated-SA service got no association at all (fixed, PR #1528; regression fixture
+  `.environment-api-tests/environments/shared-sa-dev.yaml`).
 - **AWS platform account** (ProviderConfig `platform-ecr` = assumeRoleChain): per service
   an ECR repo `team-<team>/<product>-<svc>`, `IMMUTABLE_WITH_EXCLUSION` (allows
   `sha256-*` cosign tags), scan-on-push, **`deletionPolicy: Orphan`** (product-scoped,
