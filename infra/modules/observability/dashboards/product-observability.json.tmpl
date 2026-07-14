@@ -119,14 +119,14 @@
   "annotations": {
     "list": [
       {
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
         "enable": true,
-        "expr": "changes(kube_deployment_metadata_generation{namespace=\"__TEAM__-$product-$stage\"}[2m]) > 0",
+        "expr": "changes(rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Progressing\"}[2m]) > 0",
         "iconColor": "blue",
         "name": "Deploys",
         "step": "1m",
-        "tagKeys": "namespace,deployment",
-        "textFormat": "{{namespace}}/{{deployment}}",
+        "tagKeys": "exported_namespace,name",
+        "textFormat": "{{exported_namespace}}/{{name}}",
         "titleFormat": "Deploy"
       }
     ]
