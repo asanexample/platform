@@ -59,6 +59,21 @@
         "includeAll": false,
         "multi": false,
         "current": { "text": "prod", "value": "prod", "selected": true }
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service (logs)",
+        "description": "Filters the Recent logs panel to one or more services (Loki's `service_name` label). Defaults to All.",
+        "datasource": { "type": "loki", "uid": "loki-all" },
+        "query": "label_values({namespace=\"__TEAM__-$product-$stage\"}, service_name)",
+        "definition": "label_values({namespace=\"__TEAM__-$product-$stage\"}, service_name)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": { "text": "All", "value": "$__all", "selected": true }
       }
     ]
   },
@@ -66,7 +81,7 @@
     {
       "title": "Explore → Loki (this namespace)",
       "type": "link",
-      "url": "/explore?left=%7B%22datasource%22:%22loki-all%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki-all%22%7D,%22expr%22:%22%7Bnamespace%3D%5C%22__TEAM__-$product-$stage%5C%22%7D%22%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
+      "url": "/explore?left=%7B%22datasource%22:%22loki-all%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki-all%22%7D,%22expr%22:%22%7Bnamespace%3D%5C%22__TEAM__-$product-$stage%5C%22,service_name%3D~%5C%22${service:regex}%5C%22%7D%22%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
       "targetBlank": true
     },
     {
@@ -711,7 +726,7 @@
       "id": 20,
       "type": "logs",
       "title": "Recent logs",
-      "description": "LogQL: `{namespace=\"__TEAM__-$product-$stage\"}` against `Loki (all clusters)`. Use the Explore → Loki link above for filters, live tail, or a wider time range.",
+      "description": "LogQL: `{namespace=\"__TEAM__-$product-$stage\", service_name=~\"${service:regex}\"}` against `Loki (all clusters)`. Use the Service picker above to filter to one or more services, or the Explore → Loki link for anything more.",
       "datasource": { "type": "loki", "uid": "loki-all" },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 53 },
       "options": {
@@ -728,7 +743,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki-all" },
-          "expr": "{namespace=\"__TEAM__-$product-$stage\"}"
+          "expr": "{namespace=\"__TEAM__-$product-$stage\", service_name=~\"${service:regex}\"}"
         }
       ]
     },
