@@ -74,14 +74,33 @@
         "allValue": ".*",
         "multi": true,
         "current": { "text": "All", "value": "$__all", "selected": true }
+      },
+      {
+        "name": "level",
+        "type": "custom",
+        "label": "Level (logs)",
+        "description": "Filters the Recent logs panel to one or more log levels (Loki's detected_level, structured metadata - not a real label, so this is a static list rather than label_values). Defaults to All.",
+        "query": "DEBUG,INFO,WARN,ERROR",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": { "text": "All", "value": "$__all", "selected": true }
+      },
+      {
+        "name": "search",
+        "type": "textbox",
+        "label": "Search (logs)",
+        "description": "Optional free-text substring filter for the Recent logs panel, e.g. an order ID or trace ID. Empty = no filtering.",
+        "query": "",
+        "current": { "text": "", "value": "" }
       }
     ]
   },
   "links": [
     {
-      "title": "Explore → Loki (this namespace)",
+      "title": "Explore → Loki (this namespace, best-effort filters)",
       "type": "link",
-      "url": "/explore?left=%7B%22datasource%22:%22loki-all%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki-all%22%7D,%22expr%22:%22%7Bnamespace%3D%5C%22__TEAM__-$product-$stage%5C%22,service_name%3D~%5C%22${service:regex}%5C%22%7D%22%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
+      "url": "/explore?left=%7B%22datasource%22:%22loki-all%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki-all%22%7D,%22expr%22:%22%7Bnamespace%3D%5C%22__TEAM__-$product-$stage%5C%22,service_name%3D~%5C%22${service:regex}%5C%22%7D|detected_level%3D~%5C%22${level:regex}%5C%22|%3D%5C%22$search%5C%22%22%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
       "targetBlank": true
     },
     {
@@ -726,7 +745,7 @@
       "id": 20,
       "type": "logs",
       "title": "Recent logs",
-      "description": "LogQL: `{namespace=\"__TEAM__-$product-$stage\", service_name=~\"${service:regex}\"}` against `Loki (all clusters)`. Use the Service picker above to filter to one or more services, or the Explore → Loki link for anything more.",
+      "description": "LogQL: `{namespace=\"__TEAM__-$product-$stage\", service_name=~\"${service:regex}\"} | detected_level=~\"${level:regex}\" |= \"$search\"`, against `Loki (all clusters)`. Use the Service/Level pickers and Search box above to filter, or the Explore → Loki link for anything more.",
       "datasource": { "type": "loki", "uid": "loki-all" },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 53 },
       "options": {
@@ -743,7 +762,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki-all" },
-          "expr": "{namespace=\"__TEAM__-$product-$stage\", service_name=~\"${service:regex}\"}"
+          "expr": "{namespace=\"__TEAM__-$product-$stage\", service_name=~\"${service:regex}\"} | detected_level=~\"${level:regex}\" |= \"$search\""
         }
       ]
     },
