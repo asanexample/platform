@@ -68,6 +68,12 @@ variable "min_instance_memory_mib" {
   default     = 0
 }
 
+variable "min_instance_cpu" {
+  description = "Exclude instance types with this many vCPUs or fewer. The same fixed per-node DaemonSet slab (~410m CPU: Cilium/Alloy/node-exporter/falco/...) is pure overhead on every node, so tiny 1-2 vCPU nodes waste 20-43% of their CPU on it and can't fit per-node DaemonSets once workloads pack in. A floor forces fewer, bigger nodes that amortize the overhead. 0 = no floor. e.g. 3 requires 4 vCPU+ (lands on c6g.xlarge — cheapest per-vCPU at 8 GiB+)."
+  type        = number
+  default     = 0
+}
+
 variable "capacity_types" {
   description = "Allowed capacity types — e.g. [\"on-demand\"] (platform, stateful-safe) or [\"spot\",\"on-demand\"] (preprod, cheap/ephemeral)."
   type        = list(string)

@@ -116,6 +116,15 @@ inputs = {
   memory_limit = "64Gi"
   # Require 8 GiB+ nodes — the per-node DaemonSet slab (Cilium, Beyla, Alloy) exhausts a 4 GiB t4g.medium.
   min_instance_memory_mib = 6144
+  # Require 4 vCPU+ nodes. Without this, the cheapest instance meeting the 8 GiB floor is r6g.medium (1 vCPU),
+  # so Karpenter provisioned a pile of tiny nodes — each paying the same fixed ~410m DaemonSet slab (43% of a
+  # 1-vCPU node = pure overhead), which left no room for per-node DaemonSets (e.g. alloy-profiles) once tenant
+  # workloads packed in, forcing a manual pod-eviction after every unpark (2026-07-14). 4 vCPU+ (Gt 3) lands on
+  # c6g.xlarge — cheapest per-vCPU at 8 GiB+ (~$0.012/vCPU spot vs r6g.medium's ~$0.014, and r6g.large's ~$0.024)
+  # — dropping the DaemonSet overhead to ~12% and ~halving the node count. Workload here is CPU-bound (nodes ran
+  # 88-99% CPU but only 44-62% memory), so compute-optimized c6g fits; ~6.5 GiB total workload memory sits well
+  # inside 2-3x c6g.xlarge (8 GiB each). Roughly cost-neutral vs a properly-sized fleet of small nodes.
+  min_instance_cpu = 3
 
   high_availability  = include.base.locals.high_availability
   helm_chart_version = include.base.locals.helm_versions.karpenter
