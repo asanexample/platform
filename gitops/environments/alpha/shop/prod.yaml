@@ -15,6 +15,12 @@ spec:
   product: shop
   stage: prod
   tier: standard
+  # Default quota (cpu: "4") was sized for the original storefront+catalog canary validation; the full
+  # 7-service parity shape needs 6 CPU steady-state (3 replicas x 250m for 6 services + 3x500m storefront) with
+  # zero headroom for canary overlap — orders/payment couldn't schedule ANY pods at the default. Set to team
+  # alpha's cap (gitops/teams/alpha.yaml quotaCap.cpu: "8"), leaving 2 CPU of headroom for canary transitions.
+  quota:
+    cpu: "8"
   # Cross-team dependency (ADR-101), same as dev: orders calls bravo's dispatch/intake to kick off a real
   # shipment on checkout. Consented to by bravo's stage-scoped ServiceGrant (gitops/grants/bravo/
   # allow-alpha-shop-orders-to-dispatch-intake-prod.yaml) — restrict-environment-dependencies admits this
