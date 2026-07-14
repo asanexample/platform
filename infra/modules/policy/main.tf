@@ -89,7 +89,17 @@ locals {
       }
     } : {})
     # Leader-elected controllers: a single active replica regardless of count.
-    backgroundController = { replicas = 1 }
+    backgroundController = {
+      replicas = 1
+      # The chart default memory limit (128Mi) OOMKills the background controller under a large reconcile
+      # backlog — e.g. after a post-unpark churn/deadlock leaves a big batch of resources to (re)process for
+      # generate/mutate-existing rules (observed 2026-07-14 on preprod: CrashLoop/OOMKilled at 128Mi). Bump the
+      # limit to 384Mi (request stays at the chart default 128Mi) so a backlog spike can burst without OOM.
+      resources = {
+        limits   = { memory = "384Mi" }
+        requests = { cpu = "100m", memory = "128Mi" }
+      }
+    }
     reportsController = {
       replicas = 1
       rbac     = { serviceAccount = { annotations = {} } } # SA bound to the ECR role via Pod Identity (ADR-047)
