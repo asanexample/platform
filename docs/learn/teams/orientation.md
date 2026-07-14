@@ -38,7 +38,7 @@ them. (The domain model walks a claim through that fence request by request —
 
 ## The record — a Team in git
 
-Onboarding a Team is adding one file, `gitops/teams/<team>.yaml`. Here is `acme`'s, envelope and all (trimmed
+Onboarding a Team is adding one file, `gitops/teams/<team>.yaml`. Here is `alpha`'s, envelope and all (trimmed
 for brevity — labels, comments, and a few optional fields elided; the [reference](reference.md) has the full
 field-by-field schema):
 
@@ -46,9 +46,9 @@ field-by-field schema):
 apiVersion: platform.refplat.org/v1beta1
 kind: Team
 metadata:
-  name: acme
+  name: alpha
 spec:
-  ssoGroup: Dev-acme               # the IDENTITY half — the IdP/Keycloak group this team maps to
+  ssoGroup: Dev-alpha              # the IDENTITY half — the IdP/Keycloak group this team maps to
   envelope:                        # the GOVERNANCE half — the bound on everything the team may ask for
     allowedTiers:  [standard]      # compliance tiers an Environment may request
     allowedStages: [dev, test, uat, staging, prod]
@@ -75,7 +75,7 @@ both worlds.
 Merge that file and the platform converges a handful of things off it, each keyed on the one Team
 (`metadata.name`):
 
-- **A Keycloak group** — one group per Team (`Dev-acme`), the SSO identity the team signs in as; apps read the
+- **A Keycloak group** — one group per Team (`Dev-alpha`), the SSO identity the team signs in as; apps read the
   bare group name from the token. (Plumbing: [Identity](../identity/orientation.md).)
 - **A GitHub org team** — the human *ownership* grant. When the team owns a Product, this org team is granted
   `push` on that product's repo. One caveat
@@ -118,7 +118,7 @@ A Team is the root of the ownership tree ([domain model](../domain-model/orienta
 
 - A **Team** owns Products and declares the envelope that bounds them.
 - A **Product** is one application the team owns ([Onboarding a Product](../products/orientation.md)).
-- An **Environment** is a Product at a stage (`acme-shop-dev`), claimed within the envelope
+- An **Environment** is a Product at a stage (`alpha-shop-dev`), claimed within the envelope
   ([Environment API](../environment-api/orientation.md)).
 
 Onboard the Team first: a Product PR is rejected if its Team doesn't exist yet, and an Environment claim is

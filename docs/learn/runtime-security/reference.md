@@ -66,8 +66,8 @@ A mesh is only justified by L7 east-west traffic management, which isn't needed 
 - Module: `mutual_auth_enabled` (→ `authentication.enabled` + `authentication.mutual.spire.enabled`),
   `spire_install` (embedded vs external), `spire_persistence`, `spire_storage_class`. Live on preprod only
   (`mutual_auth_enabled = true`); platform has no `cilium-spire` namespace.
-- **Proof (preprod):** the real `acme-shop → acme-checkout` call is SPIRE-mutually-authenticated; a cross-team
-  impostor is DROPPED at checkout's ingress. The auth-required CNP lives in the `acme-shop` app repo, not
+- **Proof (preprod):** the real `storefront → checkout` call is SPIRE-mutually-authenticated; a cross-team
+  impostor is DROPPED at checkout's ingress. The auth-required CNP lives in the `alpha-shop` app repo, not
   `gitops/`.
 - **Embedded SPIRE, not standalone:** attests via k8s PSAT and stays clean on the overlay+WireGuard
   stack. Standalone SPIRE only earns its keep if identity is needed beyond Cilium — app-level mTLS or

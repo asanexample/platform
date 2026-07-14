@@ -113,10 +113,10 @@ Keycloak:
 
 Humans aren't the only subjects. Your `shop` pod needs to read its S3 bucket, so it needs an identity too,
 and the platform's answer is the same no-standing-secret instinct. Through EKS Pod Identity, a pod assumes a
-scoped AWS role *via its ServiceAccount* — the real one behind `acme`'s `shop`:
+scoped AWS role *via its ServiceAccount* — the real one behind `alpha`'s `shop`:
 
 ```text
-Pod-acme-shop-dev-web  →  arn:aws:iam::<workload-acct>:role/Pod-acme-shop-dev-web
+Pod-alpha-shop-dev-storefront  →  arn:aws:iam::<workload-acct>:role/Pod-alpha-shop-dev-storefront
 ```
 
 No access key is ever minted, stored in the image, or left sitting in a secret to be stolen; the pod gets

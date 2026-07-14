@@ -16,7 +16,7 @@ sibling of the [Environment API](../environment-api/): that provisions an *envir
 ## Read in this order
 
 1. **[Orientation](orientation.md)** — the one idea (one registry entry, everything derives from it), the
-   real `acme-shop` record, the derivations (github-oidc / policy / argocd-apps, plus github-teams), and the
+   real `alpha-shop` record, the derivations (github-oidc / policy / argocd-apps, plus github-teams), and the
    paved road (scaffolder → gate → reconcile-on-merge).
 2. **[Reference](reference.md)** — the `Product` schema, the derivations table, the paved road, and gotchas.
 

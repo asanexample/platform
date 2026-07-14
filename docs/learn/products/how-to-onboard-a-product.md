@@ -18,7 +18,7 @@ the [orientation](orientation.md) first for the *why*.
   need one first. It seeds a new `<team>-<product>` repo from the golden starter. You only need an existing
   repo for the manual Path B. Either way, one Product is one repo — that's the supply-chain trust anchor —
   and multiple Services live in that one repo.
-- **A name.** The Product's `metadata.name` is `<team>-<product>` (e.g. `acme-shop`), lowercase-kebab.
+- **A name.** The Product's `metadata.name` is `<team>-<product>` (e.g. `alpha-shop`), lowercase-kebab.
 
 ## What you're actually doing
 
@@ -62,17 +62,17 @@ Want to see exactly what gets written, or bringing an existing repo? Use Path B.
 
 ### Step 1 — create the registry file
 
-Add `gitops/products/<team>/<product>.yaml`. Here's a complete, annotated example for a new `acme` product
+Add `gitops/products/<team>/<product>.yaml`. Here's a complete, annotated example for a new `alpha` product
 called `checkout`:
 
 ```yaml
 apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata:
-  name: acme-checkout            # <team>-<product>, lowercase-kebab
+  name: alpha-checkout           # <team>-<product>, lowercase-kebab
 spec:
-  team: acme                     # MUST be an existing Team (gitops/teams/acme.yaml)
-  repo: asanexample/acme-checkout # the ONE repo sourcing this product — the trust anchor
+  team: alpha                    # MUST be an existing Team (gitops/teams/alpha.yaml)
+  repo: asanexample/alpha-checkout # the ONE repo sourcing this product — the trust anchor
   tenancy: pooled                 # pooled | per-customer
   defaultIsolation:
     compute: dedicated-namespace  # shared-namespace | dedicated-namespace | dedicated-nodes |
@@ -135,7 +135,7 @@ or to add more stages, do them explicitly:
 
 1. **Wire your app's CI** to the shared signing pipeline so its images are signed and attested (Path A:
    already wired). → the `supply-chain-onboarding` skill / [Supply chain](../supply-chain/orientation.md).
-2. **Create an Environment** — a Product *at a stage* (`acme-checkout-dev`) via an `XEnvironment` claim
+2. **Create an Environment** — a Product *at a stage* (`alpha-checkout-dev`) via an `XEnvironment` claim
    (Path A: a dev one was claimed for you; add test / staging / prod the same way).
    → the `environment-onboarding` skill / [Environment API](../environment-api/orientation.md).
 3. **Deploy and promote** across stages. → [Delivery](../delivery/orientation.md).
@@ -158,10 +158,10 @@ it's getting the *identity* fields wrong. A typo'd `repo` breaks the trust ancho
 
 **A starting prompt:**
 
-> Onboard a new Product `acme-checkout` owned by team `acme`, repo `asanexample/acme-checkout`, following
-> `docs/learn/products/how-to-onboard-a-product.md`. Create `gitops/products/acme/checkout.yaml` matching
-> the schema and the existing files' conventions (`metadata.name: acme-checkout`, `tenancy: pooled`,
-> `defaultIsolation.compute: dedicated-namespace`, `domains: []`). **Verify the team `acme` exists in
+> Onboard a new Product `alpha-checkout` owned by team `alpha`, repo `asanexample/alpha-checkout`, following
+> `docs/learn/products/how-to-onboard-a-product.md`. Create `gitops/products/alpha/checkout.yaml` matching
+> the schema and the existing files' conventions (`metadata.name: alpha-checkout`, `tenancy: pooled`,
+> `defaultIsolation.compute: dedicated-namespace`, `domains: []`). **Verify the team `alpha` exists in
 > `gitops/teams/` first** — if not, stop and tell me. Open a PR with *only* that one file. Do not touch any
 > derived infra (IAM, policies, ArgoCD) — those are reconciled automatically on merge.
 

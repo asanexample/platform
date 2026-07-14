@@ -21,14 +21,14 @@ build → push to ECR → cosign sign (keyless) → SLSA provenance (isolated) �
 ## Inspect it yourself (real commands)
 
 ```console
-$ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-acme/shop-web@sha256:f6b37d…
+$ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-storefront@sha256:f6b37d…
 └── 🔐 Signatures …          # 1 signature
 └── 💾 Attestations …        # 2: SLSA provenance (v0.2) + CycloneDX SBOM
 
-$ cosign verify … team-acme/shop-web@sha256:f6b37d…
+$ cosign verify … team-alpha/shop-storefront@sha256:f6b37d…
 Issuer:  https://token.actions.githubusercontent.com          # keyless (GitHub Actions OIDC)
 Subject: …/asanexample/trusted-ci/…/build-sign.yml@…          # the shared signer
-githubWorkflowRepository: asanexample/acme-shop              # the caller repo = the trust anchor
+githubWorkflowRepository: asanexample/alpha-shop            # the caller repo = the trust anchor
 ```
 
 ## The trust rule

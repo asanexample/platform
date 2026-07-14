@@ -10,7 +10,7 @@ full frame and metaphor. If you already know Cilium, the terse lookup is the [Re
 *North-south* traffic crosses the cluster edge — a browser reaching your service through the Gateway,
 TLS-terminated there. *East-west* is the
 larger conversation happening inside the cluster: service to service, pod to pod, node to node —
-`acme-shop` calling `acme-checkout`. It never touches the edge, so the edge's TLS does nothing for it.
+`storefront` calling `checkout`. It never touches the edge, so the edge's TLS does nothing for it.
 
 The platform already has a strong east-west floor:
 [Cilium](https://docs.cilium.io/en/stable/) L3/L4
@@ -151,16 +151,16 @@ The moving parts:
    identity handshake before allowing it, and caches the result in a BPF auth-cache — visible as
    `cilium-dbg bpf auth list` → `AUTH TYPE: spire` for the authenticated identity pair.
 
-Here is the full handshake on the showcase `acme-shop → acme-checkout` path — and what happens to an
+Here is the full handshake on the showcase `storefront → checkout` path — and what happens to an
 impostor that wears the right label but holds no valid SVID:
 
 ```mermaid
 sequenceDiagram
-    participant Shop as acme-shop pod
+    participant Shop as storefront pod
     participant Imp as impostor pod
     participant Cil as Cilium agent
     participant SP as SPIRE
-    participant Chk as acme-checkout pod
+    participant Chk as checkout pod
     Shop->>Cil: open TCP to checkout WireGuard-encrypted
     Cil->>Cil: match CNP auth-required rule
     Cil->>SP: verify shop and checkout SVIDs
@@ -220,13 +220,13 @@ Platform's `cilium-config` reads `mesh-auth-enabled: "false"` — exactly the in
 ### What it secures (the proof)
 
 The showcase demo is the
-payoff: the real `acme-shop → acme-checkout` east-west call succeeds and is
+payoff: the real `storefront → checkout` east-west call succeeds and is
 SPIRE-mutually-authenticated (`cilium-dbg bpf auth list` shows `AUTH TYPE: spire` for the
 shop↔checkout identity pair), while a cross-team impostor pod in another namespace is dropped at
 checkout's ingress — even though, label-wise, a plain NetworkPolicy might have let it through. That is
 the zero-trust promise made concrete: label ≠ identity.
 
-One subtlety: the `authentication.mode: required` `CiliumNetworkPolicy` lives in the `acme-shop`
+One subtlety: the `authentication.mode: required` `CiliumNetworkPolicy` lives in the `alpha-shop`
 application repo (external `asanexample/*`), *not* in this platform repo — so you won't find it under
 `gitops/`. Tenants author their own east-west + auth posture, which is why the delivery AppProject
 permits tenant `(Cilium)NetworkPolicy`.
@@ -289,7 +289,7 @@ no regulated tenant exists yet.
 - **WireGuard encryption: genuinely done.** Live fleet-wide on both clusters — the real
   deployed posture.
 - **mTLS identity: a live preprod showcase.** SPIRE is running, the
-  `acme-shop → acme-checkout` pair is mutually authenticated, and the impostor is dropped — proven
+  `storefront → checkout` pair is mutually authenticated, and the impostor is dropped — proven
   live. But it is one service pair on preprod only, *not* the platform cluster, *not* fleet-wide.
 - **Fleet-wide / tier-gated enforcement: designed, not built.** Wiring `authentication.mode: required`
   into the Crossplane Environment Composition per compliance tier (the Composition already has `$tier`

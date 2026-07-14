@@ -36,7 +36,7 @@ the admission walk, SSO groups and roles — read the [domain model](../domain-m
 
 | field | type | meaning |
 | --- | --- | --- |
-| `spec.ssoGroup` | string, ✅ | upstream IdP/Keycloak group the Team maps to (e.g. `Dev-acme`) — root of both authz planes |
+| `spec.ssoGroup` | string, ✅ | upstream IdP/Keycloak group the Team maps to (e.g. `Dev-alpha`) — root of both authz planes |
 | `spec.slack.channel` | string | incident channel the owner-routing agent posts to |
 | `spec.pagerduty.escalationPolicyId` | string | live on-call pointer |
 | `spec.oncall.{primary,fallback}` | arrays of GitHub logins | static accountable-contact fallback |

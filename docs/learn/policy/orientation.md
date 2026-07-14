@@ -56,12 +56,12 @@ Watch all three verbs on a real workload, starting with the one you meet first w
 ## Verb 1 — validate: watch a bad workload get turned away
 
 A genuinely non-compliant Deployment — a stock `nginx:latest`, no resource limits, no probes — dry-run
-against a real environment namespace (`acme-shop-dev`). Kyverno's answer, verbatim (lightly trimmed):
+against a real environment namespace (`alpha-shop-dev`). Kyverno's answer, verbatim (lightly trimmed):
 
 ```text
 Error from server: admission webhook "validate.kyverno.svc-fail" denied the request:
 
-resource Deployment/acme-shop-dev/learn-policy-demo was blocked due to the following policies
+resource Deployment/alpha-shop-dev/learn-policy-demo was blocked due to the following policies
 
 disallow-latest-tag:
   … Using the ':latest' tag is not allowed; pin an immutable version.
@@ -71,8 +71,8 @@ require-requests-limits:
   … CPU and memory requests and limits are required on every container.
 restrict-image-registries:
   … Image registry not allowed. Environment images must come from <platform-acct>.dkr.ecr.us-east-1.amazonaws.com
-restrict-images-acme-shop-dev:
-  … shop workloads may only run images under <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-acme/shop-
+restrict-images-alpha-shop-dev:
+  … shop workloads may only run images under <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-
 ```
 
 There's a lot of the model in those few lines:
@@ -82,7 +82,7 @@ There's a lot of the model in those few lines:
   and paging someone at 2 a.m.
 - The rules stack from general to specific. `disallow-latest-tag`, `require-pod-probes`,
   `require-requests-limits`, and `restrict-image-registries` are **baseline** policies — platform-wide, every
-  namespace. But `restrict-images-acme-shop-dev` is **per-product**: *shop* workloads may run only *shop's*
+  namespace. But `restrict-images-alpha-shop-dev` is **per-product**: *shop* workloads may run only *shop's*
   images. That second layer is how one cluster safely holds many teams (more on where it comes from below).
 - It's `validate.kyverno.svc-fail` — the webhook is *failing closed*. That word "fail" is doing real work;
   we'll come back to it.
@@ -137,7 +137,7 @@ teams:
 - **Baseline policies** are platform-wide and hold no team data — `disallow-latest-tag`,
   `require-requests-limits`, `restrict-image-registries`, the securityContext backstops. Written once,
   applied everywhere.
-- **Per-product policies** are derived, not hand-written. `restrict-images-acme-shop-dev` ("shop may only run
+- **Per-product policies** are derived, not hand-written. `restrict-images-alpha-shop-dev` ("shop may only run
   shop's images") and `restrict-route-hostnames-…` ("shop may only claim its own hostnames") are generated
   per environment by the [Environment Composition](../environment-api/orientation.md) — it reads each
   `XEnvironment` claim's team/product (the ECR path and its allowed hostnames) and stamps out the scoping

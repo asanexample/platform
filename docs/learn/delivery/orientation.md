@@ -14,7 +14,7 @@ You'll get more out of this if the [domain model](../domain-model/orientation.md
 
 ## The question
 
-You merged a fix to `acme`'s `shop`. CI built and signed an image, so you have a **digest**. Now the delivery
+You merged a fix to `alpha`'s `shop`. CI built and signed an image, so you have a **digest**. Now the delivery
 questions — the ones newcomers find genuinely mysterious here:
 
 - How does that digest get from "built" to running in **dev**? Then to test, staging, **prod**?
@@ -33,17 +33,17 @@ A service's deployed version, at each stage, is one line in a **`Release` record
 platform's git:
 
 ```yaml
-# gitops/releases/acme/shop/dev.yaml       # what runs in shop's DEV
+# gitops/releases/alpha/shop/dev.yaml      # what runs in shop's DEV
 kind: Release
 spec:
   services:
-    web:
+    storefront:
       digest: sha256:f6b37d…
 ```
 
 There's one of these per stage — `dev.yaml`, `test.yaml`, `uat.yaml`, `staging.yaml`, `prod.yaml`. The digest
 written in that file *is* the deployed version. Not a dashboard, not a pipeline's memory — a version-controlled
-file. Look at `acme-shop` right now: dev carries `sha256:f6b37d…` while prod carries a different
+file. Look at `alpha-shop` right now: dev carries `sha256:f6b37d…` while prod carries a different
 `sha256:42b927…`. Read that difference like a photograph of the ladder mid-climb — a change has landed in dev
 and hasn't yet made its way up to prod.
 
@@ -202,12 +202,12 @@ hub and spokes — the shape from [How the Platform Fits](../spine/how-the-platf
 
 ![One change, dev to prod: CI signs the image, then ArgoCD and the Rollout land it in dev; the auto-promoter bumps test once dev is healthy, climbing one rung per run up to staging, and a human release-approver gates the final step to prod.](images/one-change-dev-to-prod.svg)
 
-Watch all three reconcilers cooperate on `shop`'s `web` fix (`f6b37d…`):
+Watch all three reconcilers cooperate on `shop`'s `storefront` fix (`f6b37d…`):
 
 1. CI signs the image → digest `f6b37d…`. A promote step writes it into `dev.yaml`.
-2. **ArgoCD's ApplicationSet** notices the new dev Release → generates/updates the `acme-shop-dev` Application →
+2. **ArgoCD's ApplicationSet** notices the new dev Release → generates/updates the `alpha-shop-dev` Application →
    syncs it to the preprod spoke → the **Rollout** canaries `f6b37d…` in. Dev now runs the fix.
-3. Some minutes later, the **auto-promoter**'s cron run sees `acme-shop-dev` is `Synced + Healthy` → opens a
+3. Some minutes later, the **auto-promoter**'s cron run sees `alpha-shop-dev` is `Synced + Healthy` → opens a
    Release PR bumping `test.yaml` to `f6b37d…` → the gitops Gate auto-merges → ArgoCD + Rollout land it in test.
 4. …the same, one rung per run, up through **staging** — the digest baking at each stage until the next
    reconcile confirms health.

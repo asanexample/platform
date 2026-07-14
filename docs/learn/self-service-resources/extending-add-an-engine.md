@@ -342,7 +342,7 @@ first IAM-only engine before you attempt a stateful one.
 3. **End-to-end:** add `resources.<name>: { kind: stream, engine: kinesis, access: readwrite }` to a real
    env claim → the gate admits it (team opted in) → the MR reaches `READY` → the derived RolePolicy carries
    the new ARN → the `<svc>-resources` ConfigMap gains `<NAME>_STREAM_NAME` → prove real I/O from the
-   workload (the `acme/conformance` selftest is the reference harness). Then confirm the safety floor in AWS
+   workload (the `bravo/dispatch` selftest is the reference harness). Then confirm the safety floor in AWS
    directly (encryption on).
 
 ## The bar

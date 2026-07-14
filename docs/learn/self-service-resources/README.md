@@ -12,7 +12,7 @@ are a field on your claim — so read the [Environment API orientation](../envir
 ## Read in this order
 
 1. **[Orientation](orientation.md)** — one idea, *abstraction above the claim, safety below*, taught on a real
-   service (`acme/conformance` — four resources from four lines, running in steady state): abstract intent
+   service (`bravo/dispatch` — four resources from four lines, running in steady state): abstract intent
    (`kind`/`engine`/`access`), the derived least-privilege IAM you never write, the non-overridable safety
    floor, and how the coordinates reach your app.
 2. **[Reference](reference.md)** — the claim schema, the per-engine IAM tables, the safety floor, the naming,

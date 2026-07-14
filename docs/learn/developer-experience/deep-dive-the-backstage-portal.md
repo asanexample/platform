@@ -65,7 +65,7 @@ Two other mechanisms fill in the rest of the graph — and, unlike the credentia
 
 So the browse experience is a direct rendering of the [domain model](../domain-model/orientation.md) — Team → Product → Service → Environment. Projection beats scrape because git is the source of truth: the catalog stays correct with no privileged cluster access and cannot drift from what's declared. A guardrail rides along — `catalog.rules: [Component, Location]` — so an app repo can register a `Component` but not spoof a `Group` or `System`. No ownership forgery.
 
-The live registries today: teams **acme / globex / platform**, their products (acme's `shop`, `checkout`, `conformance`; globex's `widgets`; platform's `triage-copilot`), and their environments. The projection runs in `projection_mode = "v3"` — a unit flag, not baked into the image (the v3 code already ships dormant; `v2 → v3` needed no rebuild).
+The live registries today: teams **alpha / bravo / platform**, their products (alpha's `shop`, `checkout`; bravo's `dispatch`; platform's `triage-copilot`), and their environments. The projection runs in `projection_mode = "v3"` — a unit flag, not baked into the image (the v3 code already ships dormant; `v2 → v3` needed no rebuild).
 
 ## Auth: direct Keycloak OIDC
 

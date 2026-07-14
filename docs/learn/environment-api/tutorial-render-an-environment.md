@@ -23,7 +23,7 @@ cd infra/modules/crossplane/.environment-api-tests
 
 ## 1. Render your first environment
 
-The harness ships example claims under `environments/`. Render the `demo-dev` one — the `acme` team's
+The harness ships example claims under `environments/`. Render the `demo-dev` one — the `alpha` team's
 `demo` product, in `dev`:
 
 ```console
@@ -39,9 +39,9 @@ platform would create on a cluster — you're just seeing it rendered offline.
 Scroll the output and find these three. Each is one YAML doc, tagged with a `composition-resource-name`
 annotation:
 
-- the Namespace — labels for `team: acme`, `product: demo`, `stage: dev`;
-- the ECR Repository — `external-name: team-acme/demo-web`;
-- the IAM Role — `Pod-acme-demo-dev-web`.
+- the Namespace — labels for `team: alpha`, `product: demo`, `stage: dev`;
+- the ECR Repository — `external-name: team-alpha/demo-web`;
+- the IAM Role — `Pod-alpha-demo-dev-web`.
 
 Now count the composed resources:
 
@@ -68,8 +68,8 @@ crossplane render /tmp/my-env.yaml ../charts/environment-api/files/composition.y
   render/functions.yaml --extra-resources render/environmentconfig.yaml | grep -E "external-name:|kind: Namespace" | head
 ```
 
-The namespace derives to `acme-demo-test` and the role to `Pod-acme-demo-test-web` — but the ECR repo
-stays `team-acme/demo-web`. If you predicted that, you've got it: names are either product + service
+The namespace derives to `alpha-demo-test` and the role to `Pod-alpha-demo-test-web` — but the ECR repo
+stays `team-alpha/demo-web`. If you predicted that, you've got it: names are either product + service
 (identity, stage-independent) or product + stage (the environment). Identity stays put; the place changes.
 
 ## 4. Add a service — watch the footprint grow

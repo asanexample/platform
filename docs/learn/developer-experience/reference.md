@@ -105,7 +105,7 @@ Templates in `scaffolder/templates/` (registered via `location.yaml`, CODEOWNERS
 
 - **Live:** Backstage Phase 2 (`backstage.aws.refplat.org`, direct Keycloak OIDC, catalog projection v3,
   K8s/ArgoCD/Cost plugins); scaffolder enabled (team members self-serve non-privileged templates; `new-team`/offboard admin-gated); new-product/new-environment/new-resource/
-  request-promotion proven e2e (`acme/shop`, 2026-06-14).
+  request-promotion proven e2e (`alpha/shop`, 2026-06-14).
 - **Known gaps (template headers):** `new-product` repo-creation 403s (scaffolder GitHub App not org-wide yet);
   gitops-Gate auto-merge not armed (a reviewer merges low-risk cases); no scaffolder template for `XAgent`
   (hand-authored). The gate's decommission-first / purge-completeness guard is armed.

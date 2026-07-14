@@ -38,7 +38,7 @@ Everything below is that diagram, verified hop by hop.
 A team's cost budget lives in exactly one place — its envelope in the git registry:
 
 ```yaml
-# gitops/teams/acme.yaml (admin-authored)
+# gitops/teams/alpha.yaml (admin-authored)
 spec:
   envelope:
     budget:
@@ -48,12 +48,12 @@ spec:
 The schema is deliberately tiny. In the env-API `Team` CRD, `budget` is an optional object with a single
 field, `monthlyUSD: { type: number, minimum: 0 }`. Optional is meaningful: a team with no budget is
 surfaced-but-unbounded — you still see its spend, there's just no line to trip. All three live teams
-(`acme`, `globex`, `platform`) carry a demo budget; the exact dollar figures are private and don't matter
+(`alpha`, `bravo`, `platform`) carry a demo budget; the exact dollar figures are private and don't matter
 to the mechanism. What matters is that the number is authored once, by an admin, in git.
 
 From there it's projected, never re-authored. [kube-state-metrics](https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/)
 runs a **CustomResourceState** config that reads the `Team` CR and emits a gauge —
-`team_budget_monthly_usd{team="acme"}` — straight from `spec.envelope.budget.monthlyUSD`, with the team
+`team_budget_monthly_usd{team="alpha"}` — straight from `spec.envelope.budget.monthlyUSD`, with the team
 label pulled from the CR's name. That one metric is the join key for all three rungs. There's no second
 budget store to drift against — this is *decide-once-in-git, project-everywhere*, the same
 coherence move the platform makes for roles and quotas.
@@ -63,7 +63,7 @@ coherence move the platform makes for roles and quotas.
 The [`observability-opencost`](https://github.com/asanexample/platform/blob/main/infra/modules/observability-opencost)
 cost dashboard has a **"Budget utilization by team (%)"** panel that does the obvious thing: per-team
 spend (OpenCost allocation) divided by `team_budget_monthly_usd`, times 100. That's all of surface — the
-breaker rating drawn next to the actual draw, so a human glancing at Grafana sees "acme is at 40%" without
+breaker rating drawn next to the actual draw, so a human glancing at Grafana sees "alpha is at 40%" without
 doing arithmetic.
 
 ### Alert — a burn-rate rule where spend and budget coexist
@@ -124,7 +124,7 @@ Live, right now:
 
 ```console
 $ kubectl --context preprod get cm cost-budget-status -n observability -o jsonpath='{.data}'
-{"acme":"ok","globex":"ok","platform":"ok"}
+{"alpha":"ok","bravo":"ok","platform":"ok"}
 ```
 
 ### Part 2 — the Kyverno policy (reads the verdict)
@@ -146,7 +146,7 @@ Two more safety properties are baked in:
 So the enforce rung is fail-open twice (bad query → `ok`; dead engine → allow) and, structurally, only
 gates new provisioning — it matches `CREATE`, touches no running Deployment, evicts nothing. That's the
 rule made concrete: a cost control must never become an availability control. The deny path is proven —
-forcing `acme=exceeded` and flipping to Enforce, a dry-run create of an acme environment was blocked by
+forcing `alpha=exceeded` and flipping to Enforce, a dry-run create of an alpha environment was blocked by
 Kyverno, then reverted to Audit.
 
 ### Why this whole apparatus is preprod-only — and that's correct

@@ -13,7 +13,7 @@ ideally [Life of a Deployment](../spine/life-of-a-deployment.md).
 ## Read in this order
 
 1. **[Orientation](orientation.md)** — the one idea (*you move a digest up a ladder; reconcilers converge each
-   rung*), the three reconcilers (auto-promoter · ArgoCD · Rollout), and a real `acme-shop` climb from dev to
+   rung*), the three reconcilers (auto-promoter · ArgoCD · Rollout), and a real `alpha-shop` climb from dev to
    prod.
 2. **[Reference](reference.md)** — look-up: the `Release` schema, the per-Product ApplicationSet, the
    promotion paths and the ladder, the Rollout canary, the gotchas that bite, and a glossary.

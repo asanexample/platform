@@ -53,17 +53,17 @@ code — the derivation is exact and re-runs every time the registry changes.
 
 ## The record — a Product in the registry
 
-Here's `acme`'s `shop` (`gitops/products/acme/shop.yaml`) — the essential spec, with the file's header comment
+Here's `alpha`'s `shop` (`gitops/products/alpha/shop.yaml`) — the essential spec, with the file's header comment
 and `metadata.labels` elided for clarity:
 
 ```yaml
 apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata:
-  name: acme-shop
+  name: alpha-shop
 spec:
-  team: acme                        # who OWNS it (→ ownership, access, on-call)
-  repo: asanexample/acme-shop       # its source repo — and its supply-chain TRUST anchor
+  team: alpha                       # who OWNS it (→ ownership, access, on-call)
+  repo: asanexample/alpha-shop      # its source repo — and its supply-chain TRUST anchor
   tenancy: pooled                   # how it shares infrastructure
   defaultIsolation: { compute: dedicated-namespace }
   domains: []                       # any custom hostnames it serves
@@ -81,11 +81,11 @@ its slice per Product. This is the heart of it:
 
 ![One Product record fans out on merge into its derived footprint: the `github-oidc` CI push role (OIDC-federated, trusting only the product's repo), the per-product Kyverno verify-images / verify-attestations policies, the `argocd-apps` AppProject + ApplicationSet, and the `github-teams` ownership grant. The ECR repositories are the exception — they materialize when an Environment claim reconciles, not on the Product merge.](images/product-derivation.svg)
 
-- **`github-oidc`** derives a CI role that lets `acme-shop`'s pipeline push to its ECR repo — federated by
+- **`github-oidc`** derives a CI role that lets `alpha-shop`'s pipeline push to its ECR repo — federated by
   [GitHub OIDC](../supply-chain/orientation.md) so it needs no stored keys, and scoped so the role trusts only
-  `spec.repo`. `acme-shop`'s CI can't push as `globex-widgets`.
-- **`policy`** derives the per-product Kyverno policies — `verify-images-product-acme-shop` and
-  `verify-attestations-product-acme-shop` — so only signed, attested images from shop's repo run (the enforce
+  `spec.repo`. `alpha-shop`'s CI can't push as `bravo-dispatch`.
+- **`policy`** derives the per-product Kyverno policies — `verify-images-product-alpha-shop` and
+  `verify-attestations-product-alpha-shop` — so only signed, attested images from shop's repo run (the enforce
   side — Kyverno rejecting non-compliant images at admission; see [Policy](../policy/orientation.md)).
 - **`argocd-apps`** derives one AppProject + ApplicationSet per Product, which then fans out one ArgoCD
   Application per Environment (the delivery machinery from [Delivery](../delivery/orientation.md)).
@@ -94,7 +94,7 @@ A fourth unit, `github-teams`, also derives from this registry — it grants the
 `<team>-<product>` repo. The three above are
 the per-product footprint, which is why we foreground them; `github-teams` is the ownership grant.
 
-All three are computed from the same `acme-shop.yaml`. Change the registry, they re-derive. There's no second
+All three are computed from the same `alpha-shop.yaml`. Change the registry, they re-derive. There's no second
 place where "the list of products" lives to drift out of sync.
 
 This declare-once-then-derive shape is the platform's signature move, not a one-off.
@@ -143,7 +143,7 @@ A Product doesn't live alone; it's the middle of the ownership model
   [Self-service resources](../self-service-resources/orientation.md)).
 - A **Product** is the application. It has one or more Services (deployable units → ECR repos
   `team-<team>/<product>-<svc>`).
-- An **Environment** is a Product at a stage (`acme-shop-dev`), provisioned by the
+- An **Environment** is a Product at a stage (`alpha-shop-dev`), provisioned by the
   [Environment API](../environment-api/orientation.md) from a claim.
 
 Onboarding a Product is registering that middle object; Environments and Services then hang off it.

@@ -9,7 +9,7 @@ governance and automation hang off. No prior platform knowledge needed.
 
 ## Read in this order
 
-1. **[Orientation](orientation.md)** — ownership is a tree, deployment is a grid. Walk a real team (`acme`)
+1. **[Orientation](orientation.md)** — ownership is a tree, deployment is a grid. Walk a real team (`alpha`)
    down the tree and across the grid.
 2. **[Reference](reference.md)** — the terse lookup: the nouns as a schema, the relationships, the naming
    conventions, and the Team envelope.

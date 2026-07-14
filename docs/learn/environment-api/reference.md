@@ -71,7 +71,7 @@ service:
 [SNS](https://docs.aws.amazon.com/sns/latest/dg/welcome.html) /
 [DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html) as
 namespaced `*.aws.m.upbound.io` managed resources, each with derived least-privilege IAM onto the Pod
-role and a `<svc>-resources` ConfigMap. Exercised by `gitops/environments/acme/conformance/dev.yaml`.
+role and a `<svc>-resources` ConfigMap. Exercised by `gitops/environments/bravo/dispatch/dev.yaml`.
 
 ## Delivery, topology, lifecycle
 
@@ -220,9 +220,9 @@ won't publish the `infra/`/`gitops/` trees. Doc-to-doc links stay relative.
   [Composition](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/environment-api/files/composition.yaml),
   [EnvironmentConfig](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/environment-api/templates/environmentconfig.yaml).
 - Which cluster enables it: [`…/preprod/…/crossplane/terragrunt.hcl`](https://github.com/asanexample/platform/blob/main/infra/live/aws/preprod/us-east-1/platform/crossplane/terragrunt.hcl).
-- Real examples: [`acme/shop/dev.yaml`](https://github.com/asanexample/platform/blob/main/gitops/environments/acme/shop/dev.yaml),
-  [`products/acme/shop.yaml`](https://github.com/asanexample/platform/blob/main/gitops/products/acme/shop.yaml),
-  [`acme/conformance/dev.yaml`](https://github.com/asanexample/platform/blob/main/gitops/environments/acme/conformance/dev.yaml)
+- Real examples: [`alpha/shop/dev.yaml`](https://github.com/asanexample/platform/blob/main/gitops/environments/alpha/shop/dev.yaml),
+  [`products/alpha/shop.yaml`](https://github.com/asanexample/platform/blob/main/gitops/products/alpha/shop.yaml),
+  [`bravo/dispatch/dev.yaml`](https://github.com/asanexample/platform/blob/main/gitops/environments/bravo/dispatch/dev.yaml)
   (self-service resources).
 - Authoring the Composition: the `crossplane-composition-authoring` skill. Onboarding an environment:
   the `environment-onboarding` skill + [runbook](../../runbooks/environment-onboarding.md).

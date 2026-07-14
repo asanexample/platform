@@ -157,7 +157,7 @@ That's why a developer can be handed real power safely — the guardrails aren't
   catalog projection (v3), and the Kubernetes / ArgoCD / Cost plugins. The scaffolder is enabled — team
   members self-serve the non-privileged paths (new-environment / new-resource / request-promotion /
   new-product); privileged templates (`new-team`, offboarding) are gated server-side. Those paths have been
-  proven end to end — the `acme/shop` product went the whole way.
+  proven end to end — the `alpha-shop` product went the whole way.
 - **Known live gaps (from the templates' own headers, not speculation):** `new-product`'s repo-creation step
   403s until the scaffolder GitHub App is broadened org-wide (the registry-PR half works); the gitops Gate's
   auto-merge isn't armed yet, so a reviewer merges even the low-risk cases today.

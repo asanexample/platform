@@ -136,7 +136,7 @@ spec:
           app.kubernetes.io/managed-by: crossplane
           platform.refplat.org/product: demo
           platform.refplat.org/stage: dev
-          platform.refplat.org/team: acme
+          platform.refplat.org/team: alpha
           platform.refplat.org/tier: standard
 ```
 
@@ -182,7 +182,7 @@ that render uses `default`):
 metadata:
   annotations:
     crossplane.io/composition-resource-name: ecr-repo-web
-    crossplane.io/external-name: team-acme/demo-web
+    crossplane.io/external-name: team-alpha/demo-web
 spec:
   providerConfigRef:
     name: platform-ecr

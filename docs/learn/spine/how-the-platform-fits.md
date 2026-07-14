@@ -110,13 +110,13 @@ Almost nothing here is bespoke. The platform's value isn't a novel architecture 
 
 A map is really about boundaries. Two of them explain most of "why is it done that way?", and both are worth committing to memory.
 
-**1 · Control plane vs. data plane.** The control planes *manage* — ArgoCD, Crossplane, Kyverno, Karpenter. They decide what should exist and keep it healthy; they never personally serve a customer request. The data plane is where real user traffic actually flows: your running pods, the Gateway handing bytes to `shop-acme-dev...`.
+**1 · Control plane vs. data plane.** The control planes *manage* — ArgoCD, Crossplane, Kyverno, Karpenter. They decide what should exist and keep it healthy; they never personally serve a customer request. The data plane is where real user traffic actually flows: your running pods, the Gateway handing bytes to `shop-alpha-dev...`.
 
 It's air traffic control vs. the aircraft. ATC manages, sequences, and keeps everyone safe — but no passenger rides in the control tower. The planes carry the actual people. The crucial property falls right out of the metaphor: if ATC goes dark, planes already in the air don't fall — they keep flying on their current heading; you just can't coordinate new movements. Same here: if a control plane is down, existing traffic often keeps flowing — the managers are out, but the workers are still at their posts. That's why "ArgoCD is down" is serious but not an outage, while "the Gateway is down" is an outage. Knowing which plane a component is in tells you how scared to be.
 
 **2 · Platform-owned vs. tenant-owned.** The platform team owns the planes — every control plane, the paved road, the guardrails. App teams own their Products — the code, the claims, the manifests. The boundary between them is an **API**: a team declares intent (an `XEnvironment` claim, a `k8s/` folder), and the platform's planes turn it into reality — without the team ever touching a control plane, and without the platform ever touching the team's code. That's the domain model's ownership split ([Team → Product → …](../domain-model/orientation.md)), seen from the infrastructure side: **the claim is the contract.** Everything above the API is a tenant's business; everything below is the platform's.
 
-One consequence is worth stating. Because a plane is just a control loop reconciling git, platform services ride the exact same rails as tenant products. The triage agent is delivered by the same ArgoCD, from the same kind of registry, as `acme`'s `shop` — one road for platform-owned and tenant-owned alike. The platform dogfoods its own paved road, which is the surest way to know the road is any good.
+One consequence is worth stating. Because a plane is just a control loop reconciling git, platform services ride the exact same rails as tenant products. The triage agent is delivered by the same ArgoCD, from the same kind of registry, as `alpha`'s `shop` — one road for platform-owned and tenant-owned alike. The platform dogfoods its own paved road, which is the surest way to know the road is any good.
 
 ## Reading the map when something breaks
 

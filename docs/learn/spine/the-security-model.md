@@ -8,7 +8,7 @@ what an attacker hopes you'll write, so this one stays honest about the gaps.
 ## The question
 
 Most of the platform is framed around shipping software. Flip it around and take the adversary's view: if
-someone wanted to steal `acme`'s data or take over the cluster, what actually stops them at each level,
+someone wanted to steal `alpha`'s data or take over the cluster, what actually stops them at each level,
 and where are the holes we already know about? A model that defends one layer — workloads, say — while
 staying quiet about the cloud account, the cluster, the application code, and the things we *haven't built
 yet* is a comfort blanket, not a security model. So this one goes top to bottom and keeps a running tally
@@ -25,7 +25,7 @@ attacker's. We never built a separate "security system" — security falls out o
 depth means many independent walls, arranged so an attacker must defeat all of them in sequence.
 
 The walls, outermost to innermost — each an independent slice a request or workload must clear before it
-can reach `acme`'s data. The standard way to organize them is the
+can reach `alpha`'s data. The standard way to organize them is the
 **[4 C's of cloud-native security](https://kubernetes.io/docs/concepts/security/overview/)** — concentric
 layers, outermost first:
 
@@ -112,7 +112,7 @@ by software we operate.
   Pod-to-pod traffic is transparently encrypted on the wire (WireGuard, live on *both* clusters — no app
   changes), and Cilium mutual authentication with an embedded SPIRE issues a per-workload SPIFFE identity,
   so services cryptographically prove who they are to each other rather than being merely "restricted by
-  policy." Live as a showcase on preprod: the `acme-shop → acme-checkout` call is SPIRE-mutually-authenticated
+  policy." Live as a showcase on preprod: the `storefront → checkout` call within `alpha-shop` is SPIRE-mutually-authenticated
   (`AUTH TYPE=spire`), a cross-team impostor is denied. Fleet-wide, tier-gated enforcement is the remaining half.
 - **Gaps** — EKS API audit logging isn't fully on (a cost trade-off — the logs are CloudWatch-only and
   high-volume), leaving cluster forensics thin. Hardened-AMI adoption is backlog.
@@ -220,7 +220,7 @@ The most important section. A posture you can trust is one that names its own ho
 | --- | --- | --- |
 | **Cloud** | No **WAF** / managed DDoS | No edge inspection of requests for OWASP-class attack patterns |
 | **Cloud** | No **GuardDuty / Config / Security Hub / Inspector / Macie** | Isolation walls exist, but no cloud-level threat *detection* or continuous posture/CSPM (a cost trade-off) |
-| **Cluster** | **East-west mutual auth not yet fleet-enforced** — encryption is fleet-wide; mutual auth (SPIFFE/SPIRE) is a **preprod showcase** | Every service *can* be cryptographically authenticated (proven on acme-shop↔acme-checkout), but `authentication.mode: required` policies aren't yet applied fleet-wide per tier |
+| **Cluster** | **East-west mutual auth not yet fleet-enforced** — encryption is fleet-wide; mutual auth (SPIFFE/SPIRE) is a **preprod showcase** | Every service *can* be cryptographically authenticated (proven on alpha-shop's storefront↔checkout), but `authentication.mode: required` policies aren't yet applied fleet-wide per tier |
 | **Cluster** | **EKS API audit logging** not fully on | Thin cluster-API forensics after an incident (CloudWatch cost trade-off) |
 | **Cluster** | No **hardened-AMI** program; kube-bench findings not yet remediated | The CIS *scan* now runs, but node hardening isn't complete |
 | **Container** | No end-to-end **block-on-critical-CVE** gate; base-image currency partial | A known-vulnerable image can still deploy |

@@ -95,7 +95,7 @@ encryption.
 > away at the door.
 
 The honest status: this is built and live, but as a **showcase on preprod only**, one service pair. The real
-`acme-shop → acme-checkout` call is SPIRE-mutually-authenticated, and a cross-team impostor is **dropped** at
+`storefront → checkout` call is SPIRE-mutually-authenticated, and a cross-team impostor is **dropped** at
 checkout's door (proven live). But it's **not on the platform cluster**, and fleet-wide, tier-gated
 enforcement — wiring auth-required policies into the Environment provisioner *per compliance tier*, gated on
 `regulated` — is **designed, not built**, deliberately parked until a regulated tenant actually exists (none

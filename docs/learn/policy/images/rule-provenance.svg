@@ -19,7 +19,7 @@
 <text class="t-green mono" x="62" y="320" font-size="11.5" fill="#1c7a4f">require-requests-limits</text>
 <text class="t-green mono" x="62" y="340" font-size="11.5" fill="#1c7a4f">restrict-image-registries</text>
 <text class="t-green mono" x="62" y="360" font-size="11.5" fill="#1c7a4f">verify-images · verify-attestations</text>
-<text class="muted mono" x="62" y="404" font-size="10" fill="#6c6c73">ADR-014 · policy-as-code</text>
+<text class="muted mono" x="62" y="404" font-size="10" fill="#6c6c73">policy-as-code</text>
 
 
 <rect class="bg-blue bd-blue" x="387" y="196" width="333" height="222" rx="12" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
@@ -29,11 +29,11 @@
 <text class="muted" x="409" y="262" font-size="12" fill="#5a6b83">carries only the team&#39;s own facts</text>
 <line class="bd-blue" x1="409" y1="278" x2="698" y2="278" stroke="#c4d8f4" stroke-width="1"></line>
 <text class="muted mono" x="409" y="301" font-size="11" fill="#6c6c73">team</text>
-<text class="t-blue mono" x="470" y="301" font-size="11.5" fill="#2c66c4">acme</text>
+<text class="t-blue mono" x="470" y="301" font-size="11.5" fill="#2c66c4">alpha</text>
 <text class="muted mono" x="409" y="321" font-size="11" fill="#6c6c73">product</text>
 <text class="t-blue mono" x="470" y="321" font-size="11.5" fill="#2c66c4">shop</text>
 <text class="muted mono" x="409" y="341" font-size="11" fill="#6c6c73">→ ECR</text>
-<text class="t-blue mono" x="470" y="341" font-size="11" fill="#3d6fc0">…/team-acme/shop-*</text>
+<text class="t-blue mono" x="470" y="341" font-size="11" fill="#3d6fc0">…/team-alpha/shop-*</text>
 <text class="muted mono" x="409" y="361" font-size="11" fill="#6c6c73">→ hosts</text>
 <text class="t-blue mono" x="470" y="361" font-size="11" fill="#3d6fc0">the names it owns</text>
 <text class="muted mono" x="409" y="404" font-size="10" fill="#6c6c73">one per environment</text>
@@ -85,10 +85,10 @@
 <circle class="ac-blue" cx="80" cy="818" r="4" fill="#2c66c4"></circle>
 <text class="text" x="92" y="822" font-size="13.5" fill="#1c1c22" font-weight="600">Per-product scoping</text>
 <text class="t-blue mono" x="74" y="840" font-size="10.5" fill="#3060b0">derived per env</text>
-<text class="t-blue mono" x="234" y="820" font-size="11.5" fill="#2c66c4">restrict-images-acme-shop · restrict-route-hostnames-…</text>
+<text class="t-blue mono" x="234" y="820" font-size="11.5" fill="#2c66c4">restrict-images-alpha-shop · restrict-route-hostnames-…</text>
 
 
-<text class="dim mono" x="40" y="896" font-size="10" fill="#9a9aa1" letter-spacing="0.8px">OWNED BY (ADR-046)</text>
+<text class="dim mono" x="40" y="896" font-size="10" fill="#9a9aa1" letter-spacing="0.8px">OWNED BY</text>
 <circle class="ac-green" cx="196" cy="892" r="4.5" fill="#1f8a5b"></circle>
 <text class="muted mono" x="208" y="896" font-size="11.5" fill="#6c6c73">platform policy module</text>
 <circle class="ac-blue" cx="404" cy="892" r="4.5" fill="#2c66c4"></circle>

@@ -18,11 +18,11 @@ A lookup for the delivery mechanism. For the narrative, see the [orientation](or
 apiVersion: platform.refplat.org/v1beta1
 kind: Release
 metadata:
-  name: acme-shop-dev
+  name: alpha-shop-dev
 spec:
-  environmentRef: acme-shop-dev          # <team>-<product>[-<customer>]-<stage>
+  environmentRef: alpha-shop-dev         # <team>-<product>[-<customer>]-<stage>
   services:
-    web:
+    storefront:
       digest: sha256:f6b37d…              # the deployed image digest for this service, this stage
 ```
 

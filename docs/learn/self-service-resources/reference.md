@@ -19,7 +19,7 @@ services:
 
 - **`kind`** is the abstract class; **`engine`** the concrete implementation; **`access`** your intent.
 - **Built + live today:** `s3` (objectstore), `sqs` + `sns` (stream), `dynamodb` (keyvalue) — all four
-  provisioned & ready on preprod (`acme/conformance/dev`).
+  provisioned & ready on preprod (`bravo/dispatch/dev`).
 
 ## Derived least-privilege IAM (per engine)
 
