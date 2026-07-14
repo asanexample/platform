@@ -21,11 +21,11 @@ sign-in and roles, see [identity](../identity/orientation.md). Here you just get
   not the Team itself). Both paths below are gated so only an admin can land one.
 - **A name.** `metadata.name` is a bare lowercase slug, `^[a-z][a-z0-9]{1,15}$` — letters and digits, **no
   hyphens**. The team name is parsed back out of `<team>-<product>-<stage>` namespace names, so a hyphen
-  would make that split ambiguous. `alpha`, not `a-l-p-h-a`. (The Backstage form enforces exactly this pattern;
+  would make that split ambiguous. `charlie`, not `c-h-a-r-l-i-e`. (The Backstage form enforces exactly this pattern;
   the Teams Gate's own regex is looser — it permits hyphens and longer names — so on a hand-authored Path B
   PR the reviewer, not the gate, is what catches a stray hyphen.)
 - **An SSO group.** The upstream group this Team maps to (`spec.ssoGroup`). The convention is `Dev-<name>`
-  (so `Dev-alpha`); a tenant Team may **not** map to a privileged/platform group. The Teams Gate rejects the
+  (so `Dev-charlie`); a tenant Team may **not** map to a privileged/platform group. The Teams Gate rejects the
   *configured* denied set (today just `platform-admins`, matched case-insensitively) — note `Platform` itself
   is **not** in that set (the platform-owned Team uses it), so CODEOWNERS review, not the gate, is the
   backstop for every other privileged group.
@@ -70,18 +70,18 @@ Team — an existing tenant Team is the model — and adjust.
 
 ### Step 1 — write the registry file
 
-Add `gitops/teams/<name>.yaml`. Here's a complete, annotated example for a new team `alpha`:
+Add `gitops/teams/<name>.yaml`. Here's a complete, annotated example for a new team `charlie`:
 
 ```yaml
 apiVersion: platform.refplat.org/v1beta1
 kind: Team
 metadata:
-  name: alpha                      # bare slug, no hyphens; ^[a-z][a-z0-9]{1,15}$
+  name: charlie                      # bare slug, no hyphens; ^[a-z][a-z0-9]{1,15}$
   labels:
     app.kubernetes.io/managed-by: argocd
     app.kubernetes.io/part-of: environment-api
 spec:
-  ssoGroup: Dev-alpha              # the Keycloak/IdP group this team maps to (identity)
+  ssoGroup: Dev-charlie              # the Keycloak/IdP group this team maps to (identity)
   slack:
     channel: "C0XXXXXXXXX"         # incident channel id — the triage agent posts here
   envelope:                        # the bound on every Product/Environment this team may author
@@ -152,7 +152,7 @@ You don't run `terragrunt apply`. Merging to `main` under `gitops/teams/**` fire
 converges the derived units on the in-VPC runner, in order: **keycloak-config → argocd → argocd-apps →
 github-teams**. Out of that one file come:
 
-- **A Keycloak group** — one group per Team (`spec.ssoGroup`, e.g. `Dev-alpha`), the team's SSO identity
+- **A Keycloak group** — one group per Team (`spec.ssoGroup`, e.g. `Dev-charlie`), the team's SSO identity
   that apps read from the `groups` claim.
 - **A GitHub org team** — `github-teams` creates the org team (named for the slug) and later grants it
   `push` on each of the team's `<team>-<product>` repos. This is **human ownership only** — org-team
@@ -191,8 +191,8 @@ must not get wrong — and what a human must check.
 
 **A starting prompt:**
 
-> Onboard a new Team `alpha` mapping to SSO group `Dev-alpha`, following
-> `docs/learn/teams/how-to-onboard-a-team.md`. Create `gitops/teams/alpha.yaml` in the **v1beta1** shape,
+> Onboard a new Team `charlie` mapping to SSO group `Dev-charlie`, following
+> `docs/learn/teams/how-to-onboard-a-team.md`. Create `gitops/teams/charlie.yaml` in the **v1beta1** shape,
 > copying an existing tenant Team's conventions. Envelope: `allowedTiers: ["standard"]`, stages
 > `["dev","test","staging","prod"]`, `quotaCap` cpu `"8"` / memory `16Gi` / pods `40`, `budget.monthlyUSD:
 > 2000`, `maxDedicatedIsolation: { cluster: 0, account: 0 }`, `resources.allowedEngines: ["s3"]`,
