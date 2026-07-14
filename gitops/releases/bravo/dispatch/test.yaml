@@ -9,3 +9,5 @@ spec:
       digest: sha256:0775093b80f9ac8c319e6d3746c98dd1d7e49672b62da405db44eb97ec93bf6e
     tracker:
       digest: sha256:124d4fa810d93f2acb4d7d5d0207fff33a3a5b97e4c8d0a55d0ac95841abd756
+    notify:
+      digest: sha256:a8577ab746ee188a054075decc8b01d040df6cdbd7f66c2137f62880ec92b1dc
