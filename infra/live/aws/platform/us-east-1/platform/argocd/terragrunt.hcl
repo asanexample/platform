@@ -219,17 +219,47 @@ inputs = {
     # mutated paths — app-controlled fields (runAsNonRoot, etc.) still sync. The admission webhook
     # (disallow-privilege-escalation / require-seccomp) is what actually enforces these, so ignoring
     # the ArgoCD diff is safe. See docs/architecture/kyverno-policy-catalog.md.
+    #
+    # Only scalar/map-key paths belong in the kind-unscoped `.all` block. The containers[]/initContainers[]
+    # array-notation paths below are deliberately NOT here — combined with RespectIgnoreDifferences=true
+    # (delivery.tf) on a CRD without a registered Kubernetes scheme (argoproj.io/Rollout), ArgoCD's
+    # normalizeTargetResources() falls back to an RFC7396 JSON Merge Patch, which cannot express a partial
+    # array update and instead replaces the WHOLE array — silently reverting Rollout's `containers[].image`
+    # to the stale live value while still reporting "successfully synced" (confirmed upstream:
+    # argoproj/argo-cd#23283, #26588, fix argoproj/argo-cd#26924 still open as of 2026-07-14). Scalar/map
+    # paths (this block) are provably safe: RFC7396 merges objects recursively and never touches unrelated
+    # array fields. The array-notation rules are scoped to apps_Deployment/apps_StatefulSet below instead,
+    # which have a registered scheme and use a proper strategic merge patch (no corruption risk).
     "resource.customizations.ignoreDifferences.all" = yamlencode({
       jqPathExpressions = [
         ".spec.template.spec.automountServiceAccountToken",
+        ".spec.template.metadata.labels.team",
+        ".spec.template.metadata.labels.\"app.kubernetes.io/name\"",
+      ]
+    })
+
+    # The array-notation half of the Kyverno-tolerance rules above — deliberately excluded from Rollout
+    # (argoproj.io CRD, unregistered scheme) to avoid the merge-patch corruption described above. Deployment
+    # and StatefulSet are in the registered "apps" scheme, so they get a real strategic merge patch here and
+    # can safely tolerate the same array-notation drift.
+    "resource.customizations.ignoreDifferences.apps_Deployment" = yamlencode({
+      jqPathExpressions = [
         ".spec.template.spec.containers[]?.securityContext.allowPrivilegeEscalation",
         ".spec.template.spec.containers[]?.securityContext.capabilities",
         ".spec.template.spec.containers[]?.securityContext.seccompProfile",
         ".spec.template.spec.initContainers[]?.securityContext.allowPrivilegeEscalation",
         ".spec.template.spec.initContainers[]?.securityContext.capabilities",
         ".spec.template.spec.initContainers[]?.securityContext.seccompProfile",
-        ".spec.template.metadata.labels.team",
-        ".spec.template.metadata.labels.\"app.kubernetes.io/name\"",
+      ]
+    })
+    "resource.customizations.ignoreDifferences.apps_StatefulSet" = yamlencode({
+      jqPathExpressions = [
+        ".spec.template.spec.containers[]?.securityContext.allowPrivilegeEscalation",
+        ".spec.template.spec.containers[]?.securityContext.capabilities",
+        ".spec.template.spec.containers[]?.securityContext.seccompProfile",
+        ".spec.template.spec.initContainers[]?.securityContext.allowPrivilegeEscalation",
+        ".spec.template.spec.initContainers[]?.securityContext.capabilities",
+        ".spec.template.spec.initContainers[]?.securityContext.seccompProfile",
       ]
     })
 
