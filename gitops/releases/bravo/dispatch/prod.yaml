@@ -13,3 +13,5 @@ spec:
       digest: sha256:31fcd2c9384e1a67ae7ad2afedf370cf4051fe112957602912b194148ddc8099
     shipments:
       digest: sha256:952ef6e4655061c40556d03a31ef4f242b76999c0ea547794d4a87abb07e4e49
+    tracker:
+      digest: sha256:f7937b110b9e649ea6dd30524a8e061a0f69f8ed2199ba6ecd10e0f7c750ec66
