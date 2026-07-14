@@ -52,11 +52,24 @@ locals {
   # INFO/ERROR/WARN/DEBUG; see the stage.regex comment below) since stage.template here has no
   # ToLower/case-fold function, so match uppercase directly. Runs last so it rewrites the final
   # line rather than the raw one the trace/span/level regexes below match against.
+  #
+  # ESCAPING GOTCHA (confirmed live, #1434): the grafana/alloy chart's configmap.yaml runs
+  # `tpl $values.configMap.content .` — the WHOLE River config text is executed as a Helm/Sprig Go
+  # template BEFORE it's written to the ConfigMap, against Helm's own render context (not Alloy's
+  # per-log-line extracted-values map). A literal `{{ .detected_level }}`-style Alloy template
+  # meant for stage.template gets silently evaluated by Helm instead — `.detected_level`/`.Entry`
+  # don't exist in Helm's context, so the whole block collapses to an empty string (no error, no
+  # trace of it — verified by pulling the live ConfigMap and seeing `template = ``` post-apply).
+  # Fix: escape every literal `{{`/`}}` as the Helm idiom `{{ "{{" }}` / `{{ "}}" }}` so Helm's tpl
+  # pass reconstructs them literally in its output, and Alloy's OWN template engine (a completely
+  # separate Go-template evaluation, done at Alloy's own config load / per-log-line, not by Helm)
+  # sees the intended `{{ if eq .detected_level "ERROR" }}...{{ end }}` text. Verified via a local
+  # `helm template --show-only templates/configmap.yaml` dry run against the pinned chart version.
   emoji_stage_raw = <<-EMOJI
 
       stage.template {
         source   = "emoji_line"
-        template = `{{ if eq .detected_level "ERROR" }}🔥 {{ .Entry }}{{ else if eq .detected_level "FATAL" }}💀 {{ .Entry }}{{ else if or (eq .detected_level "WARN") (eq .detected_level "WARNING") }}⚠️ {{ .Entry }}{{ else if eq .detected_level "DEBUG" }}🐛 {{ .Entry }}{{ else if eq .detected_level "INFO" }}ℹ️ {{ .Entry }}{{ else }}{{ .Entry }}{{ end }}`
+        template = `{{ "{{" }} if eq .detected_level "ERROR" {{ "}}" }}🔥 {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else if eq .detected_level "FATAL" {{ "}}" }}💀 {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else if or (eq .detected_level "WARN") (eq .detected_level "WARNING") {{ "}}" }}⚠️ {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else if eq .detected_level "DEBUG" {{ "}}" }}🐛 {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else if eq .detected_level "INFO" {{ "}}" }}ℹ️ {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else {{ "}}" }}{{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} end {{ "}}" }}`
       }
       stage.output {
         source = "emoji_line"
