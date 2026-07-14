@@ -92,8 +92,16 @@ matching ArgoCD `ignoreDifferences` is safe.
 > **recommended but not required** — `require-workload-labels` requires only `team`, which is
 > auto-injected. Apps therefore need no label boilerplate.
 
-ArgoCD is told to ignore the mutated sub-fields (`argocd_cm_extra` →
-`resource.customizations.ignoreDifferences.all`) so selfHeal doesn't fight Kyverno.
+ArgoCD is told to ignore the mutated sub-fields (`argocd_cm_extra` in the `argocd` unit) so selfHeal
+doesn't fight Kyverno — split across two keys, not one: the scalar/map-key paths
+(`automountServiceAccountToken`, the `labels.*` rules) sit in the kind-unscoped
+`resource.customizations.ignoreDifferences.all`, while the array-notation `securityContext.*` paths
+(`containers[]?...`, `initContainers[]?...`) are scoped to `.apps_Deployment`/`.apps_StatefulSet` only —
+deliberately excluding `argoproj.io/Rollout`. Rollout is a CRD without a registered Kubernetes scheme, and
+an array-notation `ignoreDifferences` rule on such a CRD makes ArgoCD's sync fall back to a JSON Merge
+Patch that replaces arrays wholesale instead of merging them — silently reverting a Rollout's
+`containers[].image` to the stale live value while still reporting a successful sync. See
+[debug-argocd-sync.md](../runbooks/debug-argocd-sync.md#synced-but-stale-rollout-image-silently-dropped).
 
 ## Generate policies (ADR-085 availability)
 

@@ -185,6 +185,19 @@ Composition (`crossplane/charts/agent-api/`), and their delivery is **hub-target
   still stomps those fields and fights the canary (found in prod; the offline spikes couldn't surface it). The
   per-stage canary shape lives in the app's `k8s/overlays/prod` (scaffolder `deployStrategy`), and the prod
   metric gate queries the hub Mimir via the spoke read route — see ADR-056's as-built section.
+- **A Rollout's image can silently fail to update, while ArgoCD reports a successful sync.** `Rollout`
+  (`argoproj.io`) is a CRD without a registered Kubernetes scheme. Combined with
+  `RespectIgnoreDifferences=true`, any `ignoreDifferences` rule whose path descends into an **array**
+  field on that resource (`containers[]?...`, `initContainers[]?...`) makes ArgoCD's sync fall back to a
+  JSON Merge Patch that replaces the whole array wholesale instead of merging it — silently reverting
+  `containers[].image` to the stale live value while the sync logs `"successfully synced"`. Scalar and
+  map-key `ignoreDifferences` paths (`/spec/replicas`, `labels.team`) are unaffected — they never touch an
+  array. This is why the platform's Kyverno-tolerance rules (`argocd_cm_extra`'s
+  `resource.customizations.ignoreDifferences.all`, in the `argocd` unit) keep array-notation paths scoped
+  to `apps_Deployment`/`apps_StatefulSet` only, never applied to Rollout. If you're about to add a **new**
+  `ignoreDifferences` rule (global or per-Application) with an array-notation path, check it doesn't now
+  apply to Rollout too. Full root cause + the confirmed-live fix:
+  [debug-argocd-sync.md](../../../docs/runbooks/debug-argocd-sync.md#synced-but-stale-rollout-image-silently-dropped).
 - **Canary first-run stall: `ignoreDifferences` on the weight field can mask a missing second `backendRef`.**
   If a Rollout's canary strategy references a `canaryService` (Gateway-API plugin) but the HTTPRoute's
   `backendRefs` only lists the stable service on the **first** sync (the canary entry not yet present), the
