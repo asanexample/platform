@@ -109,7 +109,6 @@ No modules.
 | <a name="input_oauth_client_secret"></a> [oauth\_client\_secret](#input\_oauth\_client\_secret) | Tailscale OAuth client secret (not needed when using generated oauth\_override.tf) | `string` | `""` | no |
 | <a name="input_region"></a> [region](#input\_region) | AWS region of the cluster (for destroy-time finalizer cleanup auth) | `string` | `""` | no |
 | <a name="input_split_dns"></a> [split\_dns](#input\_split\_dns) | Map of domain to nameserver IPs for split DNS (created after subnet router is online) | `map(list(string))` | `{}` | no |
-| <a name="input_system_nodegroup_name"></a> [system\_nodegroup\_name](#input\_system\_nodegroup\_name) | Managed node group name to pin the subnet router to (stable, non-Karpenter compute), matched via the eks.amazonaws.com/nodegroup label. Keeps the tailnet access path off ephemeral Karpenter nodes so consolidation/disruption can't flap it. | `string` | `"system"` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs
