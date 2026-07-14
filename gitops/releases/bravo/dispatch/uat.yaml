@@ -1,0 +1,9 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: bravo-dispatch-uat
+spec:
+  environmentRef: bravo-dispatch-uat
+  services:
+    notify:
+      digest: sha256:a8577ab746ee188a054075decc8b01d040df6cdbd7f66c2137f62880ec92b1dc
