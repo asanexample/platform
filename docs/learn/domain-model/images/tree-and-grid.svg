@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 566" width="760" height="566" style="color-scheme:light dark" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif">
-<rect x="0" y="0" width="760" height="566" fill="light-dark(#f6f6f3,#1c1e26)"></rect>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 584" width="760" height="584" style="color-scheme:light dark" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif">
+<rect x="0" y="0" width="760" height="584" fill="light-dark(#f6f6f3,#1c1e26)"></rect>
 <text x="40" y="54" font-size="12" fill="light-dark(#6c6c73,#a6a6ad)" letter-spacing="1.6px" font-family="ui-monospace,Menlo,Consolas,monospace">THE ONE IDEA</text>
 <text x="40" y="92" font-size="27" fill="light-dark(#1c1c22,#e9e9ee)" font-weight="600" letter-spacing="-0.3px">Ownership is a tree, deployment is a grid</text>
 <text x="40" y="118" font-size="15" fill="light-dark(#6c6c73,#a6a6ad)">Two shapes, and the whole model is their interplay. Who owns a thing and where it runs are</text>
@@ -91,7 +91,8 @@
 <text x="362" y="468" font-size="11.5" fill="light-dark(#9a9aa1,#8a8a92)">shop runs every stage; dispatch dev+test;</text>
 <text x="362" y="484" font-size="11.5" fill="light-dark(#9a9aa1,#8a8a92)">checkout is registered, not yet deployed.</text>
 
-<rect x="40" y="510" width="680" height="40" rx="10" fill="light-dark(#e7f4ec,#1e2a22)" stroke="light-dark(#a3ccb4,#3f8a63)" stroke-width="1"></rect>
-<rect x="40" y="510" width="3" height="40" rx="1.5" fill="light-dark(#1f7a49,#7fd6a6)"></rect>
-<text x="58" y="535" font-size="13.5" fill="light-dark(#1c1c22,#e9e9ee)">The connector: a <tspan fill="light-dark(#1f7a49,#7fd6a6)" font-weight="600">Service runs inside each Environment</tspan> — shop&#39;s storefront runs in alpha-shop-dev and alpha-shop-prod. Identity <tspan font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12">team-alpha/shop-storefront</tspan> stays; place changes.</text>
+<rect x="40" y="508" width="680" height="60" rx="10" fill="light-dark(#e7f4ec,#1e2a22)" stroke="light-dark(#a3ccb4,#3f8a63)" stroke-width="1"></rect>
+<rect x="40" y="508" width="3" height="60" rx="1.5" fill="light-dark(#1f7a49,#7fd6a6)"></rect>
+<text x="58" y="530" font-size="13.5" fill="light-dark(#1c1c22,#e9e9ee)">The connector: a <tspan fill="light-dark(#1f7a49,#7fd6a6)" font-weight="600">Service runs inside each Environment</tspan> — shop&#39;s storefront runs in</text>
+<text x="58" y="550" font-size="13.5" fill="light-dark(#1c1c22,#e9e9ee)">alpha-shop-dev and alpha-shop-prod. Identity <tspan font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12">team-alpha/shop-storefront</tspan> stays; place changes.</text>
 </svg>
