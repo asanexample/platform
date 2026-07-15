@@ -262,7 +262,7 @@ follow-up, not yet in place.
 
 ## Per-team isolation: hard write-split, soft reads
 
-![Per-team isolation in three bands — a soft read plane (per-tenant datasources + Grafana folder permissions), a struck-through retired fail-closed read proxy (#1269), and a hard write plane where cortex-tenant splits namespaces into real alpha/bravo/platform tenants — all resting on a network default-deny, ClusterIP-only floor.](images/isolation-status.svg)
+![Three stacked bands showing layered per-team observability isolation. Read plane (amber, dashed): per-team Mimir datasources for alpha and bravo scoped by static X-Scope-OrgID and Grafana folder permissions — an RBAC boundary, not a data-plane gate. Write plane (green, solid): cortex-tenant splits each namespace's series into its own Mimir/Loki tenant, with solid alpha, bravo, and platform tenant boxes fed by the preprod spoke and hub. Floor (teal): the observability namespace is network default-deny and ClusterIP-only, the only hard data-plane boundary.](images/isolation-status.svg)
 
 Per-team isolation is the place to be careful, so here's the precise version — a trust artifact that
 over- or under-sells is worse than one with an honest gap.

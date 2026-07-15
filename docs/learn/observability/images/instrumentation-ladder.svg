@@ -2,7 +2,7 @@
 <rect class="bg" x="0" y="0" width="760" height="706" fill="#f6f6f3"></rect>
 
 
-<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">OBSERVABILITY · COLLECTION · ADR-077</text>
+<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">OBSERVABILITY · COLLECTION</text>
 <text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Climb only as far as you need.</text>
 <text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">Instrumentation is a ladder, not a switch. Every workload stands on the free eBPF floor with zero</text>
 <text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73">code. Add an annotation to climb to code-level depth — and AI agents get a rung of their own. You</text>

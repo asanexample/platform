@@ -4,7 +4,7 @@
 
 <text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.9px">OBSERVABILITY · CORRELATION · THE 3 A.M. WALK</text>
 <text class="text" x="40" y="90" font-size="27" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Symptom to root cause, without re-typing.</text>
-<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">One Grafana over four stores means you <tspan class="text" fill="#1c1c22" font-style="italic">walk</tspan> the incident instead of re-querying it. <tspan class="mono" fill="#2c66c4" font-family="ui-monospace,Menlo,Consolas,monospace">shop-web</tspan></text>
+<text class="muted" x="40" y="118" font-size="14.5" fill="#6c6c73">One Grafana over four stores means you <tspan class="text" fill="#1c1c22" font-style="italic">walk</tspan> the incident instead of re-querying it. <tspan class="mono" fill="#2c66c4" font-family="ui-monospace,Menlo,Consolas,monospace">storefront</tspan></text>
 <text class="muted" x="40" y="137" font-size="14.5" fill="#6c6c73">is slow. Every arrow below is one click, wired into the datasources — never a copy-pasted query.</text>
 
 
@@ -25,7 +25,7 @@
 <rect class="ac-blue" x="44" y="210" width="4" height="68" rx="2" fill="#2c66c4"></rect>
 <text class="text" x="62" y="228" font-size="13" fill="#2c66c4" font-weight="600"><tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#6f86b0">01</tspan>  <tspan fill="#1c1c22" font-size="16">Metric</tspan></text>
 <text class="t-blue mono" x="62" y="246" font-size="10.5" fill="#3d6fc0">Mimir · dashboard</text>
-<text class="text" x="188" y="224" font-size="13" fill="#243a5c">On <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">alpha</tspan>&#39;s health dashboard, the <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">shop-web</tspan> p99 latency line jumps. The spike carries</text>
+<text class="text" x="188" y="224" font-size="13" fill="#243a5c">On <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">alpha</tspan>&#39;s health dashboard, the <tspan class="mono" font-family="ui-monospace,Menlo,Consolas,monospace" fill="#2c66c4">storefront</tspan> p99 latency line jumps. The spike carries</text>
 <text class="text" x="188" y="242" font-size="13" fill="#243a5c">an <tspan font-style="italic" fill="#123">exemplar</tspan> — a clickable dot Mimir stored beside the point, remembering one real</text>
 <text class="text" x="188" y="260" font-size="13" fill="#243a5c">request&#39;s trace ID.</text>
 <text class="muted" x="188" y="279" font-size="12.5" fill="#5f5f66"><tspan fill="#8a8a91">learn:</tspan> <tspan font-style="italic" fill="#123">something&#39;s wrong, roughly where.</tspan></text>
@@ -43,7 +43,7 @@
 <text class="t-amber mono" x="62" y="372" font-size="10.5" fill="#8a6410">Tempo · waterfall</text>
 <text class="text" x="188" y="350" font-size="13" fill="#4a3c1c">Grafana opens <tspan font-style="italic" fill="#123">that request&#39;s</tspan> trace — the waterfall across services.</text>
 
-<text class="mono" x="188" y="379" font-size="10.5" fill="#7a6a3f" font-family="ui-monospace,Menlo,Consolas,monospace">shop-web</text>
+<text class="mono" x="188" y="379" font-size="10.5" fill="#7a6a3f" font-family="ui-monospace,Menlo,Consolas,monospace">storefront</text>
 <rect x="262" y="370" width="42" height="11" rx="3" fill="#c89b52"></rect>
 <text class="mono" x="312" y="379" font-size="10.5" fill="#6c6c73" font-family="ui-monospace,Menlo,Consolas,monospace">18ms · fine</text>
 <text class="mono" x="188" y="399" font-size="10.5" fill="#9a6a0a" font-family="ui-monospace,Menlo,Consolas,monospace">checkout</text>

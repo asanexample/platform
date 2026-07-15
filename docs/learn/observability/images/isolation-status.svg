@@ -1,60 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 726" width="760" height="726" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif"><style>@media(prefers-color-scheme:dark){[fill="#f6f6f3"]{fill:#1b1b18}[stroke="#f6f6f3"]{stroke:#1b1b18}[fill="#6c6c73"]{fill:#898990}[stroke="#6c6c73"]{stroke:#898990}[fill="#1c1c22"]{fill:#dddde3}[stroke="#1c1c22"]{stroke:#dddde3}[fill="#f9f0da"]{fill:#584619}[stroke="#f9f0da"]{stroke:#584619}[fill="#e0b84a"]{fill:#edd083}[stroke="#e0b84a"]{stroke:#edd083}[fill="#e0a52a"]{fill:#efc877}[stroke="#e0a52a"]{stroke:#efc877}[fill="#4a3208"]{fill:#eda72b}[stroke="#4a3208"]{stroke:#eda72b}[fill="#8a6410"]{fill:#ecb02d}[stroke="#8a6410"]{stroke:#ecb02d}[fill="#f4ead0"]{fill:#5e4b1b}[stroke="#f4ead0"]{stroke:#5e4b1b}[fill="#e0cd9c"]{fill:#dfc990}[stroke="#e0cd9c"]{stroke:#dfc990}[fill="#4a3c1c"]{fill:#c3a256}[stroke="#4a3c1c"]{stroke:#c3a256}[fill="#123"]{fill:#508cc8}[stroke="#123"]{stroke:#508cc8}[fill="#7a6a4f"]{fill:#ab997a}[stroke="#7a6a4f"]{stroke:#ab997a}[fill="#fae9e6"]{fill:#532118}[stroke="#fae9e6"]{stroke:#532118}[fill="#e0a59c"]{fill:#df9b90}[stroke="#e0a59c"]{stroke:#df9b90}[fill="#f7ded9"]{fill:#59241a}[stroke="#f7ded9"]{stroke:#59241a}[fill="#e6b3aa"]{fill:#e09b8f}[stroke="#e6b3aa"]{stroke:#e09b8f}[fill="#a63527"]{fill:#da5e4f}[stroke="#a63527"]{stroke:#da5e4f}[fill="#a5342a"]{fill:#d75e54}[stroke="#a5342a"]{stroke:#d75e54}[fill="#c0392b"]{fill:#e07266}[stroke="#c0392b"]{stroke:#e07266}[fill="#5a201a"]{fill:#cf564a}[stroke="#5a201a"]{stroke:#cf564a}[fill="#6a4a44"]{fill:#a77a72}[stroke="#6a4a44"]{stroke:#a77a72}[fill="#e7f4ec"]{fill:#224b32}[stroke="#e7f4ec"]{stroke:#224b32}[fill="#7cc79b"]{fill:#9ad6b2}[stroke="#7cc79b"]{stroke:#9ad6b2}[fill="#1f8a5b"]{fill:#40d996}[stroke="#1f8a5b"]{stroke:#40d996}[fill="#eafcf1"]{fill:#17502e}[stroke="#eafcf1"]{stroke:#17502e}[fill="#2c7a56"]{fill:#54c591}[stroke="#2c7a56"]{stroke:#54c591}[fill="#25402f"]{fill:#6cac84}[stroke="#25402f"]{stroke:#6cac84}[fill="#1c7a4f"]{fill:#41d893}[stroke="#1c7a4f"]{stroke:#41d893}[fill="#dcefe3"]{fill:#255035}[stroke="#dcefe3"]{stroke:#255035}[fill="#3c9a6c"]{fill:#6ac89a}[stroke="#3c9a6c"]{stroke:#6ac89a}[fill="#5f7d6c"]{fill:#81988b}[stroke="#5f7d6c"]{stroke:#81988b}[fill="#ececea"]{fill:#20201d}[stroke="#ececea"]{stroke:#20201d}[fill="#a8a8a2"]{fill:#909088}[stroke="#a8a8a2"]{stroke:#909088}[fill="#3a3a40"]{fill:#dfdfe2}[stroke="#3a3a40"]{stroke:#dfdfe2}[fill="#e2eff2"]{fill:#23464e}[stroke="#e2eff2"]{stroke:#23464e}[fill="#b8dbe4"]{fill:#275966}[stroke="#b8dbe4"]{stroke:#275966}[fill="#d2e9ef"]{fill:#204e5a}[stroke="#d2e9ef"]{stroke:#204e5a}[fill="#0f6f8e"]{fill:#2bbeee}[stroke="#0f6f8e"]{stroke:#2bbeee}[fill="#1c3a44"]{fill:#5aa5be}[stroke="#1c3a44"]{stroke:#5aa5be}[fill="#0a2831"]{fill:#3db7dc}[stroke="#0a2831"]{stroke:#3db7dc}[fill="#9a6a0a"]{fill:#f6b022}[stroke="#9a6a0a"]{stroke:#f6b022}[fill="#b83a2c"]{fill:#dd6f63}[stroke="#b83a2c"]{stroke:#dd6f63}}</style>
-<rect class="bg" x="0" y="0" width="760" height="726" fill="#f6f6f3"></rect>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 606" width="760" height="606" style="color-scheme:light dark" font-family="system-ui,-apple-system,&#39;Segoe UI&#39;,Roboto,Helvetica,Arial,sans-serif">
+<rect x="0" y="0" width="760" height="606" fill="light-dark(#f6f6f3,#1c1e26)"></rect>
+<text x="40" y="52" font-size="12" fill="light-dark(#6c6c73,#a6a6ad)" letter-spacing="1.8px" font-family="ui-monospace,Menlo,Consolas,monospace">OBSERVABILITY · TENANCY · PER-TEAM ISOLATION</text>
+<text x="40" y="89" font-size="26" fill="light-dark(#1c1c22,#e9e9ee)" font-weight="600" letter-spacing="-0.3px">Hard write-split, soft read scoping.</text>
+<text x="40" y="117" font-size="14.5" fill="light-dark(#6c6c73,#a6a6ad)">Per-team isolation is layered: writes are physically split into real per-team tenants; reads are scoped</text>
+<text x="40" y="136" font-size="14.5" fill="light-dark(#6c6c73,#a6a6ad)">organizationally; the network underneath is the only hard data-plane boundary.</text>
 
+<rect x="40" y="158" width="680" height="120" rx="12" fill="light-dark(#f9f0da,#2a2416)" stroke="light-dark(#e0b84a,#6a5a2a)" stroke-width="1.3" stroke-dasharray="6 4"></rect>
+<rect x="58" y="172" width="94" height="20" rx="5" fill="#e0a52a"></rect>
+<text x="105" y="186" font-size="9.5" fill="#4a3208" text-anchor="middle" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">READ PLANE</text>
+<text x="162" y="187" font-size="14" fill="light-dark(#1c1c22,#e9e9ee)" font-weight="600">soft — RBAC / organizational boundary</text>
+<text x="702" y="186" font-size="10" fill="light-dark(#8a6410,#e6c46a)" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">dashed = not a data-plane gate</text>
+<rect x="58" y="204" width="128" height="40" rx="8" fill="light-dark(#f4ead0,#332c18)" stroke="light-dark(#e0cd9c,#5a4c28)" stroke-width="1"></rect>
+<text x="72" y="221" font-size="11" fill="light-dark(#8a6410,#e6c46a)" font-family="ui-monospace,Menlo,Consolas,monospace">Mimir (alpha)</text>
+<text x="72" y="236" font-size="9.5" fill="light-dark(#9a8a5a,#b0a06a)" font-family="ui-monospace,Menlo,Consolas,monospace">static X-Scope-OrgID</text>
+<rect x="194" y="204" width="128" height="40" rx="8" fill="light-dark(#f4ead0,#332c18)" stroke="light-dark(#e0cd9c,#5a4c28)" stroke-width="1"></rect>
+<text x="208" y="221" font-size="11" fill="light-dark(#8a6410,#e6c46a)" font-family="ui-monospace,Menlo,Consolas,monospace">Mimir (bravo)</text>
+<text x="208" y="236" font-size="9.5" fill="light-dark(#9a8a5a,#b0a06a)" font-family="ui-monospace,Menlo,Consolas,monospace">static X-Scope-OrgID</text>
+<text x="340" y="214" font-size="12.5" fill="light-dark(#4a3c1c,#d8c48a)">Isolation = Grafana <tspan font-weight="600">folder permissions</tspan> +</text>
+<text x="340" y="231" font-size="12.5" fill="light-dark(#4a3c1c,#d8c48a)">namespace-filtered per-team dashboards.</text>
+<text x="58" y="264" font-size="11.5" fill="light-dark(#7a6a4f,#c9b985)">RBAC / organizational boundary — <tspan font-weight="600">not</tspan> a data-plane gate.</text>
 
-<text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · TENANCY · WHAT&#39;S ACTUALLY LIVE</text>
-<text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Hard writes, soft reads, one retired middle.</text>
-<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">Per-team isolation is honest only if you say which layer is real. The write split is a data-plane fact; the</text>
-<text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">read scoping is an organizational boundary; the fail-closed proxy was pulled.</text>
+<rect x="40" y="292" width="680" height="164" rx="12" fill="light-dark(#e7f4ec,#1e2a22)" stroke="light-dark(#7cc79b,#3f8a63)" stroke-width="1.5"></rect>
+<rect x="58" y="306" width="100" height="20" rx="5" fill="#1f8a5b"></rect>
+<text x="108" y="320" font-size="9.5" fill="#eafcf1" text-anchor="middle" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">WRITE PLANE</text>
+<text x="168" y="321" font-size="14" fill="light-dark(#1c1c22,#e9e9ee)" font-weight="600">hard — real per-team tenants</text>
+<text x="702" y="320" font-size="10" fill="light-dark(#2c7a56,#7fd6a6)" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">solid walls = data-plane fact</text>
+<text x="58" y="344" font-size="12.5" fill="light-dark(#25402f,#bfe0cc)"><tspan fill="light-dark(#1c7a4f,#7fd6a6)" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="11">cortex-tenant</tspan> splits each namespace&#39;s series into its own Mimir/Loki tenant.</text>
+<rect x="58" y="358" width="200" height="52" rx="9" fill="light-dark(#dcefe3,#24352b)" stroke="light-dark(#3c9a6c,#46785c)" stroke-width="2"></rect>
+<text x="72" y="381" font-size="13" fill="light-dark(#1c7a4f,#7fd6a6)" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">alpha</text>
+<text x="72" y="398" font-size="10.5" fill="light-dark(#5f7d6c,#a6a6ad)">preprod spoke → feeds</text>
+<rect x="272" y="358" width="200" height="52" rx="9" fill="light-dark(#dcefe3,#24352b)" stroke="light-dark(#3c9a6c,#46785c)" stroke-width="2"></rect>
+<text x="286" y="381" font-size="13" fill="light-dark(#1c7a4f,#7fd6a6)" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">bravo</text>
+<text x="286" y="398" font-size="10.5" fill="light-dark(#5f7d6c,#a6a6ad)">preprod spoke → feeds</text>
+<rect x="486" y="358" width="216" height="52" rx="9" fill="light-dark(#ececea,#23242a)" stroke="light-dark(#a8a8a2,#55555c)" stroke-width="2"></rect>
+<text x="500" y="381" font-size="13" fill="light-dark(#3a3a40,#d0d0d6)" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">platform</text>
+<text x="500" y="398" font-size="10.5" fill="light-dark(#6c6c73,#a6a6ad)">hub → feeds</text>
+<text x="58" y="438" font-size="11.5" fill="light-dark(#5f7d6c,#a6a6ad)">preprod spoke feeds <tspan fill="light-dark(#1c7a4f,#7fd6a6)" font-weight="600">alpha</tspan> · <tspan fill="light-dark(#1c7a4f,#7fd6a6)" font-weight="600">bravo</tspan>  —  hub feeds <tspan fill="light-dark(#3a3a40,#d0d0d6)" font-weight="600">platform</tspan>. Each is a real, separate tenant.</text>
 
+<rect x="40" y="470" width="680" height="60" rx="12" fill="light-dark(#e2eff2,#172329)" stroke="light-dark(#b8dbe4,#3f7f92)" stroke-width="1"></rect>
+<rect x="58" y="488" width="86" height="24" rx="6" fill="light-dark(#d2e9ef,#1b2a30)" stroke="light-dark(#b8dbe4,#3f7f92)" stroke-width="1"></rect>
+<text x="101" y="503" font-size="10" fill="light-dark(#0f6f8e,#7fc6da)" text-anchor="middle" letter-spacing="0.5px" font-family="ui-monospace,Menlo,Consolas,monospace">FLOOR</text>
+<text x="160" y="494" font-size="12.5" fill="light-dark(#1c3a44,#b8d8e0)">The network is the real invariant: <tspan fill="light-dark(#0f6f8e,#7fc6da)" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="11">observability</tspan> is default-deny + ClusterIP-only.</text>
+<text x="160" y="512" font-size="12.5" fill="light-dark(#0a2831,#d6ecf2)" font-style="italic">No tenant pod can even reach a store to name a tenant.</text>
 
-<rect x="40" y="158" width="680" height="98" rx="12" fill="#f9f0da" stroke="#e0b84a" stroke-width="1.3" stroke-dasharray="6 4"></rect>
-<rect x="58" y="172" width="86" height="20" rx="5" fill="#e0a52a"></rect>
-<text class="mono" x="101" y="186" font-size="9.5" fill="#4a3208" text-anchor="middle" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">READ PLANE</text>
-<text class="text" x="156" y="187" font-size="14" fill="#1c1c22" font-weight="600">soft — RBAC boundary</text>
-<text class="mono" x="702" y="186" font-size="10" fill="#8a6410" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">dashed = not a data-plane gate</text>
-<rect x="58" y="204" width="98" height="26" rx="7" fill="#f4ead0" stroke="#e0cd9c" stroke-width="1"></rect>
-<text class="mono" x="107" y="221" font-size="10.5" fill="#8a6410" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">Mimir (alpha)</text>
-<rect x="162" y="204" width="98" height="26" rx="7" fill="#f4ead0" stroke="#e0cd9c" stroke-width="1"></rect>
-<text class="mono" x="211" y="221" font-size="10.5" fill="#8a6410" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace">Mimir (bravo)</text>
-<text class="text" x="272" y="213" font-size="12" fill="#4a3c1c">per-team datasource, <tspan font-style="italic" fill="#123">static</tspan> <tspan class="mono" font-family="ui-monospace,monospace" font-size="10.5">X-Scope-OrgID</tspan> → gateway.</text>
-<text class="text" x="272" y="228" font-size="12" fill="#4a3c1c">Isolation = Grafana <tspan font-weight="600">folder permissions</tspan> + dashboards <tspan class="mono" font-family="ui-monospace,monospace" font-size="10">#1157</tspan>.</text>
-<text class="muted" x="58" y="248" font-size="11.5" fill="#7a6a4f">An editable panel can still query another tenant — an RBAC boundary, not a wall.</text>
-
-
-<rect x="40" y="268" width="680" height="70" rx="12" fill="#fae9e6" stroke="#e0a59c" stroke-width="1"></rect>
-<rect x="58" y="282" width="148" height="20" rx="6" fill="#f7ded9" stroke="#e6b3aa" stroke-width="1"></rect>
-<text class="mono" x="132" y="296" font-size="9.5" fill="#a63527" text-anchor="middle" letter-spacing="0.3px" font-family="ui-monospace,Menlo,Consolas,monospace">BUILT → RETIRED · #1269</text>
-<text class="text" x="218" y="297" font-size="13.5" fill="#a5342a" font-weight="600" text-decoration="line-through">tenant-proxy + loki-tenant-proxy</text>
-<text x="702" y="300" font-size="16" fill="#c0392b" text-anchor="end">✗</text>
-<text class="text" x="58" y="318" font-size="12" fill="#5a201a">Fail-closed; verified the OIDC token, overwrote <tspan class="mono" font-family="ui-monospace,monospace" font-size="10.5">X-Scope-OrgID</tspan>. Retired because OSS Grafana&#39;s <tspan class="mono" fill="#a5342a" font-family="ui-monospace,monospace" font-size="10.5">oauthPassThru</tspan></text>
-<text class="muted" x="58" y="333" font-size="12" fill="#6a4a44">couldn&#39;t forward the SSO token → proxy fail-closed → every dashboard blanked. Modules inert, <tspan class="mono" fill="#a5342a" font-family="ui-monospace,monospace" font-size="10.5">read_proxy_url = &#34;&#34;</tspan>.</text>
-
-
-<rect x="40" y="350" width="680" height="132" rx="12" fill="#e7f4ec" stroke="#7cc79b" stroke-width="1.5"></rect>
-<rect x="58" y="364" width="90" height="20" rx="5" fill="#1f8a5b"></rect>
-<text class="mono" x="103" y="378" font-size="9.5" fill="#eafcf1" text-anchor="middle" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">WRITE PLANE</text>
-<text class="text" x="160" y="379" font-size="14" fill="#1c1c22" font-weight="600">hard — real tenants</text>
-<text class="mono" x="702" y="378" font-size="10" fill="#2c7a56" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">solid walls = data-plane fact</text>
-<text class="text" x="58" y="401" font-size="12" fill="#25402f"><tspan class="mono" fill="#1c7a4f" font-family="ui-monospace,monospace" font-size="10.5">cortex-tenant</tspan> splits each environment namespace&#39;s series into its own Mimir/Loki tenant — not one bucket with a label.</text>
-<rect x="58" y="414" width="204" height="52" rx="9" fill="#dcefe3" stroke="#3c9a6c" stroke-width="2"></rect>
-<text class="mono" x="72" y="437" font-size="13" fill="#1c7a4f" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">alpha</text>
-<text class="muted" x="72" y="454" font-size="10.5" fill="#5f7d6c">← preprod spoke feeds</text>
-<rect x="278" y="414" width="204" height="52" rx="9" fill="#dcefe3" stroke="#3c9a6c" stroke-width="2"></rect>
-<text class="mono" x="292" y="437" font-size="13" fill="#1c7a4f" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">bravo</text>
-<text class="muted" x="292" y="454" font-size="10.5" fill="#5f7d6c">← preprod spoke feeds</text>
-<rect x="498" y="414" width="204" height="52" rx="9" fill="#ececea" stroke="#a8a8a2" stroke-width="2"></rect>
-<text class="mono" x="512" y="437" font-size="13" fill="#3a3a40" font-weight="500" font-family="ui-monospace,Menlo,Consolas,monospace">platform</text>
-<text class="muted" x="512" y="454" font-size="10.5" fill="#6c6c73">← hub (no env ns)</text>
-
-
-<rect x="40" y="494" width="680" height="58" rx="12" fill="#e2eff2" stroke="#b8dbe4" stroke-width="1"></rect>
-<rect x="58" y="512" width="86" height="22" rx="6" fill="#d2e9ef" stroke="#b8dbe4" stroke-width="1"></rect>
-<text class="mono" x="101" y="522" font-size="9.5" fill="#0f6f8e" text-anchor="middle" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">THE</text>
-<text class="mono" x="101" y="531" font-size="9.5" fill="#0f6f8e" text-anchor="middle" letter-spacing="0.4px" font-family="ui-monospace,Menlo,Consolas,monospace">FLOOR</text>
-<text class="text" x="160" y="518" font-size="12.5" fill="#1c3a44">The network is the real invariant: <tspan class="mono" fill="#0f6f8e" font-family="ui-monospace,monospace" font-size="11">observability</tspan> is default-deny + ClusterIP-only.</text>
-<text class="text" x="160" y="536" font-size="12.5" fill="#0a2831" font-style="italic">No tenant pod can even reach a store to name a tenant.</text>
-
-
-<text class="muted" x="40" y="592" font-size="13.5" fill="#6c6c73">Write separation = <tspan fill="#1f8a5b" font-weight="600">real &amp; live.</tspan>  Read scoping = <tspan fill="#9a6a0a" font-weight="600">soft &amp; live.</tspan>  Hard read gate = <tspan fill="#b83a2c" font-weight="600">retired.</tspan>  Say all three.</text>
+<text x="40" y="566" font-size="13.5" fill="light-dark(#6c6c73,#a6a6ad)">Write split = <tspan fill="light-dark(#1f8a5b,#7fd6a6)" font-weight="600">hard &amp; live.</tspan>  Read scoping = <tspan fill="light-dark(#9a6a0a,#e6c46a)" font-weight="600">soft &amp; live.</tspan>  The only hard data-plane boundary is the <tspan fill="light-dark(#0f6f8e,#7fc6da)" font-weight="600">network.</tspan></text>
 </svg>

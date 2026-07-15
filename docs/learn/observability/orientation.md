@@ -157,7 +157,7 @@ One Grafana, one set of stores, many teams — so the interesting question is *w
 metrics?* This is the most sophisticated part of the system, and it's a layered answer, because the obvious
 mechanism isn't the real boundary.
 
-![Per-team isolation, honest about hard vs soft: writes are physically split into per-team tenants by cortex-tenant (real); reads are scoped by Grafana folder permissions and per-tenant datasources (organizational, not a data-layer gate); the only true data-layer boundary is network default-deny. The fail-closed auth proxy was built, then retired (#1269).](images/isolation-model.svg)
+![Two side-by-side planes over a shared floor. Write path (green, real and live): ingest to cortex-tenant to physically separate alpha and bravo tenants — real, end-to-end. Read path (amber, soft RBAC): Grafana query to a per-tenant Mimir datasource, enforced by Grafana folder permissions and per-team dashboards — an organizational boundary, not a data-layer gate. The floor (teal): network default-deny, stores ClusterIP-only — the only true data-layer boundary.](images/isolation-model.svg)
 
 Every signal carries an **`X-Scope-OrgID`** header naming a *tenant*, and the stores run
 `multitenancy_enabled` — they deliver to whatever tenant the header names. But hold onto the security fact:
