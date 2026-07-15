@@ -1,7 +1,7 @@
 {
   "uid": "product-observability-__TEAM__",
   "title": "Product Observability — __TEAM__",
-  "description": "Single pane of glass for operating one of __TEAM__'s products/environments reliably: SLO burn, golden signals (RED), deploy/rollout status, resource headroom, cost, active alerts, and log/trace/profile jump-off points. Pick Product → Stage above.",
+  "description": "Single pane of glass for operating one of __TEAM__'s products/environments reliably: SLO burn, golden signals (RED), deploy/rollout status, resource headroom, cost, active alerts, observed cross-service dependencies, and log/trace/profile jump-off points. Pick Product → Stage above.",
   "tags": [
     "product",
     "sre",
@@ -59,14 +59,48 @@
         "includeAll": false,
         "multi": false,
         "current": { "text": "prod", "value": "prod", "selected": true }
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "label": "Service (logs)",
+        "description": "Filters the Recent logs panel to one or more services (Loki's `service_name` label). Defaults to All.",
+        "datasource": { "type": "loki", "uid": "loki-all" },
+        "query": "label_values({namespace=\"__TEAM__-$product-$stage\"}, service_name)",
+        "definition": "label_values({namespace=\"__TEAM__-$product-$stage\"}, service_name)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": { "text": "All", "value": "$__all", "selected": true }
+      },
+      {
+        "name": "level",
+        "type": "custom",
+        "label": "Level (logs)",
+        "description": "Filters the Recent logs panel to one or more log levels (Loki's detected_level, structured metadata - not a real label, so this is a static list rather than label_values). Defaults to All.",
+        "query": "DEBUG,INFO,WARN,ERROR",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": { "text": "All", "value": "$__all", "selected": true }
+      },
+      {
+        "name": "search",
+        "type": "textbox",
+        "label": "Search (logs)",
+        "description": "Optional free-text substring filter for the Recent logs panel, e.g. an order ID or trace ID. Empty = no filtering.",
+        "query": "",
+        "current": { "text": "", "value": "" }
       }
     ]
   },
   "links": [
     {
-      "title": "Explore → Loki (this namespace)",
+      "title": "Explore → Loki (this namespace, best-effort filters)",
       "type": "link",
-      "url": "/explore?left=%7B%22datasource%22:%22loki-all%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki-all%22%7D,%22expr%22:%22%7Bnamespace%3D%5C%22__TEAM__-$product-$stage%5C%22%7D%22%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
+      "url": "/explore?left=%7B%22datasource%22:%22loki-all%22,%22queries%22:%5B%7B%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22loki-all%22%7D,%22expr%22:%22%7Bnamespace%3D%5C%22__TEAM__-$product-$stage%5C%22,service_name%3D~%5C%22${service:regex}%5C%22%7D|detected_level%3D~%5C%22${level:regex}%5C%22|%3D%5C%22$search%5C%22%22%7D%5D,%22range%22:%7B%22from%22:%22now-6h%22,%22to%22:%22now%22%7D%7D",
       "targetBlank": true
     },
     {
@@ -85,14 +119,14 @@
   "annotations": {
     "list": [
       {
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
         "enable": true,
-        "expr": "changes(kube_deployment_metadata_generation{namespace=\"__TEAM__-$product-$stage\"}[2m]) > 0",
+        "expr": "changes(rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Progressing\"}[2m]) > 0",
         "iconColor": "blue",
         "name": "Deploys",
         "step": "1m",
-        "tagKeys": "namespace,deployment",
-        "textFormat": "{{namespace}}/{{deployment}}",
+        "tagKeys": "exported_namespace,name",
+        "textFormat": "{{exported_namespace}}/{{name}}",
         "titleFormat": "Deploy"
       }
     ]
@@ -472,20 +506,37 @@
       "id": 13,
       "type": "state-timeline",
       "title": "Rollout phase by service",
+      "description": "One row per service, colored by its currently-active Argo Rollouts phase. rollout_phase is 6 separate 0/1 gauges (one per phase) per service - the query collapses them into a single numeric code per service (sum by (name) of each phase's gauge x its code) so each service gets exactly one row instead of one row per (service, phase) pair it has ever been in.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
       "options": {
-        "legend": { "showLegend": true }
+        "legend": { "showLegend": true },
+        "showValue": "never"
       },
       "fieldConfig": {
-        "defaults": { "custom": { "lineWidth": 0, "fillOpacity": 70 } },
+        "defaults": {
+          "custom": { "lineWidth": 0, "fillOpacity": 70 },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Completed", "color": "green" },
+                "1": { "text": "Progressing", "color": "blue" },
+                "2": { "text": "Paused", "color": "yellow" },
+                "3": { "text": "Timeout", "color": "orange" },
+                "4": { "text": "Error", "color": "red" },
+                "5": { "text": "Abort", "color": "dark-red" }
+              }
+            }
+          ]
+        },
         "overrides": []
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\"} == 1",
-          "legendFormat": "{{name}} — {{phase}}",
+          "expr": "sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Completed\"} * 0) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Progressing\"} * 1) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Paused\"} * 2) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Timeout\"} * 3) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Error\"} * 4) + sum by (name) (rollout_phase{exported_namespace=\"__TEAM__-$product-$stage\", phase=\"Abort\"} * 5)",
+          "legendFormat": "{{name}}",
           "datasource": { "type": "prometheus", "uid": "${datasource}" }
         }
       ]
@@ -703,17 +754,50 @@
       ]
     },
     {
+      "id": 27,
+      "type": "table",
+      "title": "Unhealthy pods",
+      "description": "Pods that are NOT Running or containers stuck waiting on a bad reason (CrashLoopBackOff, ImagePullBackOff, etc. - a container can be waiting even while its pod phase is Running, since phase is pod-level and waiting reasons are container-level) right now, unioned with pods that restarted within the dashboard's selected time range. Empty table = every pod is healthy within that window. Complements the aggregate \"Pod Restarts (1h)\" stat above by naming which pod.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 52 },
+      "fieldConfig": {
+        "defaults": { "unit": "string" },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "kube_pod_status_phase{namespace=\"__TEAM__-$product-$stage\", phase!=\"Running\"} == 1 or kube_pod_container_status_waiting_reason{namespace=\"__TEAM__-$product-$stage\"} == 1 or (sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=\"__TEAM__-$product-$stage\"}[$__range])) > 0)"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true, "prometheus": true, "prometheus_replica": true, "endpoint": true, "service": true, "cluster": true, "uid": true },
+            "renameByName": { "pod": "Pod", "container": "Container", "phase": "Phase", "reason": "Reason" }
+          }
+        }
+      ]
+    },
+    {
       "type": "row",
       "title": "Logs & Traces",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 }
     },
     {
       "id": 20,
       "type": "logs",
       "title": "Recent logs",
-      "description": "LogQL: `{namespace=\"__TEAM__-$product-$stage\"}` against `Loki (all clusters)`. Use the Explore → Loki link above for filters, live tail, or a wider time range.",
+      "description": "LogQL: `{namespace=\"__TEAM__-$product-$stage\", service_name=~\"${service:regex}\"} | detected_level=~\"${level:regex}\" |= \"$search\"`, against `Loki (all clusters)`. Use the Service/Level pickers and Search box above to filter, or the Explore → Loki link for anything more.",
       "datasource": { "type": "loki", "uid": "loki-all" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 53 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 60 },
       "options": {
         "showTime": true,
         "showLabels": false,
@@ -728,7 +812,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki-all" },
-          "expr": "{namespace=\"__TEAM__-$product-$stage\"}"
+          "expr": "{namespace=\"__TEAM__-$product-$stage\", service_name=~\"${service:regex}\"} | detected_level=~\"${level:regex}\" |= \"$search\""
         }
       ]
     },
@@ -738,7 +822,7 @@
       "title": "Recent traces",
       "description": "TraceQL search scoped to this namespace via `Tempo (all clusters)`. Click a Trace ID to open the full trace view, or use the Explore → Tempo link above for TraceQL filters.",
       "datasource": { "type": "tempo", "uid": "tempo-all" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 61 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 68 },
       "targets": [
         {
           "refId": "A",
@@ -754,6 +838,86 @@
             }
           ],
           "limit": 20
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Dependencies (observed, cross-service calls)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 76 }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Outbound dependency rate",
+      "description": "Tempo's service-graph metrics (traces_service_graph_*, derived from real traces - not the XEnvironment claim's declared `dependencies` list, which is schema-only and never reconciled, ADR-101). Shows every OTHER product this one has actually called recently. Caveat: service_name has no stage component, so if two stages of the same product both have live traffic right now, their outbound edges are indistinguishable here - a genuine platform-wide gap (the same one found while wiring Pyroscope's per-stage labels), not specific to this panel.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 77 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (client, server) (rate(traces_service_graph_request_total{client=~\"$product-.*\", server!~\"$product-.*|user\"}[5m]))",
+          "legendFormat": "{{client}} → {{server}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Outbound dependency error rate",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 77 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 10 },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.05 } ] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (client, server) (rate(traces_service_graph_request_failed_total{client=~\"$product-.*\", server!~\"$product-.*|user\"}[5m])) / sum by (client, server) (rate(traces_service_graph_request_total{client=~\"$product-.*\", server!~\"$product-.*|user\"}[5m]))",
+          "legendFormat": "{{client}} → {{server}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "Outbound dependency latency (p95)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 77 },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, client, server) (rate(traces_service_graph_request_client_seconds_bucket{client=~\"$product-.*\", server!~\"$product-.*|user\"}[5m])))",
+          "legendFormat": "{{client}} → {{server}}",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" }
         }
       ]
     }

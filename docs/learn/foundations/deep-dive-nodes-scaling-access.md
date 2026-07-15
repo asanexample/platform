@@ -139,16 +139,20 @@ interesting part — the same module, two personalities:
 | | platform (hub) | preprod (spoke) |
 |---|---|---|
 | capacity types | `on-demand` | `spot`, `on-demand` |
-| `consolidationPolicy` | `WhenEmpty` | `WhenEmptyOrUnderutilized` |
-| CPU / memory ceiling | 32 vCPU / 128 GiB | 48 vCPU / 192 GiB |
+| `consolidationPolicy` | `WhenEmptyOrUnderutilized` | `WhenEmptyOrUnderutilized` |
+| `consolidateAfter` | `15m` | `15m` |
+| CPU / memory ceiling | 16 vCPU / 64 GiB | 16 vCPU / 64 GiB |
 
-`WhenEmpty` (platform) only reclaims fully-empty nodes — it never disrupts a running pod. That's the
-right call on the stateful hub, where the TSDBs, Keycloak, and CNPG databases must not be shuffled;
-paired with `karpenter.sh/do-not-disrupt` + PodDisruptionBudgets on those workloads, a Karpenter node is
-never yanked out from under state. `WhenEmptyOrUnderutilized` (preprod) is aggressive: it actively repacks
-underutilized nodes onto fewer nodes to save money, accepting the churn because preprod's tenant
-workloads are ephemeral and reschedule freely. Both use `consolidateAfter: 1m` to damp flapping, and a
-hard `limits` ceiling so Karpenter can never runaway-provision past the cost guardrail.
+Both clusters actively repack underutilized nodes onto fewer nodes to save money, not just reclaim
+fully-empty ones — paired with `karpenter.sh/do-not-disrupt` + PodDisruptionBudgets on the hub's stateful
+TSDBs/Keycloak/CNPG databases, so a Karpenter node is never yanked out from under state regardless of
+policy. What differs is `consolidateAfter`'s **purpose**: the hub's 15m lets the post-unpark reschedule
+storm fully settle before consolidation acts (a short window would consolidate mid-storm and undo its own
+right-sizing); preprod's 15m exists because a shorter one (1m, the module default, tried and reverted)
+raced the BYOCNI `node.cilium.io/agent-not-ready` startup taint — a fresh node can sit taint-blocked
+longer than 1 minute waiting on Cilium, and the disruption controller would delete it as "empty" before
+its intended pod ever landed, forcing an endless provision-disrupt-repend loop. A hard `limits` ceiling
+on both clusters means Karpenter can never runaway-provision past the cost guardrail.
 
 ### Three details that keep Karpenter honest
 
@@ -261,8 +265,7 @@ underutilized thresholds. In the 2026-07-02 incident the cool node sat at **39% 
 40% default**, which would have just barely qualified. Preprod raises the destination threshold to 50%
 to give the emptier of two small nodes reliable headroom to be a valid target, and tightens cadence to 10
 minutes because that's the cluster where a hot node actually melts down. Platform keeps the calm 40/70
-defaults: bigger nodes, conservative `WhenEmpty` consolidation, and stateful services where fewer
-evictions is better.
+defaults: bigger nodes, `do-not-disrupt`-protected stateful services, and fewer evictions being better.
 
 The maître d' analogy carries a critical caveat: only to a seat that fits, and never mid-meal. The
 [descheduler

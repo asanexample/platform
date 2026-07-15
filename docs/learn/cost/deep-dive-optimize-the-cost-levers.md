@@ -28,21 +28,32 @@ is rendered by a small local Helm chart so the custom resources don't need the C
 
 **Consolidation is the cost part.** Provisioning right-sized nodes saves money going up; the bigger
 continuous win is coming down. The NodePool's `disruption` block carries two knobs —
-`consolidationPolicy` and `consolidateAfter` — and those two enums are the whole lever, tuned oppositely
-per cluster:
+`consolidationPolicy` and `consolidateAfter` — and those two enums are the whole lever:
 
 | | **platform (hub)** | **preprod** |
 | --- | --- | --- |
 | `capacity_types` | `["on-demand"]` | `["spot", "on-demand"]` |
-| `consolidationPolicy` | `WhenEmpty` | `WhenEmptyOrUnderutilized` |
-| `consolidateAfter` | `1m` | `1m` |
+| `consolidationPolicy` | `WhenEmptyOrUnderutilized` | `WhenEmptyOrUnderutilized` |
+| `consolidateAfter` | `15m` | `15m` |
 
-`WhenEmpty` (the hub) only reclaims a node once it is fully empty — it never disrupts a running pod. That
-is deliberate: the hub carries the stateful singletons (Mimir, Loki, Tempo, Pyroscope, Keycloak, the CNPG
-databases), and a valet who re-parks occupied cars would be moving a database mid-write.
-`WhenEmptyOrUnderutilized` (preprod) is the aggressive version — it actively bin-packs workloads onto
-fewer nodes and reclaims the underutilized ones. Preprod runs ephemeral tenant workloads that ArgoCD
-simply reschedules, so the churn is free money.
+Both clusters bin-pack and reclaim underutilized nodes, not just fully-empty ones — `WhenEmpty` was the
+hub's original, more conservative setting, but it left over-provisioned nodes sitting idle after the
+post-unpark reschedule storm (a database-mid-write valet concern that `karpenter.sh/do-not-disrupt` +
+PDBs already handle directly, under either policy — the stateful singletons stay protected regardless).
+
+The two clusters instead differ on `consolidateAfter`'s **purpose**, not its value — both currently sit
+at `15m`, but for different reasons. The hub's 15m lets its post-unpark scheduling storm fully settle
+before consolidation acts, so it reclaims a calm, stably-idle picture instead of consolidating mid-storm.
+Preprod's 15m exists for a sharper reason: this is a BYOCNI cluster (Cilium, ADR-009) — every fresh
+Karpenter node comes up tainted `node.cilium.io/agent-not-ready:NoSchedule` until Cilium's own agent
+starts and clears it, and only then can the pod Karpenter provisioned the node for actually land. A short
+`consolidateAfter` (1m, tried and reverted) races that taint-clearing window: the disruption controller
+checks in at the 1-minute mark, sees "0 pods bound" — true only because Cilium hasn't finished yet — and
+deletes the very node it just built, before its intended pod ever got a chance to schedule. The pod stays
+Pending, Karpenter provisions again, and the cycle repeats every ~10 minutes with zero net progress.
+15m gives a fresh node comfortable room to clear the taint and pick up real work before consolidation
+ever reconsiders it — on preprod this matters more than on the hub, since spot capacity is an additional
+churn source stacked on top of the same taint-timing race.
 
 **Spot capacity on preprod.** Spot is a live capacity type on preprod. Preprod's NodePool lists `spot`,
 and right now it is running a spot node:
@@ -53,9 +64,10 @@ NAME                  TYPE        CAPACITY   ZONE         READY   AGE
 default-…             m7g.large   spot       us-east-1c   True    101m
 ```
 
-The hub, by contrast, is on-demand-only — again for stateful reliability, since a spot reclaim of a
-database node is exactly the disruption `WhenEmpty` exists to avoid. So the two clusters demonstrate both
-postures from one module: reliability-first on the hub, cost-first on preprod.
+The hub, by contrast, is on-demand-only — for stateful reliability, since a spot reclaim of a database
+node is exactly the disruption the stateful singletons' `karpenter.sh/do-not-disrupt` + PDBs exist to
+prevent. So the two clusters demonstrate both postures from one module: reliability-first on the hub,
+cost-first on preprod.
 
 ```text
 # AWS_PROFILE=platform kubectl --context platform get nodeclaims
@@ -183,8 +195,8 @@ Now the threshold arithmetic. The incident's cool node sat at **39 % CPU** — o
 default. Had the descheduler been running with the default, it would have judged that node "not
 underutilized enough to be a destination" and done nothing. Raising preprod's underutilized threshold to
 **50 %** gives the emptier of two small nodes reliable headroom to qualify as a rebalance target. The hub
-keeps the calm 40 % default: it has more and bigger nodes, conservative `WhenEmpty` consolidation, and
-stateful services where fewer evictions is better.
+keeps the calm 40 % default: it has more and bigger nodes, `do-not-disrupt`-protected stateful services,
+and a settle-first `consolidateAfter` where fewer evictions is better.
 
 > **Where the host metaphor breaks:** a restaurant host re-seats a guest to a *known* empty table. The
 > descheduler evicts and then trusts the *scheduler* to re-place the pod well — which is why `nodeFit`

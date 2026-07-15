@@ -47,7 +47,7 @@ spec is the environment-facing contract — no infra constants leak into it:
 | `preview` | — (default `false`) | Opt into PR-preview delivery (ADR-032) — gates the per-product PR-generator ApplicationSet (`pr-preview.tf`). Read from the Product's `dev` Environment claim only |
 | `isolation.compute` | — (resolved from Product/tier) | The graduated compute dial: `shared-namespace`/`dedicated-namespace`/`dedicated-nodes`/`dedicated-cluster`/`dedicated-account` |
 | `residency.allowedLocations` | — (default `["*"]`) | Jurisdiction or `cloud:region`; must be ⊆ the Team's allowed locations |
-| `quota` | — (defaults match the old environment module) | `cpu`/`memory`/`pods`/`services`/`loadbalancers`/`pvcs`/`storage` |
+| `quota` | — (defaults: `cpu: "4"`, `memory: "8Gi"`, `pods: 20`, `services: 20`, `loadbalancers: 0`, `pvcs: 10`, `storage: "50Gi"`) | `cpu`/`memory`/`pods`/`services`/`loadbalancers`/`pvcs`/`storage`, each individually overridable up to `Team.envelope.quotaCap`. The default is easy to exceed once a claim has more than a couple of multi-replica services — size it explicitly (see the `environment-onboarding` skill) rather than assuming it scales with the claim |
 | `domains` | — | Vanity/custom aliases — an **array of plain host strings** (`[]string`, ADR-061); the XRD is authoritative here. Unioned with the implicit generated host into `restrict-route-hostnames`; the generated host is never declared |
 | `lifecycle.phase` | — (default `active`) | `active`/`suspended`/`decommissioning` — the reversible suspend zeroes the ResourceQuota (ADR-062) |
 | `services` | — | Map `<svc> → { serviceAccount, preview, image, repoPath, permissions.aws.policyStatements, resources }`; each service gets an ECR repo `team-<team>/<product>-<svc>` + a Pod-Identity role. `resources` = the self-service cloud dependencies below |
@@ -92,8 +92,15 @@ renders, from one claim:
 
 - per service: `Pod-<team>-<product>-[<customer>-]<stage>-<svc>` IAM role (trust `pods.eks.amazonaws.com` +
   `aws:SourceAccount`; capped by the **`environment-permissions-boundary-<cluster>`** boundary; `Team`/`Customer`
-  tags) + its RolePolicy (the service's `permissions.aws.policyStatements`, deny-set-validated)
-- EKS Pod Identity association `(cluster, <ns>, services.<svc>.serviceAccount) → Pod-<team>-<product>-…-<svc>`
+  tags) + its RolePolicy (the service's `permissions.aws.policyStatements`, deny-set-validated) — **one Role
+  per service, unconditionally**
+- EKS Pod Identity association `(cluster, <ns>, serviceAccount) → Pod-<team>-<product>-…-<svc>` — **one per
+  unique `serviceAccount`, not per service.** AWS allows exactly one association per (cluster, namespace,
+  serviceAccount); several services intentionally share one SA (stateless services, ADR-067 §7), so the
+  Composition picks a designated owner per shared SA (preferring a sharer that declares AWS access, else the
+  alphabetically-first) and only that owner gets the association. Rendering one per service regardless of
+  sharing used to make multiple composed resources race over the single real AWS association — confirmed
+  live, fixed PR #1528.
 
 > **Not yet provisioned (#647).** Developer cluster access today is **only** the in-cluster `<ns>:developers`
 > RoleBinding above — the Composition does **not** emit a `DeveloperAccess-<team>` IAM role or EKS access

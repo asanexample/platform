@@ -92,8 +92,10 @@ Cross-account chain: `aws sso login` (mgmt) → assume **PlatformDeployer** in t
 
 - **System node group:** fixed floor (`t4g.xlarge`, desired 2 / max 3, Graviton) — holds Karpenter, CoreDNS,
   Cilium operator, the standing stack. Changing `instance_types` is ForceNew (a ~3-min hub blip).
-- **Karpenter:** on-demand, instance-flexible NodePool (arm64, bin-pack, consolidate); `WhenEmpty` (platform)
-  vs `WhenEmptyOrUnderutilized` (preprod). Auth = Pod Identity. **Cilium-first startup taint**
+- **Karpenter:** instance-flexible NodePool (arm64, bin-pack, consolidate); both clusters run
+  `WhenEmptyOrUnderutilized` + `consolidateAfter: 15m` (not the module's `1m` default — a shorter value
+  races the Cilium-first startup taint below and Karpenter deletes its own freshly-provisioned node as
+  "empty" before its intended pod ever lands). Auth = Pod Identity. **Cilium-first startup taint**
   `node.cilium.io/agent-not-ready`. **≥8 GiB floor** (DaemonSet slab ~3.2 GiB). **SCP exemption mandatory**
   (per-cluster anchored `*-karpenter-*`).
 - **Workload autoscaling (HPA):** every scaffolded Service ships a **default HPA** (`k8s/base/hpa.yaml`,

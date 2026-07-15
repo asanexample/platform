@@ -1,0 +1,18 @@
+# Product "pulse" owned by Team platform — a continuous synthetic-traffic generator that drives realistic
+# organic traffic (plus an opt-in chaos hook and an on-demand alert trigger) against alpha-shop and
+# bravo-dispatch, to keep the observability stack demo-ready. The git-native registry entry; delivery
+# (argocd-apps, github-oidc, policy) derives repo/image-scope from here exactly as for a tenant Product.
+# Image scope: team-platform/pulse-*.
+apiVersion: platform.refplat.org/v1beta1
+kind: Product
+metadata:
+  name: platform-pulse
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: environment-api
+spec:
+  team: platform
+  repo: asanexample/platform-pulse
+  tenancy: pooled
+  defaultIsolation: { compute: dedicated-namespace }
+  domains: []

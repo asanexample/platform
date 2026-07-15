@@ -99,6 +99,53 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-14 (end-of-day PARK) — routine cost-zero park, capping a MARATHON day of durable fixes. The headline
+  for the NEXT unpark: the Tailscale-router flapping that made every preprod issue this week hard to diagnose is
+  now FIXED — expect a materially calmer unpark.** Park itself: both cost-zero (node groups `desiredSize=0`, 0
+  instances, bastions stopped). Platform 4 nodes force-terminated; **preprod again hit `deleting EC2NodeClass:
+  ... dial tcp 10.101.0.25:443: i/o timeout`** (recurring park-time preprod API flakiness — node scaling via the
+  AWS API still succeeded, so cost-zero holds; watch for a stuck/orphaned NodeClass on unpark and the
+  provider-cache `terragrunt init` fix if the Karpenter apply fails). **Durable fixes that landed today and change
+  future park/unpark behavior:**
+  • **⭐ Tailscale subnet router no longer flaps (#1529+#1530, applied BOTH clusters).** Root cause: the router
+  (THE access path to the private EKS API) had zero placement protection and rode ephemeral Karpenter nodes, so
+  every consolidation/disruption bounced it → tailnet dropped → "flapping offline" → kubectl-to-preprod wedged for
+  long stretches. Fix = `karpenter.sh/do-not-disrupt: "true"` on the router pod (via the tailscale ProxyClass) +
+  resource requests. ⚠️ GOTCHAS if you ever touch this: (1) an early revision ALSO added a `nodeSelector` to the
+  `system` node group — DON'T; preprod's single small system node is ~99% CPU and Karpenter can't provision a
+  `nodegroup=system`-labelled node, so it stranded the router Pending. do-not-disrupt ALONE is the fix. (2) The
+  Tailscale operator MERGES ProxyClass fields — removing a field from the ProxyClass does NOT remove it from the
+  operator-managed StatefulSet; you must delete the StatefulSet so the operator re-renders it (needs a
+  **PlatformDeployer** token, not PlatformAdmin). (3) `kubernetes_manifest` didn't cleanly remove the field on
+  apply either — had to patch live. So next unpark the router comes up protected and should stay put.
+  • **Karpenter caps TIGHTENED to 16 vCPU / 64 GiB both clusters (#1506)** — down from 32/128 (platform) & 48/192
+  (preprod). Anti-bankruptcy guardrail: at the cap Karpenter STOPS (pods Pending, "all available instance types
+  exceed limits"), never runaway. New **`KarpenterNodePoolAtCapacity` alert** fires at ≥90% of cap so a
+  capacity-induced Pending is diagnosable as the cost cap (not a bug). Normal usage is ~4-5 vCPU, far under.
+  • **Platform consolidation `WhenEmpty→WhenEmptyOrUnderutilized` + `consolidate_after=15m` (#1436, applied)** —
+  reclaims post-unpark over-provisioned idle nodes calmly (dropped platform 6→5 live; do-not-disrupt on the
+  stateful TSDBs limits it, so ~4-5 is the floor without bigger nodes). The 15m is deliberate: waits out the
+  ~10-min post-unpark storm so it doesn't thrash (a short consolidateAfter + spot is what stormed preprod earlier).
+  • **kyverno-background memory 128Mi→384Mi (#1600, applied both)** — it OOMKilled on the post-unpark reconcile
+  backlog; won't anymore. • **Preprod deadlock lesson (found via SSM):** when the router is flapping and kubectl-
+  via-Tailscale is down, reach preprod through the **SSM bastion** (`./scripts/eks-tunnel.sh preprod-use1-eks
+  us-east-1`) — it bypasses Tailscale. Today that revealed preprod was DEADLOCKED: Karpenter's CONTROLLER was
+  Pending (its only eligible node — the system node — had an untolerated taint), so the autoscaler couldn't run →
+  no new capacity → every workload Pending. It cleared when the taint lifted; if it recurs, unblock the system
+  node's taint so Karpenter's controller can schedule.
+
+- **2026-07-14 (later) — the "use a much longer `consolidateAfter`" recommendation below finally landed
+  on preprod, closing a gap left by the platform-only fix.** Platform's `WhenEmpty→WhenEmptyOrUnderutilized`
+  move (referenced below as "PR #1436") did eventually merge, paired with `consolidate_after: 15m` — but
+  only on platform; preprod itself, where this exact failure mode was FIRST observed (below), was never
+  touched and stayed on the module default (`1m`). Confirmed the identical taint-race pattern recurring
+  live tonight, this time from real digest-promotion scheduling pressure rather than a mass pod-delete: a
+  fresh node launches, sits `node.cilium.io/agent-not-ready` tainted past the 1-minute `consolidateAfter`
+  mark, and Karpenter's disruption controller deletes it as "empty" (true only because the taint was still
+  blocking scheduling) before its intended pod ever lands — repeating every ~10 minutes with zero net
+  progress. Fixed by finally raising preprod's `consolidate_after` to `15m` too, matching platform. See
+  `docs/runbooks/karpenter-operations.md`'s "Known gotchas" for the durable writeup.
+
 - **2026-07-14 (UNPARK) — ⚠️ ROUGH one: 3 compounding issues + the single most important lesson yet — during a
   post-unpark node-churn/Cilium-throttle storm, DO NOT mass-delete pods; it FEEDS the loop. STOP and let Karpenter
   - Cilium converge.** (Dated 07-14 by wall clock; the 07-13 park is the entry below.) Three things stacked up:

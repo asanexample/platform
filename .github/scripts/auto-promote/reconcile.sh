@@ -16,10 +16,12 @@
 # customer environments (<customer>-<stage>.yaml) are a follow-up.
 #
 # Env in:
-#   GH_TOKEN        asanexample-promote[bot] installation token (opens the Release PR on the platform repo)
-#   PLATFORM_REPO   owner/name of the control-plane repo (default asanexample/platform)
-#   KCTX            kubectl context for the platform cluster's ArgoCD (default: current context)
-#   DRY_RUN         "true" → log what WOULD be promoted, open no PRs
+#   GH_TOKEN                    asanexample-promote[bot] installation token (opens the Release PR on the platform repo)
+#   PLATFORM_REPO               owner/name of the control-plane repo (default asanexample/platform)
+#   KCTX                        kubectl context for the platform cluster's ArgoCD (default: current context)
+#   DRY_RUN                     "true" → log what WOULD be promoted, open no PRs
+#   MERGE_WAIT_TIMEOUT_SECONDS  how long to poll for each promotion PR's gate merge before moving on
+#                               (default 300 — see the wait loop below for why this exists)
 # Requires: yq (mikefarah), kubectl (ArgoCD read), gh, git. Run from the repo root of a fresh platform checkout.
 set -euo pipefail
 
@@ -138,21 +140,41 @@ for prod_file in gitops/products/*/*.yaml; do
 
       git checkout -q -b "$branch"
       git commit -q -m "promote: ${env_name} ${svc} -> sha256:${short}"
-      git push -q -u origin "$branch"
+      # Force-push (#1528 follow-up): the branch name is content-deterministic (env+svc+digest), so a same-name
+      # branch already existing remotely can only be a leftover from an earlier attempt at promoting this EXACT
+      # digest (e.g. a closed promote PR whose branch delete silently failed) — never a different, unrelated
+      # change. Force is always safe here: this script is the sole writer of these branches (each pushed branch
+      # is deleted immediately below), so there is nothing else to clobber.
+      git push -q -f -u origin "$branch"
       pr_title="promote: ${env_name} ${svc} -> ${short:0:12} (auto ${lower}→${upper})"
       pr_body="Auto-promotion (#377 Phase 2): \`${lower}\` is Synced+Healthy on \`${lower_digest}\`, advancing the same signed digest to \`${upper}\`. The gitops Gate validates + auto-merges; the per-Product ApplicationSet injects it. The app repo's main is untouched."
-      api -X POST "https://api.github.com/repos/${REPO}/pulls" \
-        -d "$(jq -n --arg t "$pr_title" --arg h "$branch" --arg b "$pr_body" '{title: $t, head: $h, base: "main", body: $b}')" >/dev/null
+      pr_number="$(api -X POST "https://api.github.com/repos/${REPO}/pulls" \
+        -d "$(jq -n --arg t "$pr_title" --arg h "$branch" --arg b "$pr_body" '{title: $t, head: $h, base: "main", body: $b}')" | jq -r '.number')"
       git checkout -q main
       git branch -q -D "$branch" 2>/dev/null || true
-      # Re-sync local main before the next service's branch-off. Without this, two services promoted to
-      # the SAME brand-new upper_rel in one run both branch from the stale pre-loop main; if the gate
-      # auto-merges the first one's PR before this loop reaches the second (routine — the gate is fast,
-      # this loop is not), the second's PR conflicts on the same file add. Confirmed live (#1516-1519):
-      # only the first of five same-file promotions in one run merged cleanly, the rest needed a manual
-      # close+regenerate. Fast-forward-only: if this ever fails (should be impossible — this script is the
-      # only writer of these branches, and each pushed branch is deleted immediately above), fall through
-      # and let the next run's stale-PR check catch it rather than silently diverging local state.
+      # Wait for the gate to actually MERGE this PR before branching the next promotion off main — not just
+      # re-fetch-and-hope. A prior fix (re-fetch + ff-only merge here, no wait) helped but didn't close the
+      # race: the gate's checks+approval automation reliably takes longer than this loop's ~10s per-service
+      # cadence, so whenever two services in one run promote to the SAME upper_rel, every PR after the first
+      # still branches from a main that doesn't yet include it and conflicts. Confirmed live, repeatedly
+      # (#1516-1519, then again #1546-1550 and #1562-1565 on the SAME evening despite the re-fetch fix) —
+      # only ever the first of N same-file promotions in a run merged cleanly. Polling for the real merge
+      # (not just pushing and moving on) is the only way the NEXT branch-off is guaranteed to start from a
+      # main that already contains this one. Bounded so one wedged PR (e.g. a genuine gate rejection) can't
+      # hang the whole run — falls through to the next promotion, which the following run's open-PR check
+      # will still catch and can retry.
+      wait_deadline=$((SECONDS + ${MERGE_WAIT_TIMEOUT_SECONDS:-300}))
+      merged=false
+      while [ "$SECONDS" -lt "$wait_deadline" ]; do
+        if [ "$(api "https://api.github.com/repos/${REPO}/pulls/${pr_number}" | jq -r '.merged // false')" = "true" ]; then
+          merged=true
+          break
+        fi
+        sleep 5
+      done
+      if [ "$merged" != "true" ]; then
+        echo "::warning::PR #${pr_number} (${env_name} ${svc}) did not merge within ${MERGE_WAIT_TIMEOUT_SECONDS:-300}s — continuing without waiting further"
+      fi
       git fetch -q origin main && git merge -q --ff-only origin/main || true
       echo "PROMOTE ${team}/${product} ${svc} ${lower}→${upper} @ ${lower_digest}"
       promoted=$((promoted + 1))

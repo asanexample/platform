@@ -1,0 +1,334 @@
+{
+  "title": "Alerting Overview",
+  "uid": "alerting-overview",
+  "description": "Every firing/pending alert fleet-wide, in one sortable/filterable place — both curated infra alerts (severity-labeled Prometheus rules) and the auto-derived per-app SLO burn-rate alerts. Built because the native Grafana alert-rules list page doesn't sort/filter well for a fast incident scan. See docs/runbooks/observability-alerts.md for per-alert runbooks.",
+  "schemaVersion": 39,
+  "timezone": "",
+  "tags": ["alerting", "platform"],
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "cluster",
+        "type": "query",
+        "label": "Cluster",
+        "datasource": { "type": "prometheus", "uid": "mimir-all" },
+        "query": "label_values(ALERTS, cluster)",
+        "definition": "label_values(ALERTS, cluster)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all", "selected": true }
+      },
+      {
+        "name": "severity",
+        "type": "query",
+        "label": "Severity",
+        "datasource": { "type": "prometheus", "uid": "mimir-all" },
+        "query": "label_values(ALERTS{alertstate=\"firing\"}, severity)",
+        "definition": "label_values(ALERTS{alertstate=\"firing\"}, severity)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all", "selected": true }
+      },
+      {
+        "name": "alertstate",
+        "type": "custom",
+        "label": "State",
+        "query": "firing : firing,pending : pending,firing or pending : firing|pending",
+        "includeAll": false,
+        "multi": false,
+        "current": { "text": "firing", "value": "firing", "selected": true }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Firing",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "mimir-all" },
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir-all" },
+          "expr": "count(ALERTS{alertstate=\"firing\", cluster=~\"$cluster\", severity=~\"$severity\"}) or vector(0)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Critical",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "mimir-all" },
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir-all" },
+          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"critical\", cluster=~\"$cluster\"}) or vector(0)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Warning",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "mimir-all" },
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir-all" },
+          "expr": "count(ALERTS{alertstate=\"firing\", severity=\"warning\", cluster=~\"$cluster\"}) or vector(0)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Pending",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "mimir-all" },
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir-all" },
+          "expr": "count(ALERTS{alertstate=\"pending\", cluster=~\"$cluster\", severity=~\"$severity\"}) or vector(0)",
+          "legendFormat": "",
+          "format": "time_series",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Alerts (sortable, filterable)",
+      "type": "table",
+      "description": "Click a column header to sort; hover a header and use the filter icon to filter by value. severity/alertstate are color-coded.",
+      "datasource": { "type": "prometheus", "uid": "mimir-all" },
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir-all" },
+          "expr": "ALERTS{alertstate=~\"$alertstate\", cluster=~\"$cluster\", severity=~\"$severity\"}",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "filterable": true, "align": "left" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "severity" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "critical": { "color": "red", "index": 0 },
+                      "warning": { "color": "orange", "index": 1 },
+                      "info": { "color": "blue", "index": 2 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "alertstate" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "firing": { "color": "red", "index": 0 },
+                      "pending": { "color": "yellow", "index": 1 }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "severity", "desc": false }]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "Value": true,
+              "__tenant_id__": true,
+              "instance": true,
+              "pod": true,
+              "container": true,
+              "endpoint": true,
+              "prometheus": true,
+              "prometheus_replica": true,
+              "dest_server": true,
+              "repo": true,
+              "uid": true
+            },
+            "indexByName": {
+              "alertname": 0,
+              "severity": 1,
+              "alertstate": 2,
+              "cluster": 3,
+              "namespace": 4,
+              "exported_namespace": 5,
+              "job": 6,
+              "service": 7,
+              "sloth_service": 8,
+              "sloth_severity": 9,
+              "sloth_id": 10,
+              "sloth_slo": 11
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Firing history",
+      "description": "One row per severity (not per alert — the per-alert breakdown is in the table above). Shows when the fleet's error budget was actually burning, at a glance.",
+      "type": "state-timeline",
+      "datasource": { "type": "prometheus", "uid": "mimir-all" },
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "mimir-all" },
+          "expr": "max by (severity) (ALERTS{alertstate=\"firing\", cluster=~\"$cluster\", severity=~\"$severity\"})",
+          "legendFormat": "{{severity}}",
+          "format": "time_series",
+          "instant": false,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "critical" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "warning" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "info" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }]
+          }
+        ]
+      },
+      "options": {
+        "rowHeight": 0.7,
+        "showValue": "never"
+      }
+    }
+  ]
+}
