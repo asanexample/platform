@@ -1,6 +1,6 @@
 {
   "uid": "agent-triage",
-  "title": "Triage Agent (ADR-076)",
+  "title": "Triage Agent",
   "tags": [
     "agent",
     "genai"
@@ -345,7 +345,7 @@
     {
       "id": 7,
       "type": "row",
-      "title": "Eval / calibration (ADR-076 Slice 3)",
+      "title": "Eval / calibration",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -457,7 +457,7 @@
     },
     {
       "type": "row",
-      "title": "Autonomy (ADR-086)",
+      "title": "Autonomy",
       "collapsed": false,
       "gridPos": {
         "h": 1,
