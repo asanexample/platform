@@ -39,8 +39,15 @@ dependency "cilium" {
 locals {
   # Graviton (arm64/t4g) vs x86 (t3), driven by include.base.locals.node_arch. (Single-AZ subnet selection
   # is done in the module — terragrunt locals can't read dependency outputs.)
-  _arm         = include.base.locals.node_arch == "arm64"
-  sys_instance = local._arm ? "t4g.large" : "t3.large"
+  _arm = include.base.locals.node_arch == "arm64"
+  # t4g.xlarge (4 vCPU / 16 GiB) — bumped from t4g.large (2 vCPU / 8 GiB) 2026-07-15, mirroring platform's
+  # own earlier fix for the identical failure. The fixed per-node DaemonSet slab (Cilium, Beyla, Alloy,
+  # node-exporter, otel) plus the standing preprod load packs the 2-vCPU node to ~91% CPU requests /
+  # ~217% CPU-limit over-commit after every unpark — starving the kubelet until it goes NotReady (frozen
+  # heartbeat), and terminating it just spawns another t4g.large that re-wedges the same way (CONFIRMED
+  # systemic on the 2026-07-15 unpark, not a bad instance). The xlarge gives the kubelet real headroom;
+  # Karpenter (min 4 vCPU, WhenEmptyOrUnderutilized) handles tenant bursts above this floor.
+  sys_instance = local._arm ? "t4g.xlarge" : "t3.xlarge"
   ami_type     = local._arm ? "AL2023_ARM_64_STANDARD" : "AL2023_x86_64_STANDARD"
 }
 
@@ -56,7 +63,7 @@ inputs = {
     # System nodes run platform components (Cilium, Crossplane tenant control plane, Falco, cert-manager, etc.)
     system = {
       subnet_ids     = [for name, id in dependency.networking.outputs.subnet_ids : id if can(regex("kubernetes$", name))]
-      instance_types = [local.sys_instance] # 2 vCPU / 8 GiB (t4g.large Graviton in the dev profile)
+      instance_types = [local.sys_instance] # 4 vCPU / 16 GiB (t4g.xlarge Graviton in the dev profile)
       ami_type       = local.ami_type
       # Dev profile: 1 node (minimal always-on; preprod is lighter — no observability/Keycloak/Backstage).
       # Crossplane's tenant control plane + Falco are RAM-heavy, so bump to 2 if pods stay Pending.
