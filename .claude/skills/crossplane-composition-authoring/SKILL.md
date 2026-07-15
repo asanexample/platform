@@ -76,7 +76,19 @@ ResourceQuota (ADR-062 reversible suspend).
   sharing used to make N composed resources race to own the one real AWS association —
   confirmed live: the shared SA ended up bound to an arbitrary member's role while a
   dedicated-SA service got no association at all (fixed, PR #1528; regression fixture
-  `.environment-api-tests/environments/shared-sa-dev.yaml`).
+  `.environment-api-tests/environments/shared-sa-dev.yaml`). **The fix prevents new
+  occurrences — it does not retroactively heal an environment provisioned before it.**
+  An environment older than the fix can still carry a stale AWS association bound to the
+  wrong `serviceAccount`; Crossplane's async reconciler won't self-heal it (AWS Pod
+  Identity associations can't change `serviceAccount` in place, and the provider just
+  retries the same failing update forever: `"diff contains fields that require resource
+  replacement: AttributeName(\"service_account\")"`). Symptom: a service with credentials
+  that "should" exist gets zero AWS creds at startup, and/or a sibling sharing the same SA
+  can't get ITS association either (`ResourceInUseException` — the SA is already "taken"
+  by the stale one). Confirmed live 2026-07-14/15 on a 17-day-old environment; recovery:
+  `kubectl delete podidentityassociations.eks.aws.upbound.io <stuck-resource>` (a
+  write-capable context, not PlatformAdmin) — Crossplane recreates it correctly on the
+  next reconcile.
 - **AWS platform account** (ProviderConfig `platform-ecr` = assumeRoleChain): per service
   an ECR repo `team-<team>/<product>-<svc>`, `IMMUTABLE_WITH_EXCLUSION` (allows
   `sha256-*` cosign tags), scan-on-push, **`deletionPolicy: Orphan`** (product-scoped,
