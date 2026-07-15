@@ -194,26 +194,39 @@ this L1, not L0), but never hardcodes a collector address.
 
 ![Beyla eBPF and the OTel SDK on the same service fragment a trace into two IDs; the fix is the inject-sdk annotation matched by Beyla's exclude_instrument predicate, moving the pod to the SDK-owned lane for one continuous storefront→alpha-checkout trace.](images/beyla-vs-sdk-fragmentation.svg)
 
-The endpoint config lives in a namespace-scoped `Instrumentation` **CR**, and today five exist — one per
+The endpoint config lives in a namespace-scoped `Instrumentation` **CR**, and today twelve exist — one per
 environment namespace, verified live:
 
 ```text
 $ kubectl --context preprod get instrumentation.opentelemetry.io -A
-NAMESPACE               NAME       ENDPOINT
-alpha-checkout-dev      platform   http://otel-collector.observability.svc.cluster.local:4318
-alpha-shop-dev          platform   http://otel-collector.observability.svc.cluster.local:4318
-alpha-shop-prod         platform   http://otel-collector.observability.svc.cluster.local:4318
-bravo-dispatch-dev      platform   http://otel-collector.observability.svc.cluster.local:4318
-platform-flagship-dev   platform   http://otel-collector.observability.svc.cluster.local:4318
+NAMESPACE                NAME       ENDPOINT
+alpha-shop-dev           platform   http://otel-collector.observability.svc.cluster.local:4318
+alpha-shop-prod          platform   http://otel-collector.observability.svc.cluster.local:4318
+alpha-shop-staging       platform   http://otel-collector.observability.svc.cluster.local:4318
+alpha-shop-test          platform   http://otel-collector.observability.svc.cluster.local:4318
+alpha-shop-uat           platform   http://otel-collector.observability.svc.cluster.local:4318
+bravo-dispatch-dev       platform   http://otel-collector.observability.svc.cluster.local:4318
+bravo-dispatch-prod      platform   http://otel-collector.observability.svc.cluster.local:4318
+bravo-dispatch-staging   platform   http://otel-collector.observability.svc.cluster.local:4318
+bravo-dispatch-test      platform   http://otel-collector.observability.svc.cluster.local:4318
+bravo-dispatch-uat       platform   http://otel-collector.observability.svc.cluster.local:4318
+platform-flagship-dev    platform   http://otel-collector.observability.svc.cluster.local:4318
+platform-pulse-dev       platform   http://otel-collector.observability.svc.cluster.local:4318
 ```
+
+(`alpha-checkout` is a registered Product but currently has no live Environment claim, so it has no
+`Instrumentation` CR right now — not a gap, just nothing deployed there at the moment.)
 
 The CR existing per namespace doesn't mean every pod in it climbed the ladder, though — the CR just
 *makes L1 available*; a pod still has to carry the `inject-sdk` annotation to use it. Spot-checked:
-`alpha-shop`'s services (`cart`, `catalog`, `orders`, `payment`, `storefront`), `alpha-checkout`, and
-`bravo-dispatch`'s `tracker`/`shipments`/`intake`/`dispatch-worker` carry the annotation and are SDK'd;
-`bravo-dispatch`'s `notify` (Node/TS, deliberately un-instrumented — the fleet's Beyla-only L0
-reference) and `platform-flagship` don't — they ride the L0 Beyla baseline like everyone else. That's the
-ladder working as designed: opt-in, per workload, not all-or-nothing per namespace.
+`alpha-shop`'s services (`cart`, `catalog`, `orders`, `payment`, `storefront`) and `bravo-dispatch`'s
+`tracker`/`shipments`/`intake`/`dispatch-worker` carry the annotation and are SDK'd, as does
+`platform-pulse`'s `generator` (a continuous synthetic-traffic generator that drives demo traffic against
+alpha-shop and bravo-dispatch; it reuses `alpha-shop`'s own `internal/telemetry` package verbatim, so its
+outbound calls propagate `traceparent` into the very services it's calling); `bravo-dispatch`'s `notify`
+(Node/TS, deliberately un-instrumented — the fleet's Beyla-only L0 reference) and `platform-flagship`
+don't — they ride the L0 Beyla baseline like everyone else. That's the ladder working as designed: opt-in,
+per workload, not all-or-nothing per namespace.
 
 ## The rest of the fleet — traces, metrics, cloud, synthetics
 
