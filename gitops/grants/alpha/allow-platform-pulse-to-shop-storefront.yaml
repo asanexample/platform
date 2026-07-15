@@ -1,0 +1,24 @@
+# Team alpha consents to the platform's `pulse` synthetic-traffic generator calling `storefront` to drive
+# continuous demo traffic (browse/cart/checkout/orders/auth). Authored in alpha's own directory (the
+# grantor/producer owns the file — gitops/grants/<target.team>/), consumed by platform's spec.dependencies
+# on its own XEnvironment claim (gitops/environments/platform/pulse/dev.yaml) — neither side alone wires
+# the hop.
+#
+# L4-port-only on purpose (no capability.network.http narrowing): pulse calls a wide, parameterized set of
+# storefront paths (/api/products/{id}, /api/orders/{id}, /api/auth/*, ...) that don't reduce to one exact
+# literal path, and this platform has only ever verified exact-literal Cilium/Envoy path enforcement (see
+# ADR-101 D4) — regex/prefix path matching is undemonstrated here. Granting at the documented, explicitly
+# optional L4 level (xservicegrant-xrd.yaml: "omit for any path/method on the granted L4 ports") is the
+# evidence-backed choice; pulse is a trusted platform-owned traffic generator, so the wider surface is an
+# acceptable trade-off rather than a boundary this needs to enforce.
+apiVersion: platform.refplat.org/v1beta1
+kind: ServiceGrant
+metadata:
+  name: allow-platform-pulse-to-shop-storefront
+spec:
+  target: { team: alpha, product: shop, stage: dev, service: storefront }
+  subject: { team: platform, product: pulse, stage: dev, service: generator }
+  capability:
+    network:
+      ports: [8080]
+      protocol: TCP

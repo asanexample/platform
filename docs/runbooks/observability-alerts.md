@@ -103,6 +103,16 @@ module READMEs).
   SCP needs client-side SSE) or other S3 errors.
 - **TempoBackendFlushFailures** — Tempo's backend scheduler is failing compaction flushes; same S3 triage.
 - **LokiPanics** — Loki logged panics; capture logs and check for a bad query/config.
+- **LokiTenantIngestStale** / **TempoTenantIngestStale** — tenant `{{ $labels.tenant }}` has shipped zero
+  log lines / spans for 15m (`loki_distributor_lines_received_total` / `tempo_distributor_spans_received_total`
+  flat), even though Loki/Tempo themselves are up. This is the "who watches the watcher" freshness check —
+  distinct from **LokiDown**/**TempoComponentDown**, which only catch the *store* being unreachable, not a
+  *specific tenant's* shipper going dark. Check that tenant's Alloy (logs) / OTel collector or Beyla (traces)
+  pods on the owning cluster. TempoTenantIngestStale only fires for tenants that normally ship traces
+  (currently `platform`/`preprod` — per-team trace scoping is deferred, so `alpha`/`bravo` never have this
+  series and won't alert). LokiTenantIngestStale has a known blind spot: if the Loki distributor pod itself
+  restarted after a tenant's last log line, that tenant's counter series doesn't exist yet and won't alert
+  until at least one line lands post-restart.
 
 ## External Secrets
 
@@ -182,7 +192,17 @@ Pending and workloads can't scale.
   self-heals from — hence the sustained window; a brief blip is normal.)
 - **KarpenterPodsPendingUnscheduled** (warning) — a pod has been Pending 15m. `kubectl describe pod` for the
   unschedulable reason; check NodePool limits/taints and the Karpenter logs. If many fire at once, the
-  elasticity loop is broken (Karpenter down, at a NodePool limit, or no matching capacity).
+  elasticity loop is broken (Karpenter down, at a NodePool limit, or no matching capacity). If
+  **KarpenterNodePoolAtCapacity** is also firing, the deliberate cost cap is the root cause — see below.
+- **KarpenterNodePoolAtCapacity** (warning) — a NodePool's cpu/memory usage is ≥90% of its `spec.limits` (the
+  deliberate cost guardrail, set intentionally low on this nightly-parked demo — ADR-078). At 100% Karpenter
+  **stops launching nodes**, so Pending pods here are due to the **cost cap**, not a bug or a broken elasticity
+  loop. This is the intended behaviour and firing is acceptable — it exists so cap-exhaustion is diagnosable as a
+  distinct root cause (vs. guessing at "pods pending"). **Decide:** (a) accept the Pending — the demo hit its
+  capacity ceiling, which is fine; or (b) if the workload legitimately grew, raise `cpu_limit`/`memory_limit` in
+  `infra/live/aws/<env>/us-east-1/platform/karpenter/terragrunt.hcl` (small, deliberate steps — the whole point
+  of the low cap is to avoid unbounded compute spend). Current caps: platform & preprod = **16 vCPU / 64 GiB**
+  each. Metric: `karpenter_nodepools_usage / karpenter_nodepools_limit`.
 
 ## controllers
 
@@ -190,9 +210,10 @@ Operator reconcile health (#1121). Any controller-runtime operator that silently
 
 - **ControllerReconcileErrors** (warning) — the `{{ $labels.controller }}` controller has been failing
   reconciles for 15m. Map the controller to its operator (Karpenter `disruption`/`nodeclaim…`; ESO
-  `clusterexternalsecret`/`clustersecretstore`; ArgoCD `applicationset`; the ADR-088 activation-operator) and
-  read that pod's logs. The desired state (a grant, a synced secret, a node) isn't being realized even though
-  the pod is up.
+  `clusterexternalsecret`/`clustersecretstore`; ArgoCD `applicationset`; the ADR-088 activation-operator, its
+  own controller-runtime reconcile-LOOP metrics scraped since #1424 — distinct from the
+  `JitActivationOutcome` SLO's mint/revoke OUTCOME signal, `## app-slos` above) and read that pod's logs. The
+  desired state (a grant, a synced secret, a node) isn't being realized even though the pod is up.
 
 ## keycloak
 
@@ -213,13 +234,43 @@ ServiceMonitor, scraped as `job=keycloak-http`.
 ## crossplane
 
 Namespace `crossplane-system`. The provisioner for every environment (XEnvironment claims) and self-service
-cloud resource. Core-controller metrics scraped via the crossplane module's PodMonitor (hub), `metrics.enabled`.
+cloud resource. Runs on BOTH clusters — the hub's own (empty) instance, and preprod, where XEnvironment
+claims actually reconcile (ADR-048). Two separate PodMonitors, on each cluster that runs crossplane:
+
+- **`crossplane`** (core controller, `app=crossplane`, `enable_crossplane_pod_monitor`) — the top-level
+  Composition/claim reconcile loop. Feeds **CrossplaneDown** below.
+- **`crossplane-providers`** (`pkg.crossplane.io/provider` Exists, `enable_crossplane_provider_pod_monitor`,
+  #1423) — the provider pods (`provider-aws-*`, `provider-family-aws`, `provider-kubernetes`) that do the
+  actual AWS/K8s resource provisioning the core controller delegates to. Distinct signal: the core loop can
+  be perfectly healthy while a specific provider is erroring on every apply (e.g. IAM permission drift).
+
+Both require the crossplane module's `metrics.enabled` (core) — providers expose a named `metrics` port by
+default, no equivalent flag needed. **Historical gotcha (#1422):** the hub's `crossplane` PodMonitor was live
+for 5 days selecting a port name (`metrics`) the deployed pod didn't expose at all — not "down", zero scrape
+targets configured — because the `metrics.enabled=true` code change had merged but the crossplane unit's
+`terragrunt apply` was never re-run. If `CrossplaneDown` or `ControllerReconcileErrors` for crossplane ever
+goes silent for a long stretch, check `helm status crossplane -n crossplane-system` for a stale
+`last_deployed` before assuming everything's fine — a live PodMonitor doesn't guarantee the pod behind it
+still matches the selector.
+
+**`provider-kubernetes` port quirk (#1428, fixed):** this provider's binary honours NEITHER port-relocation
+env var the runtime template sets for it — verified against its `cmd/provider/main.go`, which defines no
+metrics or webhook flag/env var at all. It always binds controller-runtime's hardcoded defaults: metrics on
+`:8080`, the conversion webhook on `:9443`. Under `hostNetwork` those are node-level binds — `:8080` collides
+with CNPG's operator (also a hostPort-8080 claimant) and `:9443` with Kyverno's admission controller. The
+`crossplane` module's runtime chart now declares `provider-kubernetes`'s metrics port as the literal `8080`
+(not the computed per-provider port) and hard anti-affinities it off any node running either collider. If a
+future crossplane provider upgrade or a NEW hostNetwork provider ever reports `down` on its PodMonitor target
+despite the pod being healthy, suspect this same class of bug first — `curl` the pod's actual `:8080` (or
+whatever controller-runtime's default is for that provider's manager options) before assuming it's genuinely
+unscraped.
 
 - **CrossplaneDown** (critical) — `up{namespace="crossplane-system"} == 0` for 5m: the core controller is
   down, so claims/Compositions/resources stop reconciling — new provisioning is halted (existing environments
   keep running). Check the `crossplane` deployment pod + logs. Composition/provider reconcile *errors* surface
   separately via **ControllerReconcileErrors** (the crossplane controllers now report to
-  `controller_runtime_reconcile_errors_total` once scraped).
+  `controller_runtime_reconcile_errors_total` once scraped) — now covering BOTH the core controller and
+  providers now that both are scraped.
 
 ## mimir
 
@@ -232,6 +283,89 @@ scrapeable `/metrics`, so it reads `up==0` while healthy).
   itself (the dead-man's switch is the backstop for total failure). Triage by component: ingester = memory /
   back-pressure; store-gateway / compactor = S3/IAM; distributor = ingest path.
 - **MimirRequestErrors** (warning) — >5% 5xx for 15m: reads (Grafana/alerting) or writes (remote-write) failing.
+- **SpokeMetricsFreshnessWarning** / **SpokeMetricsFreshnessCritical** — a spoke tenant (`{{ $labels.cluster }}`)
+  hasn't produced a fresh metrics sample in Mimir for 10m / 30m. This is the "who watches the watcher" check —
+  a dead or WAL-stuck spoke Prometheus-agent shows zero errors and looks healthy under availability-only SLOs.
+  Evaluated by the Mimir ruler *inside* the spoke tenant (`infra/modules/observability-mimir/templates/spoke-freshness-rules.yaml.tftpl`,
+  rendered into the `spoke-freshness` ruler namespace, synced by the same `mimirtool rules sync` CronJob as
+  the per-app SLOs). Triage: check the spoke's `prometheus-agent` pod/PVC on the affected cluster (`kubectl -n
+  observability get pods -l app.kubernetes.io/name=prometheus-agent-prometheus`), the WAL PVC (#1416 made it
+  durable across restarts — a brief blip shouldn't fire this), and the cross-cluster remote-write path
+  (Tailscale/TGW connectivity, the Gateway HTTPRoute at `<prefix>-mimir.aws.refplat.org`).
+- **MimirRulerRulesSyncStale** (warning) — the `mimirtool rules sync` CronJob (`{{ $labels.cronjob }}`,
+  schedule `*/15m`) hasn't succeeded in 30m. EVERY SLO/burn-rate alert and the spoke-freshness check above
+  depend on this CronJob actually running — a stale sync means new/changed rules never reach the ruler, and
+  eventually-removed rules never get cleaned up (`rules sync` reconciles add/update/delete, so this is also
+  a slow rule-drift risk, not just "new rules are late"). Check
+  `kubectl -n observability get jobs -l app.kubernetes.io/component=ruler-rules-sync` and the failing pod's
+  logs — usual causes: the ruler API not ready yet (post-unpark — the CronJob's `wait-for-ruler-api` init
+  container should handle this, but a park longer than its ~5m bound will still fail a run) or a malformed
+  rule file (a Terraform template rendering invalid YAML — `mimirtool rules sync` fails the whole run on a
+  parse error, not just the bad file).
+
+## platform-slos
+
+Hand-authored Sloth SLOs (`infra/live/aws/platform/us-east-1/platform/slo/terragrunt.hcl`'s `slos` input) —
+the Sloth controller renders each into SLI recording rules + multi-window burn-rate `PrometheusRule`s,
+evaluated by the hub's local Prometheus (every SLO below is on a component that runs on the hub, so no
+Mimir-ruler round-trip is needed — contrast with `## app-slos`, which evaluates inside the preprod tenant
+because the app metrics live there). Same burn-rate math/severities as `## app-slos` below.
+
+- **`K8sApiserverAvailability`** — the one control-plane signal EKS exposes: apiserver request availability.
+- **`MimirRequestsAvailability`** / **`LokiRequestsAvailability`** / **`TempoRequestsAvailability`** — stack
+  self-SLOs (meta-monitoring): error-budget the observability stack's OWN request success rate (ingest +
+  query, all routes combined — not split per-route; a meta-monitoring signal doesn't need 6 SLOs). Distinct
+  from **MimirComponentDown**/**LokiDown**/**TempoComponentDown** (plain up/down, no budget) and
+  **MimirRequestErrors**/**LokiRequestErrors** (plain threshold, no budget) — those still fire independently;
+  these give the SAME underlying failure an error-budget/burn-rate view instead of a flat threshold. If one
+  of these is burning fast, triage the same way as the matching `Down`/`RequestErrors` alert above (check
+  `kubectl -n observability get pods` for the store, then component-specific logs).
+- **`ArgoRolloutsReconcile`** — Argo Rollouts controller reconcile success rate, both clusters
+  (`rollout_reconcile_error` vs. `rollout_reconcile_count`). A burn here means the controller itself is
+  erroring while reconciling Rollouts (not a single Rollout being Degraded — that's a workload-level concern,
+  see the Argo Rollouts dashboard). Check the `argo-rollouts` controller pod/logs.
+- **`KyvernoAdmissionLatency`** — 99% of admission reviews should complete within 1s
+  (`kyverno_admission_review_duration_seconds_bucket{le="1.0"}`). A burn means admission is getting slow
+  enough to risk delaying deploys (every apply/kubectl-create goes through this webhook). Check Kyverno
+  admission-controller resource pressure (CPU throttling is the usual cause) and policy count/complexity.
+- **`JitActivationOutcome`** — combined mint+revoke success rate for JIT privilege activation
+  (`activation_mint_failures` + `activation_revoke_failures` vs. their duration-count totals). **Expect long
+  data gaps and occasional `NaN`/blank stretches on the dashboard** — this is break-glass-shaped traffic
+  (the last mint before this SLO shipped was 13 days prior), not a monitoring failure; 0 total operations in
+  a burn-rate window is normal, not itself alertable. A REAL burn here (a mint/revoke actually failing) is
+  worth immediate attention given the security sensitivity — check the `activation-operator` pod/logs and
+  the Grafana **Activation Operator** dashboard.
+- **`HighErrorBudgetBurn`** (page, `severity: critical`) / **`ErrorBudgetBurn`** (ticket, `severity:
+  warning`) suffix each alert name — same Google SRE fast/slow-burn semantics as the app-slos below.
+- **Not here: Crossplane core reconcile.** Verified live that the platform hub's `crossplane` PodMonitor
+  (namespace `observability`) selects `port: metrics`, but the deployed crossplane pod exposes no port
+  named `metrics` (only `readyz`/`webhooks`) — zero scrape targets, despite
+  `enable_crossplane_pod_monitor=true`. Tracked as a follow-up issue rather than shipping a permanently-
+  absent SLO; `CrossplaneDown` (`## crossplane` above) is similarly silently dead until this is fixed.
+
+## app-slos
+
+Per-app SLOs (ADR-056 / W11), registry-derived from every `XEnvironment` claim, any stage
+(`infra/live/aws/platform/us-east-1/platform/mimir/terragrunt.hcl`'s `local.app_slos`) — no authoring step, no
+per-Product config. Each Environment gets TWO SLOs over its Beyla RED metrics
+(`http_server_request_duration_seconds_*`), evaluated by the Mimir ruler inside the `preprod` tenant (the
+app metrics live there): a fixed 99.9% HTTP-success-rate SLO (`requests-availability`) and a fixed 99%
+sub-500ms latency SLO (`requests-latency`, `<Env>Latency*` alerts — the "good" bucket is `le="0.5"`, the
+nearest actual Beyla histogram boundary; there is no exact 300ms bucket). Both objectives/thresholds are
+fixed for now (same as the pre-existing availability SLO) — no per-Product/tier override yet, since the
+XEnvironment XRD schema is strict/structural (no freeform passthrough) and nobody has asked for one.
+
+- **`<Env>Availability`/`<Env>Latency` `HighErrorBudgetBurn`** (page, `severity: critical`) — fast burn:
+  the SLO's error budget is being exhausted within hours at the current rate (Google SRE 14.4×/6× multi-window
+  thresholds). Treat as an active incident for that app. Open the app's dashboard (`Grafana → SLO dashboard`,
+  filter `sloth_service`) and, for a latency burn specifically, check for a slow downstream dependency,
+  resource starvation (CPU throttling/OOM), or a bad deploy (correlate with the Rollout).
+- **`<Env>Availability`/`<Env>Latency` `ErrorBudgetBurn`** (ticket, `severity: warning`) — slow burn: the
+  budget is trending down over days, not yet critical. Investigate at the next opportunity; not page-worthy.
+- These alerts are synced into the ruler by the SAME `mimirtool rules sync` CronJob as the spoke-freshness
+  check above — if a burn alert seems stuck/stale, verify the CronJob's `lastSuccessfulTime`
+  (`kubectl -n observability get cronjob mimir-ruler-rules-sync-preprod`) before assuming the app itself
+  is the problem.
 
 ## tailscale
 
@@ -249,8 +383,6 @@ own metrics (a follow-up).
 
 Control-plane components whose own up/down was previously unalerted.
 
-- **CortexTenantDown** (warning) — the P13 per-team metric write-splitter is down; new metrics stop being split
-  by team (isolation degrades). Pod in `observability`.
 - **ArgoRolloutsControllerDown** (warning) — canary/blue-green Rollouts stop progressing; new Rollout deploys
   can't advance (running pods unaffected). Controller pod in `argo-rollouts`.
 - **BeylaDown** (warning) — the eBPF RED-metrics source is down; SLOs + APM correlation go stale. DaemonSet pod

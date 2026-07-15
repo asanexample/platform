@@ -4,7 +4,7 @@
 > automatically — and how a **release-approver** approves a gated prod promotion. Promotion moves a **digest**,
 > never a rebuild ([ADR-067 §8](../adrs/067-idp-domain-model.md), [ADR-071](../adrs/071-digest-promotion-via-control-plane.md)).
 >
-> **Last reviewed:** 2026-06-15
+> **Last reviewed:** 2026-07-13
 
 **Related:**
 [Promotion & Release](../architecture/promotion-and-release.md) (architecture) ·
@@ -93,6 +93,7 @@ myself, then approve my own prod."* (`spec.roles.releaseApprover` on the Team/Pr
 | **Gate rejects: no sibling Environment for the target stage** | Promoting to a stage that has no Environment | Create the Environment first (Backstage → New Environment) |
 | **Promote PR is empty / "already pinned"** | The target stage already carries that digest (idempotent) | Nothing to do — it's already there |
 | **Auto-promotion isn't advancing a rung** | The lower stage's Application isn't `Synced` + `Healthy` | Fix the lower deployment; the reconciler advances once it settles |
+| **Auto-promotion push fails: `! [rejected] ... (fetch first)`** | A same-name remote branch already exists (leftover from an earlier promotion attempt for that exact digest — e.g. a closed promote PR whose branch delete silently failed) | Nothing to do — `reconcile.sh` force-pushes (branch names are content-deterministic: `auto-promote/<env>-<svc>-<digest>`, and the reconciler is the sole writer of these ephemeral branches, PR #1538). If you still see this, the stray branch predates that fix — delete it manually and re-dispatch |
 | **prod PR auto-merged without approval** | Should never happen — would mean the prod path didn't match | Check `classify-diff.sh` / the gate logs; the prod-release regex must match the file path |
 
 → Promote App / bot token issues: [Promote GitHub App](promote-github-app.md). Gate auto-merge model:

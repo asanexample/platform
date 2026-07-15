@@ -1,0 +1,21 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: alpha-shop-uat
+spec:
+  environmentRef: alpha-shop-uat
+  services:
+    storefront:
+      digest: sha256:5456c8148ed42db08ef27c35622d5d650f85f5b71b04c53d609dc98ae0606eb7
+    catalog:
+      digest: sha256:ee49046e1ebaa24ec724ae3d66d1a15e64127df54683aef02bd54f2d99d1c30e
+    cart:
+      digest: sha256:93a57b9c8a816832443a4d67d147bba7a36508ed2f2252ebbe8ef6a0291c1b66
+    orders:
+      digest: sha256:57b18414de620b609ec4ef422d7077800581a0c919459f8c3089bc439711ec1b
+    payment:
+      digest: sha256:d86d49a77b08e3e838e6071325a47f21d94f90325203532a745b676c8e03008d
+    checkout:
+      digest: sha256:4954afd6db99aa66d5aa334ac0812c006f80b22f7ec89c3e825dedd95948cc89
+    accounts:
+      digest: sha256:3204082cfa9f22710c636982c2a3312c14d6f04b2a42dbcf63ea53e136182676

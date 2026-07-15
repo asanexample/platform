@@ -6,12 +6,16 @@ spec:
   environmentRef: alpha-shop-dev
   services:
     storefront:
-      digest: sha256:f6c2b012dfd649293b14a7bacf251f0719043df2e577e36333797203675def34
+      digest: sha256:5456c8148ed42db08ef27c35622d5d650f85f5b71b04c53d609dc98ae0606eb7
     catalog:
-      digest: sha256:5b6baf82af117c2350ffd4191909e16e9a064be58d49b93bf63cb821e4f5260f
+      digest: sha256:ee49046e1ebaa24ec724ae3d66d1a15e64127df54683aef02bd54f2d99d1c30e
     cart:
-      digest: sha256:7d7f60fba4756ebe38a5cb1eb4e0c9ff099fbe09638d34308b8d7ccbf5171f83
+      digest: sha256:93a57b9c8a816832443a4d67d147bba7a36508ed2f2252ebbe8ef6a0291c1b66
     orders:
-      digest: sha256:f492ac84572a344f2d682a68f7fb835be28d3d0197567f03140dc79dccfe7cfe
+      digest: sha256:57b18414de620b609ec4ef422d7077800581a0c919459f8c3089bc439711ec1b
     payment:
-      digest: sha256:3b405f18ce1d894461ea67a8f591a52650d730b3f5035b0dd363a6e40be88420
+      digest: sha256:d86d49a77b08e3e838e6071325a47f21d94f90325203532a745b676c8e03008d
+    checkout:
+      digest: sha256:4954afd6db99aa66d5aa334ac0812c006f80b22f7ec89c3e825dedd95948cc89
+    accounts:
+      digest: sha256:3204082cfa9f22710c636982c2a3312c14d6f04b2a42dbcf63ea53e136182676

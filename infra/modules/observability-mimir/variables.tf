@@ -181,7 +181,7 @@ variable "app_slos" {
     burn-rate rules into an `app-slos` Mimir ruler namespace, loaded into the ruler tenant by the rules-sync. The
     `error_query`/`total_query` use a `{{window}}` placeholder (Beyla RED metrics filtered to the app's namespace).
     Produces `slo:current_burn_rate:ratio{sloth_id=...}` per app (the metric the freeze gate queries) + page/ticket
-    burn alerts → hub Alertmanager. Usually registry-derived in the unit from the prod XEnvironment claims.
+    burn alerts → hub Alertmanager. Usually registry-derived in the unit from every XEnvironment claim, any stage.
   EOT
   type = list(object({
     id              = string # unique SLO id, e.g. "alpha-shop-prod-availability"
@@ -195,6 +195,24 @@ variable "app_slos" {
     ticket_severity = optional(string, "warning")
   }))
   default = []
+}
+
+variable "spoke_metrics_freshness" {
+  description = <<-EOT
+    Spoke Prometheus-agent remote-write freshness check ("who watches the watcher": a dead/stuck spoke
+    shows zero errors and looks healthy under availability-only SLOs). When enabled, renders a
+    `spoke-freshness` Mimir ruler namespace loaded into EVERY ruler_tenants entry by the same rules-sync
+    CronJob as app_slos — it must be evaluated INSIDE a tenant (`up`'s own last-received sample timestamp
+    only exists in that tenant's remote-written data, not the hub's local scrape). A plain staleness
+    alert (not a Sloth ratio SLO — freshness is boolean, not naturally an error/total ratio), mirroring
+    the true-cost-exporter's `time() - last_success > SLA` pattern.
+  EOT
+  type = object({
+    enabled                      = bool
+    warning_stale_after_seconds  = optional(number, 600)  # 10m — WAL is durable across restarts (#1416), so a brief blip shouldn't page
+    critical_stale_after_seconds = optional(number, 1800) # 30m
+  })
+  default = { enabled = false }
 }
 
 # ---------------------------------------------------------------------------

@@ -287,7 +287,7 @@
     },
     {
       "type": "row",
-      "title": "Autoscaling (ADR-078)",
+      "title": "Autoscaling",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -417,7 +417,7 @@
     },
     {
       "type": "row",
-      "title": "Progressive delivery (ADR-056)",
+      "title": "Progressive delivery",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -544,7 +544,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "RED metrics from the shop's OpenTelemetry SDK via the OTLP spoke. Since ADR-100, Mimir translates OTLP metrics to the Prometheus convention on ingest, so they carry `http_server_request_duration_seconds*` + `k8s_namespace_name` \u2014 identical to Beyla/remote-write \u2014 and one query works regardless of delivery path. Per-service breakdown is the `job` label (`alpha-shop/shop-<svc>`; OTLP's service identifier). Autoscaling + progressive-delivery panels above use kube-state-metrics / Argo Rollouts (`namespace`/`exported_namespace`)."
+        "content": "RED metrics from the shop's OpenTelemetry SDK via the OTLP spoke. Mimir translates OTLP metrics to the Prometheus convention on ingest, so they carry `http_server_request_duration_seconds*` + `k8s_namespace_name` \u2014 identical to Beyla/remote-write \u2014 and one query works regardless of delivery path. Per-service breakdown is the `job` label (`alpha-shop/shop-<svc>`; OTLP's service identifier). Autoscaling + progressive-delivery panels above use kube-state-metrics / Argo Rollouts (`namespace`/`exported_namespace`)."
       }
     },
     {

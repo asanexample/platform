@@ -44,8 +44,27 @@ resource "helm_release" "operator" {
       }
     }
     # Webhook serving cert from cert-manager (ADR-018 — present cluster-wide).
+    #
+    # Scope the pod-mutation webhook to environment namespaces only (namespaceSelector matches the
+    # `platform.refplat.org/team` label every environment namespace already carries — Kyverno relies on
+    # the same label) — without this it intercepts EVERY pod creation cluster-wide (kube-system, argocd,
+    # observability, …), none of which ever opt into instrumentation. objectSelector can't do this instead:
+    # the opt-in signal is an ANNOTATION (`instrumentation.opentelemetry.io/inject-<lang>`), and K8s webhook
+    # selectors only match labels.
+    #
+    # Once scoped, flip pods.failurePolicy Ignore -> Fail: with the blast radius limited to app namespaces,
+    # a future operator hiccup makes Kubernetes retry pod creation until the operator's back (self-healing,
+    # no new code) instead of silently admitting a pod with no OTLP endpoint injected (found live 2026-07-13 —
+    # a node-churn-timed operator restart raced 3 app pods' creation, they landed instrumented-but-inert,
+    # exporting to the SDK's localhost default forever until manually recreated).
     admissionWebhooks = {
       certManager = { enabled = true }
+      namespaceSelector = {
+        matchExpressions = [
+          { key = "platform.refplat.org/team", operator = "Exists" }
+        ]
+      }
+      pods = { failurePolicy = "Fail" }
     }
   })]
 }

@@ -6,7 +6,7 @@
 > [Crossplane Environment API](../architecture/crossplane-environment-api.md),
 > [Environment Onboarding](environment-onboarding.md)
 >
-> **Last reviewed:** 2026-06-08
+> **Last reviewed:** 2026-07-14
 
 ---
 
@@ -25,7 +25,8 @@ The UI is at `https://argocd.aws.refplat.org` (Tailscale). CLI: `argocd login ar
 3. [AppProject / RBAC denials](#appproject--rbac-denials)
 4. [Per-stage preview hostnames (and the per-PR previews gap)](#per-stage-preview-hostnames)
 5. [selfHeal / prune behavior](#selfheal--prune-behavior)
-6. [XEnvironment claims: ServerSideApply + ignoreDifferences](#xenvironment-claims-serversideapply--ignoredifferences)
+6. [Synced but stale: Rollout image silently dropped](#synced-but-stale-rollout-image-silently-dropped)
+7. [XEnvironment claims: ServerSideApply + ignoreDifferences](#xenvironment-claims-serversideapply--ignoredifferences)
 
 ---
 
@@ -165,6 +166,63 @@ To pause self-heal for debugging:
 argocd app set alpha-demo --sync-policy none      # stop automated sync (re-enable with --sync-policy automated)
 argocd app sync alpha-demo                         # one-shot manual sync
 ```
+
+---
+
+## Synced but stale: Rollout image silently dropped
+
+**Symptom:** the Application repeatedly logs `"successfully synced (all tasks run)"` (both on auto-sync and
+on a manual `argocd app sync`), `status.sync.status` may even briefly read `Synced`, but a Rollout's live
+`spec.template.spec.containers[].image` **never actually changes** — it keeps running an old digest (or
+`:placeholder`) indefinitely across many reconcile cycles. Strikes some Rollouts in a sync batch and not
+others (e.g. `storefront` applies fine while `catalog`/`cart` in the same batch don't) — not a blanket,
+always-on failure, which is what makes it easy to mistake for a transient glitch.
+
+**This was previously misdiagnosed in this doc as "a stuck internal retry/comparison state" — that was
+wrong.** It's a confirmed, currently-open **upstream ArgoCD bug**
+([argoproj/argo-cd#23283](https://github.com/argoproj/argo-cd/issues/23283),
+[#26588](https://github.com/argoproj/argo-cd/issues/26588); fix
+[#26924](https://github.com/argoproj/argo-cd/pull/26924) still open as of 2026-07-14), root-caused by
+reading ArgoCD's own `normalizeTargetResources()` in `controller/sync.go`: for a CRD without a registered
+Kubernetes scheme (Argo Rollout is exactly this), ArgoCD's `RespectIgnoreDifferences=true` sync option makes
+it compute an RFC7396 JSON Merge Patch between the ignore-adjusted live resource and the raw live resource,
+then apply that patch to the sync target. RFC7396 merges **objects** recursively but **replaces arrays
+wholesale** — it cannot express "patch one field of one array element." So any `ignoreDifferences` rule
+whose path descends into an **array** (`containers[]?...`, `initContainers[]?...`) causes the entire array —
+including `image` — to be silently overwritten with the stale live value, while the sync still reports
+success. Scalar and map-key paths (e.g. `/spec/replicas`, `labels.team`) are unaffected — they never touch
+the array, confirmed both by reading the merge-patch code path and by live reproduction (2026-07-14, fixed by
+scoping the array-notation Kyverno-tolerance rules off `argoproj.io/Rollout` — see
+`resource.customizations.ignoreDifferences.all` / `.apps_Deployment` / `.apps_StatefulSet` in the `argocd`
+unit's terragrunt.hcl).
+
+**If you hit this on an ArgoCD version still carrying the bug** (check whether upstream #26924 has merged
+and been picked up by our pinned `helm_chart_version` first — `infra/live/aws/_versions.hcl`), confirm before
+assuming it's this:
+
+- The rendered desired manifest is actually correct: `argocd app manifests <app> --core` (run inside the
+  `argocd-application-controller` pod, or with `--kube-context` set to a working cluster context) and grep
+  the field you expect changed.
+- `argocd-controller` genuinely owns the field in question, not another controller:
+  `kubectl get <kind> <name> -n <ns> --show-managed-fields -o json | jq -r '.metadata.managedFields[] | "\(.manager) \(.operation) \(.time)"'`
+  — if the last `argocd-controller Apply` predates your latest "successful" sync, that's the proof: the sync
+  is a genuine no-op, not silently reverted after the fact.
+- Check for any **new** `ignoreDifferences` rule (global `.all` or per-Application) with an array-notation
+  path (`foo[]?...`) that now applies to a CRD without a registered scheme — that's the trigger to remove or
+  rescope, not a webhook/RBAC/field-manager problem.
+
+**Manual per-resource workaround** (safe, doesn't touch `argocd-cm`, use if you hit this on an unpatched
+version or a CRD kind not yet covered by the fix above):
+
+```bash
+argocd app manifests <app> --core > /tmp/manifests.yaml   # pull the correctly-rendered desired state
+# extract just the one resource's YAML doc from /tmp/manifests.yaml, then:
+kubectl apply --server-side --field-manager=argocd-controller -f /tmp/<resource>.yaml
+```
+
+This reproduces exactly what ArgoCD's own sync should do and lands instantly — proof the API server has no
+objection, only ArgoCD's own apply-construction logic was dropping the change. Not a substitute for the
+config fix above: every freshly-promoted digest needs this reapplied by hand, it doesn't self-heal.
 
 ---
 

@@ -88,15 +88,43 @@ inputs = {
   single_az                 = include.base.locals.single_az_nodes
   node_arch                 = include.base.locals.node_arch
 
-  # AGGRESSIVE — preprod runs ephemeral tenant workloads (ArgoCD reschedules on disruption). Spot for cheap +
-  # WhenEmptyOrUnderutilized consolidation bin-packs and reclaims, the cost/elasticity win. (ADR-078.)
+  # Spot for cheap + WhenEmptyOrUnderutilized consolidation bin-packs and reclaims, the cost/elasticity win
+  # for preprod's ephemeral tenant workloads (ArgoCD reschedules on disruption). (ADR-078.)
+  #
+  # ⚠️ consolidate_after = 15m — NOT the module default (1m), and NOT the "AGGRESSIVE" 1m this unit ran with
+  # until 2026-07-14. A 1m consolidateAfter races the BYOCNI startup taint (`node.cilium.io/agent-not-ready`,
+  # cleared once Cilium's agent is up on the new node): confirmed LIVE 2026-07-14 — Karpenter provisions a
+  # node for a pending pod (~30s to launch), the node comes up taint-blocked waiting on Cilium, and at the 1m
+  # mark the disruption controller sees "0 pods bound" (true only because the taint is still up) and deletes
+  # the node it JUST built — before the pod it was provisioned for ever got a chance to land. The pod stays
+  # Pending, triggering another provision, repeating the exact cycle every ~10 minutes with zero net progress.
+  # Preprod is the worse case for this race (spot capacity is an extra churn source on top of the taint
+  # timing) — matching platform's already-proven 15m (see its own terragrunt.hcl, fixed for the same failure
+  # mode one day earlier) lets a freshly-provisioned node survive comfortably past Cilium startup + actual
+  # pod scheduling before consolidation ever reconsiders it. 15m of slower reclaim on an idle demo cluster is
+  # a rounding error next to the cost of repeated launch/destroy cycles that were never reclaiming anything.
   capacity_types       = ["spot", "on-demand"]
   consolidation_policy = "WhenEmptyOrUnderutilized"
-  consolidate_after    = "1m"
-  cpu_limit            = 48
-  memory_limit         = "192Gi"
+  consolidate_after    = "15m"
+  # Cost guardrail (deliberately CONSERVATIVE — demo env, a runaway node-count is worse than Pending pods). Real
+  # Karpenter usage here is ~1-3 nodes (~3-4 vCPU / 8-24 GiB across the tenant apps + obs spoke). 16 vCPU / 64 GiB
+  # is a hard ceiling ~5x over normal — a 3x cut from the old 48/192. When hit, Karpenter STOPS (pods Pending,
+  # "all available instance types exceed limits"); outages from this are ACCEPTABLE and surfaced by the
+  # KarpenterNodePoolAtCapacity alert so capacity is diagnosable as the root cause. Bounds Karpenter only; the
+  # system node group has its own maxSize=2.
+  cpu_limit    = 16
+  memory_limit = "64Gi"
   # Require 8 GiB+ nodes — the per-node DaemonSet slab (Cilium, Beyla, Alloy) exhausts a 4 GiB t4g.medium.
   min_instance_memory_mib = 6144
+  # Require 4 vCPU+ nodes. Without this, the cheapest instance meeting the 8 GiB floor is r6g.medium (1 vCPU),
+  # so Karpenter provisioned a pile of tiny nodes — each paying the same fixed ~410m DaemonSet slab (43% of a
+  # 1-vCPU node = pure overhead), which left no room for per-node DaemonSets (e.g. alloy-profiles) once tenant
+  # workloads packed in, forcing a manual pod-eviction after every unpark (2026-07-14). 4 vCPU+ (Gt 3) lands on
+  # c6g.xlarge — cheapest per-vCPU at 8 GiB+ (~$0.012/vCPU spot vs r6g.medium's ~$0.014, and r6g.large's ~$0.024)
+  # — dropping the DaemonSet overhead to ~12% and ~halving the node count. Workload here is CPU-bound (nodes ran
+  # 88-99% CPU but only 44-62% memory), so compute-optimized c6g fits; ~6.5 GiB total workload memory sits well
+  # inside 2-3x c6g.xlarge (8 GiB each). Roughly cost-neutral vs a properly-sized fleet of small nodes.
+  min_instance_cpu = 3
 
   high_availability  = include.base.locals.high_availability
   helm_chart_version = include.base.locals.helm_versions.karpenter

@@ -1,6 +1,9 @@
-# Environment (alpha × shop × prod) — provisioned to validate the ADR-056 prod canary end-to-end. Namespace
-# alpha-shop-prod. Synced by ArgoCD (the `environments` registry-sync app) and reconciled by the Crossplane
-# Environment Composition (v3). The deployed digest is pinned in the Release (promoted from dev).
+# Environment (alpha × shop × prod) — full-parity stage, mirroring dev's service shape exactly (ADR-067
+# v1beta1). Namespace alpha-shop-prod. Synced by ArgoCD (the `environments` registry-sync app) and reconciled
+# by the Crossplane Environment Composition (v3). Originally provisioned to validate the ADR-056 prod canary
+# with just storefront+catalog and parked for the bike-shop migration (P1 landed on dev first) — brought up to
+# full parity now that the realistic-demo feature set (accounts/cart/orders/payment/checkout) is proven on
+# dev/test/uat/staging. Digests reach here via a manual, release-approver-gated promotion (never auto-promoted).
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
@@ -12,10 +15,52 @@ spec:
   product: shop
   stage: prod
   tier: standard
-  # storefront (edge) + catalog (internal), matching dev (ADR-067 multi-service). The prod Release is parked
-  # for the bike-shop migration (P1 lands on dev first); re-deploy prod by promoting the proven dev digests up.
+  # Default quota (cpu: "4") was sized for the original storefront+catalog canary validation; the full
+  # 7-service parity shape needs 6 CPU steady-state (3 replicas x 250m for 6 services + 3x500m storefront) with
+  # zero headroom for canary overlap — orders/payment couldn't schedule ANY pods at the default. Set to team
+  # alpha's cap (gitops/teams/alpha.yaml quotaCap.cpu: "8"), leaving 2 CPU of headroom for canary transitions.
+  #
+  # Same story for pod count: the default (pods: 20) was ALSO sized for the original smaller shape. Steady
+  # state alone is 21 pods (7 services x 3 replicas) — the cpu bump alone (#1669) unblocked scheduling on CPU
+  # but immediately hit the pod-count ceiling instead (orders stuck at 2/3, FailedCreate: exceeded quota
+  # ... pods=20, limited: pods=20). Set to team alpha's pod cap too, for the same canary-headroom reasoning.
+  quota:
+    cpu: "8"
+    pods: 40
+  # Cross-team dependency (ADR-101), same as dev: orders calls bravo's dispatch/intake to kick off a real
+  # shipment on checkout. Consented to by bravo's stage-scoped ServiceGrant (gitops/grants/bravo/
+  # allow-alpha-shop-orders-to-dispatch-intake-prod.yaml) — restrict-environment-dependencies admits this
+  # claim only because that grant exists; the Composition then materializes both CNP halves automatically.
+  dependencies:
+    - { team: bravo, product: dispatch, stage: prod, service: intake }
+  # One Product, many services (ADR-067) — same shape as dev. storefront/payment/checkout are stateless →
+  # share app-alpha. catalog/cart/orders/accounts own self-service AWS data (ADR-073) so each needs its OWN SA
+  # (Pod Identity binds one role per SA); the Composition mints their least-privilege DynamoDB/SQS IAM and
+  # publishes the connection info into the <svc>-resources ConfigMap (PRODUCTS_TABLE / ITEMS_TABLE /
+  # ORDERS_TABLE + EVENTS_QUEUE_URL / USERS_TABLE / SESSIONS_TABLE). 6 resources total, within the alpha
+  # envelope (allowedEngines s3/sqs/sns/dynamodb, maxPerEnvironment 10).
   services:
     storefront:
       serviceAccount: app-alpha
     catalog:
+      serviceAccount: app-alpha-catalog
+      resources:
+        products: { kind: keyvalue, engine: dynamodb, access: readwrite }
+    payment:
       serviceAccount: app-alpha
+    checkout:
+      serviceAccount: app-alpha
+    cart:
+      serviceAccount: app-alpha-cart
+      resources:
+        items: { kind: keyvalue, engine: dynamodb, access: readwrite }
+    orders:
+      serviceAccount: app-alpha-orders
+      resources:
+        orders: { kind: keyvalue, engine: dynamodb, access: readwrite }
+        events: { kind: stream, engine: sqs, access: readwrite }
+    accounts:
+      serviceAccount: app-alpha-accounts
+      resources:
+        users: { kind: keyvalue, engine: dynamodb, access: readwrite }
+        sessions: { kind: keyvalue, engine: dynamodb, access: readwrite }

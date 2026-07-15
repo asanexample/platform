@@ -30,6 +30,27 @@ pyroscope-ebpf). Data paths: metrics→Mimir, logs→Loki (via Alloy), traces→
 OTel Collector gateway), profiles→Pyroscope (via eBPF). All stores run
 `multitenancy_enabled: true`.
 
+## Collector fleet — why it's split (don't "standardize on Alloy")
+
+A recurring question: since Alloy already collects logs/events/profiles, why not
+route metrics and traces through it too and run one agent? Answer: **no — the split
+is deliberate, not sprawl.** Alloy owns the three signals where it's the best tool;
+the other three collectors are non-Alloy for concrete reasons:
+
+| Signal | Collector | Why not Alloy |
+|---|---|---|
+| Logs · events · profiles | **Alloy** | it *is* Alloy already (`observability-alloy`, `observability-pyroscope-ebpf`) |
+| Metrics (scrape+ship) | **kube-prometheus-stack** (Prometheus CR, `agentMode` on the spoke) | it's the prometheus-**operator** ecosystem, not just a scraper: `ServiceMonitor`/`PodMonitor` CRDs (every component ships them), plus Alertmanager + `PrometheusRule` evaluation + exemplar storage on the hub. Alloy can *read* ServiceMonitors but gives you none of the alerting/rules core. Canonical k8s metrics idiom — keep it. |
+| Traces (OTLP gateway) | **OTel Collector** (`otelcol-k8s` distro) | the *one* real consolidation candidate (Alloy embeds the same otelcol components), but the upstream distro is a deliberate **vendor-neutral OTLP edge** (ADR-100, SDK-first/OTLP-native). Swapping it buys fleet uniformity at the cost of that neutrality, for no operational pain today. |
+| RED + traces (zero-code) | **Beyla** (eBPF uprobes) | a different *mechanism* (auto-instrumentation), not a collector — Alloy can orchestrate Beyla but not replace it. |
+
+So "all-Alloy" is off the table the moment you reach metrics (operator territory) and
+Beyla (different tool). The realistic simplification ceiling is exactly one move —
+traces gateway → Alloy — and we don't make it. Each collector is the canonical tool
+for its signal, which on a platform meant to *demonstrate* the ecosystem is also more
+instructive than forcing one agent to do everything. Don't re-propose consolidation
+without a new operational reason.
+
 ## Add a dashboard (dashboards-as-code)
 
 Dashboards are **Grafana sidecar ConfigMaps** — JSON files under
@@ -197,20 +218,26 @@ it starts (ADR-056 Phase 3 / the W11 freeze gate). See
   authors: group by `job`, not `service_name`, for an SDK-instrumented tenant service.
 - **Manual `terragrunt apply` needs `AWS_PROFILE=management`** (bare shell assumes
   PlatformDeployer and 403s); reach the private API over Tailscale (ADR-010).
-- **Per-team isolation (P13 / #590): write-split LIVE, read-proxy RETIRED (#1269), reads now SOFT.** Topology:
-  the platform hub runs no team workloads, so its *own* metrics are the `platform` tenant; the real per-team
-  tenants come from the **preprod spoke's live dual-write** (preprod runs the alpha/bravo apps). **Writes:**
-  `cortex-tenant` write-splits each team's series into its own real Mimir/Loki tenant — LIVE. **Reads:** the
-  hard fail-closed `tenant-proxy` (Mimir + `loki-tenant-proxy` for Loki; verified the SSO `X-Id-Token`, stamped
-  `X-Scope-OrgID`, denied on missing token) was **built then retired (#1269)** — OSS Grafana's `oauthPassThru`
-  can't reliably forward the token to a downstream proxy, so it fail-closed on `no_token` and blanked every
-  dashboard. `read_proxy_url=""`; modules kept but inert, re-enableable if Grafana's token forwarding is fixed.
-  Live read model is **soft**: per-tenant datasources (`Mimir (<team>)`, static `X-Scope-OrgID`) + **Grafana
-  dashboard-folder permissions** + the namespace-filtered Team Overview dashboards (#1157). Cross-team sharing
-  is soft too (share the dashboard/folder); the `AccessGrant` model (ADR-068) still governs cross-team access
-  generally, but its fail-closed obs read-federation went with the proxy. **Traces (Tempo) + profiles
-  (Pyroscope) per-team read scoping DEFERRED.** *(This block was itself stale until #1269 was reconciled —
-  when in doubt on isolation status, check `read_proxy_url` in the live mimir/loki units, not this note.)*
+- **Per-team isolation (P13 / #590): PARKED (ADR-104, PR #1430) — standardized on CLUSTER-level tenancy for
+  all signals, `cortex-tenant` decommissioned.** Source of truth: `enable_per_team_tenants` in
+  `infra/live/aws/{platform,preprod}/env.hcl`, currently `false` on both, with the toggle's own comment
+  ("per-team tenancy PARKED (ADR-104)... cortex-tenant decommissioned") — check *that* flag when reasoning
+  about tenant isolation, not `read_proxy_url` (a different, separately-retired mechanism, see below).
+  Verified live 2026-07-14: zero `cortex-tenant` pods running; querying the `alpha`/`bravo` tenant IDs
+  directly against Mimir returns no series at all. **Practical implication for dashboard authors:** only two
+  tenants actually receive data — `platform` (the hub's own infra) and `preprod` (the spoke, where the
+  alpha/bravo apps run — un-split within it). The `mimir-all` federated datasource's fixed tenant list
+  (`platform`,`preprod`, see `observability-mimir/locals.tf`'s `extra_tenant_datasources`) is therefore a
+  **complete** view today — no hidden third tenant to worry about missing.
+
+  Historical context (both mechanisms below predate ADR-104 and are now moot, kept for archaeology): the
+  **write** side (`cortex-tenant` splitting each team's series into its own Mimir/Loki tenant) was live for a
+  while, then parked along with the read side. The **read** side (a hard fail-closed `tenant-proxy`, verifying
+  the caller's SSO `X-Id-Token` and stamping `X-Scope-OrgID`) was **built then retired first** (#1269) — OSS
+  Grafana's `oauthPassThru` couldn't reliably forward the token to a downstream proxy, so it fail-closed on
+  `no_token` and blanked every dashboard; `read_proxy_url=""`, modules kept but inert. Cross-team sharing today
+  is soft (share the dashboard/folder); the `AccessGrant` model (ADR-068) still governs cross-team access
+  generally, but its fail-closed obs read-federation went with the proxy.
 - Mimir is **off** in the dev cost_profile; enabling it just starts `remote_write`
   (additive, no migration).
 

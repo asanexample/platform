@@ -265,6 +265,15 @@ groups:
           summary: Loki is panicking
           description: "Loki has logged panics over the last 10m."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+      - alert: LokiTenantIngestStale
+        expr: sum by (tenant) (rate(loki_distributor_lines_received_total[15m])) == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tenant {{ $labels.tenant }} has shipped no logs in 15m"
+          description: "Loki's distributor has received zero log lines for tenant {{ $labels.tenant }} over the last 15m — the tenant's Alloy shipper may be down, or the cluster/team it belongs to has gone dark. \"Who watches the watcher\": a dead shipper produces no errors and looks healthy under availability-only alerts. Known limitation: if the Loki distributor pod itself restarted after the tenant last shipped, the per-tenant series won't exist yet and this alert won't fire until at least one line lands post-restart."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
   # ---------------------------------------------------------------------------
   - name: tempo.rules
     rules:
@@ -294,6 +303,15 @@ groups:
         annotations:
           summary: Tempo backend compaction flushes are failing
           description: "Tempo's backend scheduler has failed work flushes over the last 15m — compaction/backend write issues."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
+      - alert: TempoTenantIngestStale
+        expr: sum by (tenant) (rate(tempo_distributor_spans_received_total[15m])) == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tenant {{ $labels.tenant }} has shipped no traces in 15m"
+          description: "Tempo's distributor has received zero spans for tenant {{ $labels.tenant }} over the last 15m — the tenant's OTel collector/Beyla path may be down, or the workload has gone dark. Only fires for tenants that normally ship traces (currently platform and preprod) — a tenant with no trace-producing workload never has this series and won't alert, which is expected, not a bug."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#loki--tempo-stores"
   # ---------------------------------------------------------------------------
   - name: external-secrets.rules
@@ -528,7 +546,24 @@ groups:
           severity: warning
         annotations:
           summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} stuck Pending for 15m"
-          description: "{{ $labels.namespace }}/{{ $labels.pod }} has been Pending for 15m and can't be scheduled — usually Karpenter hasn't (or can't) provision matching capacity. Check `kubectl describe pod` for the unschedulable reason, the Karpenter logs, and any NodePool limits/taints. Sustained pending = the elasticity loop is broken."
+          description: "{{ $labels.namespace }}/{{ $labels.pod }} has been Pending for 15m and can't be scheduled — usually Karpenter hasn't (or can't) provision matching capacity. Check `kubectl describe pod` for the unschedulable reason, the Karpenter logs, and any NodePool limits/taints. Sustained pending = the elasticity loop is broken. If KarpenterNodePoolAtCapacity is also firing, the deliberate cost cap is the root cause — see that alert."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#karpenter"
+      - alert: KarpenterNodePoolAtCapacity
+        # Makes the DELIBERATE COST CAP (spec.limits, set intentionally low on this nightly-parked demo — ADR-078)
+        # diagnosable as a distinct ROOT CAUSE. At 100% of the limit Karpenter STOPS launching nodes and pods stay
+        # Pending; without this you'd only see generic "pods pending" and have to guess. Firing is EXPECTED/
+        # acceptable per the cost stance — it's the signal to decide accept-the-pending vs raise the limit, not a
+        # page. The `> 0` guard on the denominator drops the series if a limit is unset (avoids divide-by-zero).
+        expr: |
+          max by (nodepool, resource_type) (
+            karpenter_nodepools_usage / (karpenter_nodepools_limit > 0)
+          ) >= 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Karpenter NodePool {{ $labels.nodepool }} at its {{ $labels.resource_type }} cost cap ({{ $value | humanizePercentage }})"
+          description: "NodePool {{ $labels.nodepool }} {{ $labels.resource_type }} usage has been >=90% of its configured spec.limits (the deliberate cost guardrail) for 10m. At 100% Karpenter STOPS launching nodes, so any Pending pods here are due to the COST CAP — not a scheduling bug or a broken elasticity loop. This is intended behavior on a cost-capped demo. DECIDE: (a) accept the Pending (capacity ceiling reached — fine for a demo), or (b) if the workload legitimately grew, raise cpu_limit/memory_limit in infra/live/aws/<env>/us-east-1/platform/karpenter/terragrunt.hcl. Cross-check KarpenterPodsPendingUnscheduled: if it's also firing, the cap is actively blocking scheduling right now."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#karpenter"
   # ---------------------------------------------------------------------------
   # Operator reconcile health (alerting P1, #1121). Any controller-runtime operator — Karpenter, ESO, the
@@ -615,6 +650,15 @@ groups:
           summary: "Mimir is returning a high 5xx rate"
           description: "Over 5% of Mimir requests have been 5xx for 15m — metric reads (Grafana + alerting) and/or writes (remote-write ingestion) are failing. Check the mimir component logs (ingester back-pressure, store-gateway/S3, or the distributor)."
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#mimir"
+      - alert: MimirRulerRulesSyncStale
+        expr: time() - kube_cronjob_status_last_successful_time{cronjob=~".*ruler-rules-sync.*"} > 1800
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mimir ruler-rules-sync CronJob ({{ $labels.cronjob }}) hasn't succeeded in 30m"
+          description: "The `mimirtool rules sync` CronJob (schedule */15m) reconciles the per-tenant ruler to match the curated rules + app-slos + spoke-freshness ConfigMap — every SLO/burn-rate alert and spoke-freshness check in this repo depends on it actually running. No successful run in 30m (2x the schedule) means new/changed rules aren't reaching the ruler and, longer-term, stale rules never get cleaned up. Check `kubectl -n observability get jobs -l app.kubernetes.io/component=ruler-rules-sync` and the failing pod's logs — the two usual causes are the ruler API not being ready yet (post-unpark) or a malformed rule file (a Terraform template producing invalid YAML)."
+          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#mimir"
   # ---------------------------------------------------------------------------
   # Tailscale (#1123) — the PRIMARY private cluster-access path (ADR-010). Not scraped for its own metrics, so
   # these are kube-state-metrics availability signals. "Up but not advertising routes" needs Tailscale's own
@@ -641,19 +685,11 @@ groups:
           runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#tailscale"
   # ---------------------------------------------------------------------------
   # Platform-service breadth (#1123): control-plane components scraped but previously unalerted for their own
-  # up/down. cortex-tenant (per-team metric re-tenanting), argo-rollouts (progressive delivery), Beyla (the
-  # eBPF app-metric source the SLOs depend on), external-dns (DNS record sync — kube-state, not scraped).
+  # up/down. argo-rollouts (progressive delivery), Beyla (the eBPF app-metric source the SLOs depend on),
+  # external-dns (DNS record sync — kube-state, not scraped). cortex-tenant was here (per-team metric
+  # re-tenanting) — decommissioned, ADR-104.
   - name: platform-services.rules
     rules:
-      - alert: CortexTenantDown
-        expr: up{job="cortex-tenant"} == 0
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "cortex-tenant is down — per-team metric re-tenanting stopped"
-          description: "cortex-tenant (the P13 write-splitter that routes each series into its team's Mimir tenant) has been down for 10m. Per-team metric isolation degrades — new metrics stop being split by team. Check the pod in observability."
-          runbook_url: "https://github.com/asanexample/platform/blob/main/docs/runbooks/observability-alerts.md#platform-services"
       - alert: ArgoRolloutsControllerDown
         expr: up{job="argo-rollouts-metrics"} == 0
         for: 10m

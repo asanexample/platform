@@ -6,12 +6,12 @@ spec:
   environmentRef: bravo-dispatch-dev
   services:
     shipments:
-      digest: sha256:0775093b80f9ac8c319e6d3746c98dd1d7e49672b62da405db44eb97ec93bf6e
+      digest: sha256:952ef6e4655061c40556d03a31ef4f242b76999c0ea547794d4a87abb07e4e49
     tracker:
-      digest: sha256:124d4fa810d93f2acb4d7d5d0207fff33a3a5b97e4c8d0a55d0ac95841abd756
+      digest: sha256:f7937b110b9e649ea6dd30524a8e061a0f69f8ed2199ba6ecd10e0f7c750ec66
     intake:
-      digest: sha256:bba6185bcdf31b972d465e6df9b69cf906b4924395b22a678fcc8ea52cdfe438
+      digest: sha256:9c6fcde85a1a6bd137434bd198eb2ea97ef21e303737ed790a00fbedc53055bd
     notify:
-      digest: sha256:a8577ab746ee188a054075decc8b01d040df6cdbd7f66c2137f62880ec92b1dc
+      digest: sha256:31fcd2c9384e1a67ae7ad2afedf370cf4051fe112957602912b194148ddc8099
     dispatch-worker:
-      digest: sha256:fa263c8b04db7b5f883184a74817ea7be0d525d9e973a5c6d7804c352849df95
+      digest: sha256:f160f059f967717e02cb625c7667639ac3b0ed994d8b88c169c7ef4a69e9ff6f

@@ -1,0 +1,17 @@
+apiVersion: platform.refplat.org/v1beta1
+kind: Release
+metadata:
+  name: bravo-dispatch-test
+spec:
+  environmentRef: bravo-dispatch-test
+  services:
+    shipments:
+      digest: sha256:952ef6e4655061c40556d03a31ef4f242b76999c0ea547794d4a87abb07e4e49
+    tracker:
+      digest: sha256:f7937b110b9e649ea6dd30524a8e061a0f69f8ed2199ba6ecd10e0f7c750ec66
+    intake:
+      digest: sha256:9c6fcde85a1a6bd137434bd198eb2ea97ef21e303737ed790a00fbedc53055bd
+    notify:
+      digest: sha256:31fcd2c9384e1a67ae7ad2afedf370cf4051fe112957602912b194148ddc8099
+    dispatch-worker:
+      digest: sha256:f160f059f967717e02cb625c7667639ac3b0ed994d8b88c169c7ef4a69e9ff6f

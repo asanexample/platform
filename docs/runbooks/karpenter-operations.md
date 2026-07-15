@@ -12,7 +12,7 @@
 > (the `terminationGracePeriod` drain backstop)
 > **See also:** [cluster-scale-down-up.md](cluster-scale-down-up.md) (park/unpark — Karpenter drain ordering)
 >
-> **Last reviewed:** 2026-07-01
+> **Last reviewed:** 2026-07-13
 
 ---
 
@@ -30,18 +30,20 @@ instance just-in-time; it also consolidates/reclaims nodes per its disruption po
 | Setting | Platform (hub) | Preprod |
 |---|---|---|
 | `capacity_types` | `["on-demand"]` — spot retired, stateful-safe | `["spot", "on-demand"]` — cost-optimized |
-| `consolidation_policy` | `WhenEmpty` — never disrupts a running pod | `WhenEmptyOrUnderutilized` — bin-packs + reclaims |
-| `consolidate_after` | `1m` | `1m` |
-| `cpu_limit` / `memory_limit` | `32` vCPU / `128Gi` (conservative) | `48` vCPU / `192Gi` (aggressive) |
+| `consolidation_policy` | `WhenEmptyOrUnderutilized` — bin-packs + reclaims | `WhenEmptyOrUnderutilized` — bin-packs + reclaims |
+| `consolidate_after` | `15m` — settle-first (see below) | `15m` — taint-race fix (see below) |
+| `cpu_limit` / `memory_limit` | `16` vCPU / `64Gi` | `16` vCPU / `64Gi` |
 | `node_arch` | `arm64` (Graviton-first) | `arm64` |
 | Instance families (arm64 default) | `t4g, m6g, m7g, c6g, r6g` | same |
 | `min_instance_memory_mib` | `6144` (8 GiB+ floor) | `6144` |
 
-Rationale for the platform/preprod split: the hub runs stateful workloads (Mimir/Loki/Tempo
-ingesters, Keycloak, CNPG) paired with `karpenter.sh/do-not-disrupt` + PodDisruptionBudgets
-— `WhenEmpty` guarantees Karpenter never evicts a running pod to consolidate. Preprod runs
-ephemeral, ArgoCD-rescheduled tenant workloads, where aggressive bin-packing is a pure cost
-win.
+Both clusters bin-pack and reclaim underutilized nodes, not just fully-empty ones. The hub runs stateful
+workloads (Mimir/Loki/Tempo ingesters, Keycloak, CNPG) paired with `karpenter.sh/do-not-disrupt` +
+PodDisruptionBudgets, so a running pod is never evicted to consolidate regardless of policy — that
+protection, not `consolidationPolicy`, is what keeps the hub safe. `WhenEmpty` was the hub's original,
+more conservative setting; it was changed because it left over-provisioned nodes idle after the
+post-unpark reschedule storm rather than reclaiming them. Preprod runs ephemeral, ArgoCD-rescheduled
+tenant workloads, where aggressive bin-packing is a pure cost win.
 
 Live units: `infra/live/aws/platform/us-east-1/platform/karpenter/terragrunt.hcl` and the
 preprod equivalent. Module: `infra/modules/aws/karpenter/` (chart templates under
@@ -73,8 +75,20 @@ preprod equivalent. Module: `infra/modules/aws/karpenter/` (chart templates unde
 
 - **`consolidationPolicy`** — `WhenEmpty` only reclaims a fully-empty node (no eviction of
   running pods); `WhenEmptyOrUnderutilized` additionally bin-packs and evicts to consolidate
-  underutilized nodes. `consolidateAfter: 1m` on both clusters is the grace period before a
-  candidate node is acted on.
+  underutilized nodes. Both clusters run `WhenEmptyOrUnderutilized` today; stateful pods stay
+  protected via `karpenter.sh/do-not-disrupt` + PDBs (below), not via the policy choice.
+  `consolidateAfter: 15m` on both clusters is the grace period before a candidate node is
+  acted on — **not** the module's `1m` default. A short `consolidateAfter` races the BYOCNI
+  startup taint above: a freshly-provisioned node can sit `node.cilium.io/agent-not-ready`
+  tainted longer than 1 minute waiting on Cilium, and the disruption controller would see "0
+  pods bound" (true only because the taint is still blocking scheduling) and delete the node
+  it just built — before the pod it was provisioned for ever got a chance to land. Confirmed
+  live on preprod (2026-07-14): this produced an endless provision→taint-wait→disrupt→re-pend
+  loop under real scheduling pressure, burning ~10 minutes per cycle with zero net progress.
+  15m gives a fresh node comfortable room to clear the taint and pick up real work first; on
+  the hub it additionally lets the post-unpark reschedule storm fully settle before
+  consolidation acts, so it reclaims a calm, stably-idle picture instead of consolidating
+  mid-storm.
 - **`terminationGracePeriod: 8h`** (ADR-085 backstop) bounds how long Karpenter will wait on
   a blocking PodDisruptionBudget or a `karpenter.sh/do-not-disrupt` annotation before it
   forcibly drains anyway. Without this, a single-replica workload with a tight PDB (or a
@@ -176,6 +190,18 @@ handle the exact ordering; the two traps worth knowing about here:
   (tags applied at launch) and `AllowScopedResourceTagging` (post-launch tagging by
   Karpenter's own `nodeclaim.tagging` controller) — missing either one silently breaks
   tag-based cost allocation or SCP compliance without blocking provisioning itself.
+- **A short `consolidateAfter` races the BYOCNI startup taint.** Symptom: under real
+  scheduling pressure, `kubectl get events --field-selector reason=FailedScheduling` shows
+  the *same* pod repeatedly failing with `Insufficient cpu`, and Karpenter's own logs
+  (`kubectl logs -n karpenter -l app.kubernetes.io/name=karpenter | grep -E "launched
+  nodeclaim|disrupting node"`) show a node launched, then disrupted as "empty" roughly a
+  `consolidateAfter` interval later — over and over, with no net progress. Root cause: a
+  fresh node stays `node.cilium.io/agent-not-ready` tainted until Cilium's own agent starts on
+  it, which can take longer than a short `consolidateAfter` — so the disruption controller
+  sees "0 pods bound" (true only because the taint is still up) and deletes the very node it
+  just built, before the pod it was provisioned for ever lands. Confirmed live on preprod
+  (2026-07-14) at the module default (`1m`); fixed by raising `consolidate_after` to `15m` on
+  both clusters (comfortably past Cilium startup) — see the Live configuration table above.
 
 ## References
 

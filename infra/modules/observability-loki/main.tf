@@ -185,9 +185,13 @@ locals {
     #  - "Loki": renamed to "Loki (platform)" (same uid) — delete the old name so provisioning doesn't collide.
     #  - "Loki (admin — alpha)": a hand-applied break-glass datasource from the #1269 incident, retired with the
     #    read-proxy now that the direct "Loki (alpha)" datasource exists. (Its stray CM is deleted separately.)
+    #  - "Loki (alpha)" / "Loki (bravo)": per-team tenancy parked (ADR-104) — dropped from
+    #    extra_tenant_datasources, so the sidecar needs the explicit delete or they linger orphaned in Grafana.
     deleteDatasources = [
       { name = "Loki", orgId = 1 },
       { name = "Loki (admin — alpha)", orgId = 1 },
+      { name = "Loki (alpha)", orgId = 1 },
+      { name = "Loki (bravo)", orgId = 1 },
     ]
     datasources = [for ds in local.datasource_tenants : {
       name   = ds.name

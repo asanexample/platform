@@ -146,4 +146,23 @@ echo "  ✓ triage-copilot-prod OK (cluster-read RB; +trust marker, restrict-ima
 printf '%s' "$(render "${here}/environments/demo-dev.yaml")" | grep -q 'platform.refplat.org/trust: platform' && { echo "::error::FAIL-SAFE VIOLATION: tenant Environment got the platform-trust marker"; exit 1; } || true
 echo "  ✓ fail-safe OK (tenant demo-dev has NO trust marker + keeps restrict-images)"
 
+echo "== render shared-sa-dev (shared serviceAccount across services) → ONE Pod-Identity association per SA, not per service =="
+OUT="$(render "${here}/environments/shared-sa-dev.yaml")"
+# Every service still gets its own IAM Role, unconditionally (unchanged behavior).
+for svc in storefront checkout payment catalog; do
+  printf '%s' "$OUT" | grep -q "external-name: Pod-alpha-sharedsa-dev-${svc}\$" || { echo "::error::Role Pod-alpha-sharedsa-dev-${svc} not rendered"; printf '%s\n' "$OUT"; exit 1; }
+done
+# AWS allows exactly ONE PodIdentityAssociation per (cluster, namespace, serviceAccount) — storefront/checkout/
+# payment share app-x, so exactly ONE of the three composed associations may render, not three (the historical
+# bug: N composed resources racing to own the same real AWS association, non-deterministically).
+assoc_count="$(printf '%s' "$OUT" | grep -c 'crossplane.io/composition-resource-name: pod-identity-')"
+[ "$assoc_count" -eq 2 ] || { echo "::error::expected exactly 2 PodIdentityAssociations (1 for shared app-x + 1 for catalog's own app-x-catalog), got ${assoc_count}"; printf '%s\n' "$OUT"; exit 1; }
+# catalog owns a dedicated SA (declares resources) — it must always get its own, un-colliding association.
+printf '%s' "$OUT" | grep -A20 'composition-resource-name: pod-identity-catalog' | grep -q 'serviceAccount: app-x-catalog' || { echo "::error::catalog's association must target its own app-x-catalog SA"; exit 1; }
+printf '%s' "$OUT" | grep -A20 'composition-resource-name: pod-identity-catalog' | grep -q 'roleArn:.*Pod-alpha-sharedsa-dev-catalog' || { echo "::error::catalog's association must bind its own role"; exit 1; }
+# The shared app-x SA's ONE association must target app-x, bound to one of the sharers' roles (deterministic:
+# alphabetically-first among storefront/checkout/payment when none of them declare AWS access — checkout).
+printf '%s' "$OUT" | grep -B2 'serviceAccount: app-x$' | grep -q 'roleArn:.*Pod-alpha-sharedsa-dev-checkout' || { echo "::error::shared app-x association must deterministically bind checkout's role (alphabetically-first sharer)"; printf '%s\n' "$OUT"; exit 1; }
+echo "  ✓ shared-sa-dev OK (4 Roles rendered, but only 2 associations: 1 for shared app-x → checkout's role, 1 for catalog's own app-x-catalog)"
+
 echo "Environment Composition render checks passed (L2a — product-scoped footprint + identity; ADR-073 — S3/SQS/SNS/DynamoDB resources; ADR-081 — platform-trust cluster RBAC)."

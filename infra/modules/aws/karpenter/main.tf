@@ -388,6 +388,7 @@ resource "helm_release" "nodepool" {
     arch                   = local.k8s_arch
     instanceFamilies       = local.instance_families
     minInstanceMemoryMib   = var.min_instance_memory_mib
+    minInstanceCpu         = var.min_instance_cpu
     capacityTypes          = var.capacity_types
     consolidationPolicy    = var.consolidation_policy
     consolidateAfter       = var.consolidate_after

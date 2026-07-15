@@ -100,8 +100,8 @@ locals {
         podMonitorSelectorNilUsesHelmValues     = false
         probeSelectorNilUsesHelmValues          = false
         resources = {
-          requests = { cpu = "100m", memory = "512Mi" }
-          limits   = { memory = "1Gi" }
+          requests = { cpu = "100m", memory = var.memory_request }
+          limits   = { memory = var.memory_limit }
         }
         # WAL storage: a PVC (durable across pod restarts during a hub outage) when storage_class names a
         # class that exists on the spoke cluster, else an ephemeral emptyDir (operator default when

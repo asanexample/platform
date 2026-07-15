@@ -56,6 +56,18 @@ resource "kubernetes_manifest" "proxy_class" {
     spec = {
       statefulSet = {
         pod = {
+          # STABLE PLACEMENT for the subnet router — it is THE access path to the private EKS API (ADR-010), so it
+          # must not be bounced. Riding ephemeral Karpenter nodes meant every consolidation/replacement/disruption
+          # moved this pod, and each move drops+re-establishes the tailnet connection = the router "flapping"
+          # offline (observed repeatedly 2026-07-10..14, wedging kubectl access to preprod).
+          # karpenter.sh/do-not-disrupt tells Karpenter never to voluntarily disrupt the node while this pod is on
+          # it — which is what stops the flapping. (An earlier revision ALSO pinned it via nodeSelector to the
+          # managed 'system' node group; that was reverted because preprod's single small system node runs ~99%
+          # CPU and Karpenter can't provision a `nodegroup=system`-labelled node, so the router got stuck Pending.
+          # do-not-disrupt alone is the safe fix — the pod stays wherever it fits and Karpenter leaves it be.)
+          annotations = {
+            "karpenter.sh/do-not-disrupt" = "true"
+          }
           tailscaleContainer = {
             # Kernel-mode subnet routing conflicts with Cilium's eBPF datapath; userspace mode avoids the conflict
             env = [
@@ -64,6 +76,14 @@ resource "kubernetes_manifest" "proxy_class" {
                 value = "true"
               }
             ]
+            # Small requests so it's Burstable (not BestEffort/first-evicted under node pressure); userspace
+            # routing is light.
+            resources = {
+              requests = {
+                cpu    = "50m"
+                memory = "64Mi"
+              }
+            }
           }
         }
       }

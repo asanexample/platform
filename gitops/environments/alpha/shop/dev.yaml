@@ -21,17 +21,29 @@ spec:
   dependencies:
     - { team: bravo, product: dispatch, stage: dev, service: intake }
   # One Product, many services (ADR-067). Browse: storefront (edge — SPA + BFF, the only HTTPRoute) + catalog
-  # (internal). Buy path (P2): cart + orders + payment (internal, east-west). cart/orders own self-service AWS
-  # data (ADR-073) so each needs its OWN SA (Pod Identity binds one role per SA); the Composition mints their
-  # least-privilege DynamoDB/SQS IAM and publishes the connection info into the <svc>-resources ConfigMap
-  # (ITEMS_TABLE / ORDERS_TABLE + EVENTS_QUEUE_URL). storefront/catalog/payment are stateless → share app-alpha.
-  # 3 resources total, within the alpha envelope (allowedEngines s3/sqs/sns/dynamodb, maxPerEnvironment 10).
+  # (internal). Buy path (P2): cart + orders + payment (internal, east-west) + checkout (extracted from
+  # storefront's buypath.go — orchestrates cart+orders as its own mutual-auth-secured hop, ADR-057).
+  # Accounts (real user accounts — rolled our own, no platform customer-IdP exists yet): owns its own
+  # `users`/`sessions` DynamoDB tables (opaque session tokens, not JWTs — storefront calls its
+  # GET /api/auth/verify rather than needing a shared signing secret). The shop's data plane is DynamoDB
+  # end to end: catalog also owns a `products` table now (it seeds an empty table from its embedded JSON
+  # on first boot, then reads live from Dynamo like every other stateful service — no data compiled into
+  # the binary). cart/orders/accounts/catalog own self-service AWS data (ADR-073) so each needs its OWN SA
+  # (Pod Identity binds one role per SA); the Composition mints their least-privilege DynamoDB/SQS IAM and
+  # publishes the connection info into the <svc>-resources ConfigMap (ITEMS_TABLE / ORDERS_TABLE +
+  # EVENTS_QUEUE_URL / USERS_TABLE / SESSIONS_TABLE / PRODUCTS_TABLE). storefront/payment/checkout are the
+  # only stateless services left → share app-alpha. 6 resources total, within the alpha envelope
+  # (allowedEngines s3/sqs/sns/dynamodb, maxPerEnvironment 10).
   services:
     storefront:
       serviceAccount: app-alpha
     catalog:
-      serviceAccount: app-alpha
+      serviceAccount: app-alpha-catalog
+      resources:
+        products: { kind: keyvalue, engine: dynamodb, access: readwrite }
     payment:
+      serviceAccount: app-alpha
+    checkout:
       serviceAccount: app-alpha
     cart:
       serviceAccount: app-alpha-cart
@@ -42,3 +54,8 @@ spec:
       resources:
         orders: { kind: keyvalue, engine: dynamodb, access: readwrite }
         events: { kind: stream, engine: sqs, access: readwrite }
+    accounts:
+      serviceAccount: app-alpha-accounts
+      resources:
+        users: { kind: keyvalue, engine: dynamodb, access: readwrite }
+        sessions: { kind: keyvalue, engine: dynamodb, access: readwrite }

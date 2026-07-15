@@ -163,6 +163,13 @@ inputs = {
   # Scrape the hub Crossplane core metrics (alerting P1, #1121) — crossplane + this stack co-reside here.
   # Feeds CrossplaneDown (needs the crossplane unit's metrics.enabled applied first).
   enable_crossplane_pod_monitor = true
+  # Composed-resource reconciliation (the actual AWS/K8s provisioning work) happens in the provider pods,
+  # not the core controller — #1423. No dependency on the crossplane unit's metrics.enabled; providers
+  # expose a named `metrics` port by default.
+  enable_crossplane_provider_pod_monitor = true
+  # activation-operator reconcile-loop health (#1424) — requires the activation-operator unit's
+  # --metrics-bind-address/--metrics-secure=false to be applied first.
+  enable_activation_operator_pod_monitor = true
 
   tags = include.base.locals.tags
 }

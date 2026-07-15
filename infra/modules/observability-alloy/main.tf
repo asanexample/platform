@@ -12,11 +12,10 @@ locals {
   # Render external_labels into River syntax (a block-level arg on loki.write). Empty => omitted entirely.
   external_labels_block = length(var.external_labels) > 0 ? "external_labels = { ${join(", ", [for k, v in var.external_labels : "\"${k}\" = \"${v}\""])} }" : ""
 
-  # P13 per-team log isolation (#590): when enabled, derive the Loki tenant from each pod's Kyverno-injected
-  # `team` label (present on env-namespace pods) and stamp it per stream; system pods with no team fall back to
-  # the cluster tenant. This is the WRITE half — the loki-tenant-proxy enforces per-team reads. Off = unchanged
-  # single-tenant behaviour. NB: for a spoke this requires the hub Loki ingest edge to PASS THROUGH the tenant
-  # (not force-stamp) — a deferred write-integrity tradeoff hardened later by ingest mTLS (#590 Phase-4 D-2).
+  # P13 per-team log isolation (#590) is PARKED (ADR-104): cluster tenancy is now standard across all
+  # three signals, so the per-team relabel + tenant stamp/drop stay flag-gated (re-enable without a
+  # redesign if a real isolation need appears later) while trace_id/span_id extraction below is
+  # unconditional — it must never regress logs->traces regardless of the flag (ADR-104 D2).
   # (heredocs kept out of the ternary — HCL rejects a heredoc directly in a `?:` true-branch.)
   retenant_rules_raw = <<-RULES
 
@@ -34,9 +33,55 @@ locals {
       }
   RULES
 
-  retenant_process_raw = <<-PROC
+  # Stamp X-Scope-OrgID from the per-stream `tenant` label, then drop it so it isn't indexed as a label.
+  # Only meaningful when the per-team relabel rules above are also active.
+  retenant_tenant_stage_raw = <<-STAGE
+      stage.tenant {
+        label = "tenant"
+      }
+      stage.label_drop {
+        values = ["tenant"]
+      }
+  STAGE
 
-    // Stamp X-Scope-OrgID from the per-stream `tenant` label, then drop it so it isn't indexed as a label.
+  retenant_rules        = var.per_team_tenant ? local.retenant_rules_raw : ""
+  retenant_tenant_stage = var.per_team_tenant ? local.retenant_tenant_stage_raw : ""
+
+  # Cosmetic level-emoji line prefix (opt-in). Reuses the `detected_level` value the retenant
+  # processor already extracts below (no redundant regex) — that value is uppercase (Go log/slog:
+  # INFO/ERROR/WARN/DEBUG; see the stage.regex comment below) since stage.template here has no
+  # ToLower/case-fold function, so match uppercase directly. Runs last so it rewrites the final
+  # line rather than the raw one the trace/span/level regexes below match against.
+  #
+  # ESCAPING GOTCHA (confirmed live, #1434): the grafana/alloy chart's configmap.yaml runs
+  # `tpl $values.configMap.content .` — the WHOLE River config text is executed as a Helm/Sprig Go
+  # template BEFORE it's written to the ConfigMap, against Helm's own render context (not Alloy's
+  # per-log-line extracted-values map). A literal `{{ .detected_level }}`-style Alloy template
+  # meant for stage.template gets silently evaluated by Helm instead — `.detected_level`/`.Entry`
+  # don't exist in Helm's context, so the whole block collapses to an empty string (no error, no
+  # trace of it — verified by pulling the live ConfigMap and seeing `template = ``` post-apply).
+  # Fix: escape every literal `{{`/`}}` as the Helm idiom `{{ "{{" }}` / `{{ "}}" }}` so Helm's tpl
+  # pass reconstructs them literally in its output, and Alloy's OWN template engine (a completely
+  # separate Go-template evaluation, done at Alloy's own config load / per-log-line, not by Helm)
+  # sees the intended `{{ if eq .detected_level "ERROR" }}...{{ end }}` text. Verified via a local
+  # `helm template --show-only templates/configmap.yaml` dry run against the pinned chart version.
+  emoji_stage_raw = <<-EMOJI
+
+      stage.template {
+        source   = "emoji_line"
+        template = `{{ "{{" }} if eq .detected_level "ERROR" {{ "}}" }}🔥 {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else if eq .detected_level "FATAL" {{ "}}" }}💀 {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else if or (eq .detected_level "WARN") (eq .detected_level "WARNING") {{ "}}" }}⚠️ {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else if eq .detected_level "DEBUG" {{ "}}" }}🐛 {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else if eq .detected_level "INFO" {{ "}}" }}ℹ️ {{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} else {{ "}}" }}{{ "{{" }} .Entry {{ "}}" }}{{ "{{" }} end {{ "}}" }}`
+      }
+      stage.output {
+        source = "emoji_line"
+      }
+  EMOJI
+
+  emoji_stage = var.emoji_log_annotations ? local.emoji_stage_raw : ""
+
+  # loki.process "retenant" always runs: it's the sole place trace_id/span_id/level are promoted to Loki
+  # structured metadata (log->trace, and the Explore/Logs-panel level badge), independent of per-team tenanting.
+  retenant_process = <<-PROC
+
     loki.process "retenant" {
       forward_to = [loki.write.platform.receiver]
       // Promote the app's OTel trace_id/span_id (in the JSON body) to Loki STRUCTURED METADATA (Loki 3.x) so the
@@ -50,25 +95,29 @@ locals {
       stage.regex {
         expression = "span_id[^0-9a-f]+(?P<span_id>[0-9a-f]{16})"
       }
+      // Same idea for the app's structured log level: Loki's own server-side detected_level heuristic (used
+      // when no client-supplied value is present) is unreliable against this CRI-wrapped JSON shape - verified
+      // live it correctly detects "info" but calls "error" lines "unknown". Extract the JSON "level" field
+      // directly so Loki uses OUR value instead of guessing. NB: no case-normalization (stage.template has no
+      // ToLower/string-case function available - confirmed via a failed apply) - the app emits uppercase
+      // (Go's log/slog default: INFO/ERROR/WARN/DEBUG); Grafana's level-badge match is case-insensitive.
+      stage.regex {
+        expression = "\"level\"\\s*:\\s*\"(?P<detected_level>[A-Za-z]+)\""
+      }
       stage.structured_metadata {
         values = {
-          trace_id = "",
-          span_id  = "",
+          trace_id       = "",
+          span_id        = "",
+          detected_level = "",
         }
       }
-      stage.tenant {
-        label = "tenant"
-      }
-      stage.label_drop {
-        values = ["tenant"]
-      }
+      ${local.retenant_tenant_stage}
+      ${local.emoji_stage}
     }
   PROC
 
-  retenant_rules   = var.per_team_tenant ? local.retenant_rules_raw : ""
-  retenant_process = var.per_team_tenant ? local.retenant_process_raw : ""
-  # loki.source.file forwards to the re-tenant processor when enabled, else straight to the writer.
-  source_forward = var.per_team_tenant ? "loki.process.retenant.receiver" : "loki.write.platform.receiver"
+  # loki.source.file always forwards through the retenant processor now (it always runs).
+  source_forward = "loki.process.retenant.receiver"
 
   # ---- Alloy River config: tail this node's pod logs -> Loki (tenant _platform) ----
   # DaemonSet + file-tailing is the node-local pattern (each Alloy reads only its own node's

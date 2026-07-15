@@ -2,7 +2,7 @@
 <rect class="bg" x="0" y="0" width="760" height="734" fill="#f6f6f3"></rect>
 <text class="muted mono" x="40" y="52" font-size="12" fill="#6c6c73" letter-spacing="1.8px">OBSERVABILITY · SLOs · TWO PIPELINES</text>
 <text class="text" x="40" y="89" font-size="26" fill="#1c1c22" font-weight="600" letter-spacing="-0.3px">Two generators, one shape.</text>
-<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">The platform runs SLOs two ways — hand-authored for platform services, auto-derived for every prod</text>
+<text class="muted" x="40" y="117" font-size="14.5" fill="#6c6c73">The platform runs SLOs two ways — hand-authored for platform services, auto-derived for every</text>
 <text class="muted" x="40" y="136" font-size="14.5" fill="#6c6c73">app. Different author, home, and consumer; identical burn-rate math.</text>
 <rect x="40" y="162" width="334" height="328" rx="12" fill="#eaf1fb" stroke="#c4d8f4" stroke-width="1"></rect>
 <rect x="41.3" y="163.3" width="331.5" height="325.5" rx="10.8" fill="none" stroke="#2c66c4" stroke-width="2.5" clip-path="url(#abar0)"></rect>
@@ -11,7 +11,7 @@
 <line x1="56" y1="216" x2="358" y2="216" stroke="#c4d8f4" stroke-width="1"></line>
 <rect x="386" y="162" width="334" height="328" rx="12" fill="#e7f4ec" stroke="#bfe0cc" stroke-width="1"></rect>
 <rect x="387.3" y="163.3" width="331.5" height="325.5" rx="10.8" fill="none" stroke="#1f8a5b" stroke-width="2.5" clip-path="url(#abar1)"></rect>
-<text class="text" x="402" y="188" font-size="14.5" fill="#1c1c22" font-weight="600">Every prod app</text>
+<text class="text" x="402" y="188" font-size="14.5" fill="#1c1c22" font-weight="600">Every app, any stage</text>
 <text class="mono" x="402" y="205" font-size="10.5" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">auto-derived</text>
 <line x1="402" y1="216" x2="704" y2="216" stroke="#bfe0cc" stroke-width="1"></line>
 <text class="mono" x="56" y="234" font-size="9.5" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">AUTHOR</text>
@@ -32,7 +32,7 @@
 <text class="mono" x="56" y="443" font-size="10" fill="#3d6fc0" font-family="ui-monospace,Menlo,Consolas,monospace">e.g. kubernetes-apiserver · 99.9%</text>
 <text class="mono" x="402" y="234" font-size="9.5" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">AUTHOR</text>
 <rect x="402" y="240" width="302" height="34" rx="8" fill="#f0f8f3" stroke="#bfe0cc" stroke-width="1"></rect>
-<text x="414" y="261" font-size="12" fill="#1c1c22"><tspan class="mono" fill="#1c7a4f" font-family="ui-monospace,monospace" font-size="10">environments/**/prod.yaml</tspan> registry</text>
+<text x="414" y="261" font-size="12" fill="#1c1c22"><tspan class="mono" fill="#1c7a4f" font-family="ui-monospace,monospace" font-size="10">environments/**/*.yaml</tspan> registry</text>
 <path d="M549 277 L557 277 L553 283 Z" fill="#6fb08f"></path>
 <text class="mono" x="402" y="285" font-size="9.5" fill="#2c7a56" font-family="ui-monospace,Menlo,Consolas,monospace">ENGINE</text>
 <rect x="402" y="291" width="302" height="46" rx="8" fill="#f0f8f3" stroke="#bfe0cc" stroke-width="1"></rect>

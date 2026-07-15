@@ -223,6 +223,21 @@ done; finer per-stage tuning (e.g. a staging canary without the gate) is optiona
 regulated manual-approval gate (a native Rollout `pause: {}` + RBAC for deployer ≠ approver) and the error-budget
 freeze (needs per-app SLOs authored in `observability-slo` first). These are fresh efforts, not tail work.
 
+*2026-07-14 — a second `RespectIgnoreDifferences` correction, this time a silent one.* Unlike the visible
+weight-revert caught above (#871–#892), this one masqueraded as success: some Rollouts across a promotion
+batch stopped receiving real digest updates indefinitely, while ArgoCD logged `"successfully synced"` on
+every reconcile. Root cause: `Rollout` is a CRD without a registered Kubernetes scheme, and combined with
+`RespectIgnoreDifferences=true`, any `ignoreDifferences` rule whose path touches an *array* field
+(`containers[]?...`) — not the scalar `/spec.replicas` rule this ADR relies on for HPA ownership, which was
+never implicated — makes ArgoCD's sync fall back to a JSON Merge Patch that replaces arrays wholesale,
+silently reverting `containers[].image` to the stale live value. The trigger was the platform's Kyverno
+mutate-tolerance rules (`argocd_cm_extra`'s global `ignoreDifferences.all`, unrelated to this ADR's own
+Service-selector/HTTPRoute-weight rules but sharing the same `RespectIgnoreDifferences` syncOption) —
+fixed by scoping those array-notation rules off `Rollout` entirely. Verified live against two products'
+stuck test-stage batches before landing; both this ADR's Service `.spec.selector` and HTTPRoute
+`backendRefs[].weight` preservation kept working unaffected (neither rule is array-notation on Rollout
+itself). Full writeup: [debug-argocd-sync.md](../runbooks/debug-argocd-sync.md#synced-but-stale-rollout-image-silently-dropped).
+
 ## Related
 
 - [ADR-085](085-workload-availability-graceful-disruption-defaults.md) — the zero-downtime *foundation* (domain

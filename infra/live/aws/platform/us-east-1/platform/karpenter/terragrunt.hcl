@@ -89,14 +89,31 @@ inputs = {
   single_az                 = include.base.locals.single_az_nodes
   node_arch                 = include.base.locals.node_arch
 
-  # CONSERVATIVE — this is the stateful hub (Prometheus/Mimir/Loki/Tempo/Pyroscope, Keycloak, CNPG). On-demand +
-  # WhenEmpty consolidation NEVER disrupts a running stateful pod (only reclaims fully-empty nodes); paired with
-  # do-not-disrupt + PDBs on the TSDBs. (ADR-078.)
+  # This is the stateful hub (Prometheus/Mimir/Loki/Tempo/Pyroscope, Keycloak, CNPG). WhenEmptyOrUnderutilized
+  # lets Karpenter reclaim UNDERUTILIZED nodes (not just fully-empty ones) — needed because the post-unpark
+  # scheduling storm over-provisions small on-demand nodes that WhenEmpty then never reclaimed (6 nodes at
+  # ~20% CPU / ~13-32% mem observed 2026-07-13, pure waste on a nightly-parked cost-demo cluster).
+  #
+  # ⚠️ consolidate_after = 15m is DELIBERATELY long (module default is 1m). The post-unpark reschedule storm
+  # settles in ~10 min; a short (1m) consolidateAfter makes Karpenter consolidate DURING the storm — on preprod
+  # (spot + WhenEmptyOrUnderutilized + 1m) that produced a node-churn thrash loop 2026-07-14 (scale 3->6, disrupt,
+  # re-pend, Cilium-429, repeat). 15m lets the storm fully settle FIRST, then reclaims only stably-idle nodes as a
+  # calm one-time right-sizing. Platform avoids preprod's other amplifier by design: it is on-demand (no spot
+  # interruptions). Stateful TSDBs/DBs stay protected — they carry `karpenter.sh/do-not-disrupt` + PDBs, honored
+  # under either policy, so consolidation drains only stateless/underutilized capacity. (ADR-078.)
   capacity_types       = ["on-demand"]
-  consolidation_policy = "WhenEmpty"
-  consolidate_after    = "1m"
-  cpu_limit            = 32
-  memory_limit         = "128Gi"
+  consolidation_policy = "WhenEmptyOrUnderutilized"
+  consolidate_after    = "15m"
+  # Cost guardrail (deliberately CONSERVATIVE — this is a nightly-parked demo; a runaway node-count is worse than
+  # a few Pending pods). Real Karpenter usage here is ~3-4 r6g.medium (~3-4 vCPU / 24-32 GiB); the post-unpark
+  # spike peaks ~4-6 nodes before consolidation. 16 vCPU / 64 GiB caps Karpenter at ~8 r6g.medium — comfortable
+  # headroom over normal + spike, but a hard ceiling that HALVES the old 32/128 blast radius. When the cap is hit
+  # Karpenter STOPS provisioning (pods go Pending, event "all available instance types exceed limits") — never a
+  # runaway. Outages from hitting this are ACCEPTABLE and are surfaced by the KarpenterNodePoolAtCapacity alert so
+  # capacity-exhaustion is diagnosable as the root cause. (This bounds Karpenter only; the system node group has
+  # its own maxSize=3.)
+  cpu_limit    = 16
+  memory_limit = "64Gi"
   # Require 8 GiB+ nodes (t4g.large, like the system group). The observability hub's per-node DaemonSets
   # (Cilium, Beyla, Alloy, node-exporter) eat ~3.2 GiB — a 4 GiB t4g.medium exhausts memory and flaps NotReady.
   min_instance_memory_mib = 6144

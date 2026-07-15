@@ -4,6 +4,11 @@
 # dispatch-worker, but that's bravo-internal). Authored in bravo's own directory (the grantor/producer owns
 # the file — gitops/grants/<target.team>/), consumed by alpha's spec.dependencies on its own XEnvironment
 # claim (gitops/environments/alpha/shop/dev.yaml) — neither side alone can wire the hop.
+#
+# SPIRE mutual auth required (ADR-057 Phase 2): the first cross-team consumer of the ServiceGrant
+# authentication capability — closes the gap where this was the one cross-team east-west call with no
+# mutual-auth option, unlike the intra-shop hops (storefront->catalog/cart/orders/checkout,
+# orders->payment) which are all already authenticated.
 apiVersion: platform.refplat.org/v1beta1
 kind: ServiceGrant
 metadata:
@@ -18,3 +23,5 @@ spec:
       http:
         - method: POST
           path: /shipments
+      authentication:
+        mode: required
