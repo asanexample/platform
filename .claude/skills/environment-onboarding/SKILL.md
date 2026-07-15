@@ -50,6 +50,18 @@ spec:
 
 The computed namespace is `<team>-<product>-<stage>` (or `…-<customer>-<stage>` for per-customer).
 
+**Size `quota` explicitly once a claim has more than a couple of services or any multi-replica ones.**
+Omitting it takes the platform default — `cpu: "4"`, `pods: 20` (the XRD's schema default,
+`crossplane/charts/environment-api/templates/xenvironment-xrd.yaml`) — which a 5-7 service claim at
+3 replicas each blows through easily even with modest per-container limits (found live: `alpha-shop-prod`
+hit both the `limits.cpu` and `pods` ceilings once its claim grew to 7 services, blocking 2 of them from
+scheduling ANY pods, including their previously-stable replicas). Rough sizing: sum each service's
+`replicas × container cpu limit` (and `services × replicas` for the pod count) before assuming the default
+is enough; set `quota: { cpu: "...", pods: ... }` up to `Team.envelope.quotaCap` if it isn't. Also worth
+checking `kubectl top pods` on a comparable existing environment before over-sizing the *containers'* own
+requests/limits in the first place — scaffolder defaults are conservative per-language tiers, not a
+measurement of what your service actually needs.
+
 ## Onboarding flow
 
 1. **Prereqs:** the **Team** CR and **Product** CR must already exist; Crossplane control plane healthy.
