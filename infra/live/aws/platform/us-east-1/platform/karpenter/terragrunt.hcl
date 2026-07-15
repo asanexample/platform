@@ -105,18 +105,28 @@ inputs = {
   consolidation_policy = "WhenEmptyOrUnderutilized"
   consolidate_after    = "15m"
   # Cost guardrail (deliberately CONSERVATIVE — this is a nightly-parked demo; a runaway node-count is worse than
-  # a few Pending pods). Real Karpenter usage here is ~3-4 r6g.medium (~3-4 vCPU / 24-32 GiB); the post-unpark
-  # spike peaks ~4-6 nodes before consolidation. 16 vCPU / 64 GiB caps Karpenter at ~8 r6g.medium — comfortable
-  # headroom over normal + spike, but a hard ceiling that HALVES the old 32/128 blast radius. When the cap is hit
-  # Karpenter STOPS provisioning (pods go Pending, event "all available instance types exceed limits") — never a
-  # runaway. Outages from hitting this are ACCEPTABLE and are surfaced by the KarpenterNodePoolAtCapacity alert so
-  # capacity-exhaustion is diagnosable as the root cause. (This bounds Karpenter only; the system node group has
-  # its own maxSize=3.)
+  # a few Pending pods). With the 4-vCPU floor below, the hub's schedulable workload (obs stack + argocd/crossplane/
+  # keycloak/backstage) rides ~2-3 xlarge Karpenter nodes; the post-unpark storm peaks higher before consolidation.
+  # 16 vCPU / 64 GiB caps Karpenter at ~4 xlarge nodes — comfortable headroom over normal + spike, but a hard ceiling
+  # that HALVES the old 32/128 blast radius. When the cap is hit Karpenter STOPS provisioning (pods go Pending, event
+  # "all available instance types exceed limits") — never a runaway. Outages from hitting this are ACCEPTABLE and are
+  # surfaced by the KarpenterNodePoolAtCapacity alert so capacity-exhaustion is diagnosable as the root cause. (This
+  # bounds Karpenter only; the system node group has its own maxSize=3.)
   cpu_limit    = 16
   memory_limit = "64Gi"
-  # Require 8 GiB+ nodes (t4g.large, like the system group). The observability hub's per-node DaemonSets
-  # (Cilium, Beyla, Alloy, node-exporter) eat ~3.2 GiB — a 4 GiB t4g.medium exhausts memory and flaps NotReady.
+  # Require 8 GiB+ nodes. The observability hub's per-node DaemonSets (Cilium, Beyla, Alloy, node-exporter) eat
+  # ~3.2 GiB — a 4 GiB t4g.medium exhausts memory and flaps NotReady.
   min_instance_memory_mib = 6144
+  # Require 4 vCPU+ nodes (Gt 3). WITHOUT this, Karpenter provisioned the cheapest node meeting the 8 GiB floor —
+  # r6g.medium (1 vCPU) — which, after the fixed ~410m DaemonSet slab, has no room for a single heavy obs pod
+  # (Mimir/Loki/Tempo ingesters, Grafana). So the entire LGTM+P stack piled onto the fixed system node group,
+  # overcommitting it to ~87% CPU / ~127% mem-limits until its kubelet starved and flapped NotReady (a system node
+  # went unregistered, orphaning the stack onto the survivor; Tempo OOM-flapped — confirmed 2026-07-15). A 4-vCPU
+  # floor lands on r6g.xlarge/m7g.xlarge — nodes big enough to actually HOST the obs stack, so it rides Karpenter's
+  # autoscaling capacity (grows with load, WhenEmptyOrUnderutilized reclaims when idle) INSTEAD of a fixed floor
+  # that can't scale. Also amortizes the DaemonSet slab (~12% of a 4-vCPU node vs ~43% of a 1-vCPU one) — fewer,
+  # better-utilized nodes: cheaper per usable vCPU, not more. Mirrors the preprod karpenter unit's same floor.
+  min_instance_cpu = 3
 
   high_availability  = include.base.locals.high_availability
   helm_chart_version = include.base.locals.helm_versions.karpenter
