@@ -30,8 +30,7 @@ governed — run as a continuous loop: **Inform** (see it honestly), **Optimize*
 than bought as a cost SaaS.
 
 That loop isn't ours. It's the [FinOps Foundation Framework](https://www.finops.org/framework/), the
-industry-standard operating model, which the platform adopts wholesale
-([ADR-092](../../adrs/092-platform-finops-practice.md)). It's the spine of this whole doc.
+industry-standard operating model, which the platform adopts wholesale. It's the spine of this whole doc.
 
 Think of metering and managing the utilities for a shared building. The cloud bill is the building's
 power-and-water bill. **Inform** is the metering — a sub-meter per tenant so each team sees its own draw, plus
@@ -65,12 +64,12 @@ You can't manage what you can't see, and the subtle part is that one cost number
 The house rule: trend on the speedometer, verdict on the odometer. A dashboard panel places the two side by
 side for reconciliation. One gotcha lives here: the odometer metric is a *monthly gauge* — the exporter
 re-emits the same running total every scrape — so you aggregate it with `max`, never `sum`, or you count the
-same dollars many times over (#668).
+same dollars many times over.
 
 **Shared cost that belongs to no team.** A big share of a small platform's bill can't be attributed to a
 tenant: the EKS control planes, the NAT gateways (a real big-ticket item), the Transit Gateway, the whole
 observability stack and its S3, ArgoCD, Crossplane. FinOps calls this the platform-shared scope, and the rule
-([ADR-092](../../adrs/092-platform-finops-practice.md) D2) is to surface it plainly and never silently
+is to surface it plainly and never silently
 socialize it onto team budgets — doing so would corrupt the very per-team signal you're trying to build.
 Allocate what's allocatable; show the rest honestly.
 
@@ -81,19 +80,19 @@ Allocate what's allocatable; show the rest honestly.
 Seeing cost is worthless if nothing acts on it. Three levers are built and live, each continuously reducing
 spend ([deep dive](deep-dive-optimize-the-cost-levers.md)).
 
-- **[Karpenter](https://karpenter.sh/) — right-sizing + consolidation**, the biggest continuous lever
-  ([ADR-078](../../adrs/078-cluster-elasticity-karpenter.md)). Instead of fixed-size node groups, Karpenter
+- **[Karpenter](https://karpenter.sh/) — right-sizing + consolidation**, the biggest continuous lever.
+  Instead of fixed-size node groups, Karpenter
   provisions just-in-time nodes sized to the actual pending pods, and — the cost part — consolidation
   continuously bin-packs workloads and terminates underutilized nodes. It's a valet who re-parks the whole lot
   continuously, picks the right-sized space for each car, and closes empty aisles — versus the old autoscaler
   that could only use pre-marked, fixed-size spaces. What *lets* it consolidate is upstream: every new service
-  ships a default HPA that scales its pods down as load falls (ADR-078 Phase 2) — fewer pods free up node
+  ships a default HPA that scales its pods down as load falls — fewer pods free up node
   capacity, which is exactly what Karpenter then reclaims. The HPA right-sizes the pods, Karpenter right-sizes
   the nodes.
 - **Cluster parking — lights off overnight**, the biggest non-prod lever. `platctl down` scales the node
   groups to zero overnight, dropping nearly all compute cost, and it's non-destructive: the control plane and
   every database volume are preserved, so `up` brings everything back. Proven boringly repeatable.
-- **The descheduler — re-seat the guests** ([ADR-093](../../adrs/093-descheduler-node-rebalancing.md)). The
+- **The descheduler — re-seat the guests.** The
   scheduler places a pod once and never moves it; on a cluster that parks, unparks, and consolidates, that
   leaves nodes lopsided. A periodic job evicts pods off over-full nodes so they repack onto emptier ones,
   respecting disruption budgets — the host who re-seats guests so one table isn't crammed while another sits
@@ -105,8 +104,7 @@ off (Prometheus-only). Flip it to `prod` and you get the full RF3, multi-AZ prod
 platform, sized by one boolean.
 
 **The lever the platform deliberately does *not* pull — Savings Plans.** Committing to a year of discounted
-compute is the biggest steady-state lever a real company has. It's deferred here for two independent reasons
-([ADR-092](../../adrs/092-platform-finops-practice.md) D6): there's no spend budget to commit, and — the
+compute is the biggest steady-state lever a real company has. It's deferred here for two independent reasons: there's no spend budget to commit, and — the
 teaching point — it's in direct tension with parking. Savings Plans are a gym membership: cheaper per visit
 only if you actually go every day. Parking the cluster is skipping the gym twelve hours a day — you don't buy
 an annual pass for a gym you lock overnight. The resolution, if ever budgeted: commit only to the genuine 24/7
@@ -119,7 +117,7 @@ floor — the always-on system pieces that never park — never the elastic part
 The last phase turns cost from something you watch into something with rules — a per-team guardrail, two
 bill-level tripwires, and an operating model ([deep dive](deep-dive-operate-guardrails-and-the-practice.md)).
 
-**The tenant guardrail — a per-team budget with a soft brake** ([ADR-091](../../adrs/091-cost-guardrails.md)),
+**The tenant guardrail — a per-team budget with a soft brake**,
 built in the same surface → alert → enforce pattern as [Policy](../policy/orientation.md)'s Audit→Enforce.
 Each team carries a budget envelope in the git registry (`Team.spec.envelope.budget.monthlyUSD`) — the breaker
 rating stamped on the panel, declared once, read by every meter. From it:
@@ -133,13 +131,13 @@ rating stamped on the panel, declared once, read by every meter. From it:
   gates new provisioning — it never touches running workloads. A cost control must never become an
   availability control.
 
-**The platform tripwires — AWS Budgets + Cost Anomaly Detection** (#1054, in the payer account). Distinct from
+**The platform tripwires — AWS Budgets + Cost Anomaly Detection** (in the payer account). Distinct from
 the per-team path: these watch the whole bill. AWS Budgets is the tripwire on the fence — alert at 80%/100% of
 a monthly threshold. Cost Anomaly Detection is the smoke detector — trip on an unexpected spike regardless of
 threshold, the canonical catch being a control-plane-logging surprise. Both fan out to a dedicated Slack/email
 channel owned by the platform team.
 
-**The practice — [ADR-092](../../adrs/092-platform-finops-practice.md).** Above the mechanisms sits the
+**The practice.** Above the mechanisms sits the
 operating model: adopt the FinOps Framework, track maturity Crawl→Walk→Run, and — a firm principle — use free
 OSS + AWS-native tools only, and never a vended cost SaaS. A second cost control plane would contradict the
 whole build-it-in-our-own-fabric demonstration. So: OpenCost, AWS Budgets/Anomaly, and
@@ -158,7 +156,7 @@ running.
 What's named but not built, and the docs say so: AWS Compute Optimizer, kube-green (per-namespace off-hours
 scaling), and Cloud Custodian (an account janitor) are adopted in the framework but unbuilt; Savings Plans are
 documented-but-unbought (above); and the AWS alert Slack delivery is wired but gated off pending a one-time
-manual workspace authorization (email works). The FinOps epic is deliberately mid-flight — Crawl→Walk,
+manual workspace authorization (email works). The FinOps practice is deliberately mid-flight — Crawl→Walk,
 honestly.
 
 ## When it breaks — the ones you'll actually hit
@@ -168,7 +166,7 @@ honestly.
 - **"The true-cost dashboard is empty / stale."** The CUR lags ~24h, and a freshly created report takes ~24h
   for its first delivery. The "data freshness (age)" panel tells you if it's stale vs just lagging.
 - **"My true-cost number looks huge / doubled."** You aggregated the monthly gauge with `sum`. Use `max`
-  (#668) — the exporter re-emits the same total each scrape.
+  — the exporter re-emits the same total each scrape.
 - **"A team can't create an environment."** Check its budget status — the enforcer may have marked it
   `exceeded`. That's the guardrail working; an admin override annotation is the escape hatch.
 - **"I parked the cluster and kubectl hangs."** Scaling to zero also drops the in-cluster Tailscale router —
@@ -182,6 +180,6 @@ honestly.
 - [Optimize — the cost levers](deep-dive-optimize-the-cost-levers.md) — Karpenter consolidation, cluster
   parking, the descheduler, `cost_profile`, and the Savings-Plans-vs-parking tension.
 - [Operate — guardrails & the practice](deep-dive-operate-guardrails-and-the-practice.md) — the per-team
-  budget enforcer, AWS Budgets + Anomaly Detection, and the ADR-092 FinOps operating model + tool verdicts.
+  budget enforcer, AWS Budgets + Anomaly Detection, and the FinOps operating model + tool verdicts.
 - The lookup: the [Reference](reference.md). Related: [Observability](../observability/orientation.md) (cost
   is a signal in the same stack), [Foundations](../foundations/orientation.md) (the always-on cost drivers).

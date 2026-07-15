@@ -47,10 +47,10 @@ protection.
 
 ## Stop 1 — the dial: `tier` as a declared, constrained dimension (built)
 
-Compliance starts in the data model. Every environment's `XEnvironment` claim carries a **`spec.tier`**
-([ADR-013](../../adrs/013-compliance-tier-model.md), Accepted) — a hardening profile that bundles an isolation
-floor, an encryption floor, a network default, and a retention floor under one label. ADR-013 defines three:
-`standard` (SOC 2 baseline), `hipaa`, and `pci`, each with a prescriptive control table. The tier sets a
+Compliance starts in the data model. Every environment's `XEnvironment` claim carries a **`spec.tier`** — a
+hardening profile that bundles an isolation floor, an encryption floor, a network default, and a retention
+floor under one label. There are three: `standard` (SOC 2 baseline), `hipaa`, and `pci`, each with a
+prescriptive control table. The tier sets a
 floor: effective isolation is `max(tier-floor, what-you-asked-for)`.
 
 You can't just claim a regulated tier. A team may only request tiers inside its
@@ -62,7 +62,7 @@ even ask for is one governed envelope. It's Enforce on preprod today (Audit/off 
 the dial exists, and you can't turn it past your license.
 
 One honest wrinkle. The tier enum has drifted across three sources — the XRD lists four values
-(`standard`/`elevated`/`pci`/`hipaa`), while ADR-013 and the policy module list three (no `elevated`).
+(`standard`/`elevated`/`pci`/`hipaa`), while the policy module lists three (no `elevated`).
 `elevated` is an accepted claim value that maps to no differentiated behavior — a small data-model
 inconsistency, exactly the kind a compliance audit would flag. There's also a stray invalid
 `compliance_tier = "high"` in the *undeployed* prod config, harmless only because prod isn't real yet.
@@ -88,7 +88,7 @@ So `tier` and `residency` are the dial; these subsystems are the controls it mod
 modulates almost nothing. The only place `tier` changes admission behavior is two Kyverno policies
 (`require-pod-security-restricted` + `require-ro-rootfs`, which add Restricted-PSS and a read-only root
 filesystem on regulated tiers). And they're gated per cluster, not per namespace — so a regulated tier means
-a whole dedicated cluster, per ADR-013's model. Both live clusters are `standard`, so those two policies don't
+a whole dedicated cluster. Both live clusters are `standard`, so those two policies don't
 render at all — they exist in code and unit tests only. Everything else — image scoping, RBAC hardening,
 probes, cosign verification, the SCPs, CloudTrail, Falco — is tier-independent, and every environment gets it,
 `standard` included. The controls are strong and live; they just run uniformly, and the regulated dial-setting
@@ -100,9 +100,7 @@ No regulated tenant exists. Every environment in git is `tier: standard`; every 
 ## Stop 3 — the gap: assurance & evidence (partly built, mostly designed)
 
 Strong controls aren't the same as proof the controls are enforced. That bridge — from "a control exists" to
-"here is continuous, tenant-attributable evidence it's enforced" — is what
-[ADR-055](../../adrs/055-compliance-assurance-and-continuous-control-evidence.md) (Proposed —
-strategy/direction) proposes to build, and it's only partly built. Of the three pieces it names:
+"here is continuous, tenant-attributable evidence it's enforced" — is only partly built. Of its three pieces:
 
 - a **control catalog as code** mapped to framework IDs — unbuilt.
 - **continuous scanning** that aggregates the signals that already exist (Kyverno PolicyReports, attestations,
@@ -114,7 +112,7 @@ strategy/direction) proposes to build, and it's only partly built. Of the three 
 The other down-payment, alongside that live PolicyReport observability, is a thorough hand-maintained document
 — `docs/compliance/scp-control-mapping.md` — mapping the org SCPs to SOC 2 / HIPAA / PCI / ISO 27001 /
 NIST 800-53 / CIS control IDs, with copy-paste auditor queries. Useful, but exactly the manual archaeology
-ADR-055 exists to replace — nothing generates or continuously verifies it.
+the assurance layer exists to replace — nothing generates or continuously verifies it.
 
 Think of it as a security system whose audit-trail printer is only half-installed. The sensors — Kyverno,
 CloudTrail, the SCPs, Falco — are all wired and firing, and Kyverno's violations *are* streamed to Grafana as
@@ -130,9 +128,9 @@ requirement Y for tenant Z" — still isn't printed; that evidence is a person r
 - **Built but inert:** the regulated-tier hardening (Restricted-PSS + RO-rootfs) — real in code, but it
   doesn't render on either cluster (both `standard`), and there's no per-namespace tier differentiation. No
   regulated tenant or team exercises it.
-- **Partly built:** ADR-055's continuous scanning has a live first slice — the Kyverno-PolicyReport→Grafana
+- **Partly built:** continuous scanning has a live first slice — the Kyverno-PolicyReport→Grafana
   `observability-policy-reporter` (both clusters, alerting on violations as compliance evidence).
-- **Designed / aspirational:** ADR-055's framework control-catalog-as-code, multi-source aggregation plus the
+- **Designed / aspirational:** the framework control-catalog-as-code, multi-source aggregation plus the
   Backstage control-status view, and retention-locked evidence collection; K8s API-server audit-log shipping.
 
 Said plainly: the platform is architected so that going regulated is a dial-turn, not a rebuild — but the dial
@@ -145,6 +143,5 @@ machinery is mostly a strategy, one live slice (PolicyReport→Grafana) aside, n
 The lookup: the [Reference](reference.md). This module rides on:
 [Policy & admission](../policy/orientation.md) · [Supply chain](../supply-chain/orientation.md) ·
 [Runtime security](../runtime-security/orientation.md) · [Identity & access](../identity/orientation.md) ·
-[Foundations](../foundations/README.md). ADRs: [013](../../adrs/013-compliance-tier-model.md) (tier model) ·
-[055](../../adrs/055-compliance-assurance-and-continuous-control-evidence.md) (assurance, Proposed). The
+[Foundations](../foundations/README.md). The
 static control map: `docs/compliance/scp-control-mapping.md`.

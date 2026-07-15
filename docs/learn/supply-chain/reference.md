@@ -5,7 +5,7 @@ Definitions, commands, and gotchas to look up. The [orientation](orientation.md)
 ## The pipeline (produce the trustworthy artifact)
 
 One shared, reusable workflow the platform owns (`asanexample/trusted-ci/build-sign.yml`) does the whole
-backbone; each app's CI is a thin caller ([ADR-050](../../adrs/050-shared-build-sign-reusable-workflow.md)):
+backbone; each app's CI is a thin caller:
 
 ```text
 build → push to ECR → cosign sign (keyless) → SLSA provenance (isolated) → SBOM
@@ -13,22 +13,22 @@ build → push to ECR → cosign sign (keyless) → SLSA provenance (isolated) �
 
 - **Keyless signing** — [cosign](https://docs.sigstore.dev/cosign/signing/overview/) / Sigstore: the CI's
   GitHub Actions OIDC identity → Fulcio issues a short-lived cert → sign → logged in Rekor
-  (public transparency log). No private key exists ([ADR-036](../../adrs/036-github-actions-oidc-federation.md)).
+  (public transparency log). No private key exists.
 - **SLSA Build L3 provenance** — generated in an isolated workflow the app team can't write, so the build
-  can't forge its own ([ADR-042](../../adrs/042-isolated-build-provenance-slsa-l3.md)).
+  can't forge its own.
 - **SBOM** — the image's ingredient list (vuln queryability).
 
 ## Inspect it yourself (real commands)
 
 ```console
-$ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-acme/shop-web@sha256:f6b37d…
+$ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-storefront@sha256:f6b37d…
 └── 🔐 Signatures …          # 1 signature
 └── 💾 Attestations …        # 2: SLSA provenance (v0.2) + CycloneDX SBOM
 
-$ cosign verify … team-acme/shop-web@sha256:f6b37d…
+$ cosign verify … team-alpha/shop-storefront@sha256:f6b37d…
 Issuer:  https://token.actions.githubusercontent.com          # keyless (GitHub Actions OIDC)
 Subject: …/asanexample/trusted-ci/…/build-sign.yml@…          # the shared signer
-githubWorkflowRepository: asanexample/acme-shop              # the caller repo = the trust anchor
+githubWorkflowRepository: asanexample/alpha-shop            # the caller repo = the trust anchor
 ```
 
 ## The trust rule
@@ -46,7 +46,7 @@ Kyverno fetches signature + attestations from ECR (via Pod Identity ECR-read) an
 
 Both Enforce on preprod — unsigned, unattested, or wrong-repo images never admit. (Platform-owned; the
 [Policy & Admission](../policy/orientation.md) module covers the admission mechanics. Per-product image
-registry scoping is separate — owned by the Environment Composition, ADR-046.)
+registry scoping is separate — owned by the Environment Composition.)
 
 ## Gotchas
 
@@ -73,9 +73,6 @@ registry scoping is separate — owned by the Environment Composition, ADR-046.)
 
 ## Go deeper
 
-- [ADR-042 isolated provenance (SLSA L3)](../../adrs/042-isolated-build-provenance-slsa-l3.md) ·
-  [ADR-050 shared build-sign + shared-signer](../../adrs/050-shared-build-sign-reusable-workflow.md) ·
-  [ADR-036 GitHub OIDC federation](../../adrs/036-github-actions-oidc-federation.md).
 - Onboard an app: the `supply-chain-onboarding` skill. Enforce side:
   [Policy & Admission](../policy/orientation.md).
 - Substrate & explainers: [cosign](https://docs.sigstore.dev/cosign/signing/overview/) ·

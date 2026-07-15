@@ -1,44 +1,44 @@
 # Minimal Kyverno-compliant Deployment for an environment namespace (preprod/platform, ADR-014).
-# The canonical concrete example for CLAUDE.md's "Authoring Policy-Compliant Workloads" section — preserved here
-# (it formerly lived in the retired seed app `app-alpha`). Adapt the team/product/service/image to yours; the
+# The canonical concrete example for CLAUDE.md's "Authoring Policy-Compliant Workloads" section. Adapt the
+# team/product/service/image to yours; the
 # New Product scaffolder emits the same compliant shape as an Argo Rollout (ADR-056) — this Deployment form is
 # the minimal equivalent (scaffolder/templates/new-product/skeleton/k8s/ renders kind: Rollout).
 #
-# Illustrative names: team `acme`, product `store`, service `web` → namespace acme-store-dev, repo acme-store.
+# Illustrative names: team `alpha`, product `shop`, service `storefront` → namespace alpha-shop-dev, repo alpha-shop.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app-acme-store
+  name: app-alpha-shop
   labels:
-    app: app-acme-store
-    app.kubernetes.io/name: app-acme-store
-    team: acme
+    app: app-alpha-shop
+    app.kubernetes.io/name: app-alpha-shop
+    team: alpha
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: app-acme-store
+      app: app-alpha-shop
   template:
     metadata:
       labels:
-        app: app-acme-store
-        app.kubernetes.io/name: app-acme-store
-        team: acme
+        app: app-alpha-shop
+        app.kubernetes.io/name: app-alpha-shop
+        team: alpha
     spec:
       # Named SA (never `default`) — Pod Identity binds AWS creds here IF the Environment claim declares any
       # (services.<svc>.permissions.aws, ADR-041). NEVER an `eks.amazonaws.com/role-arn` IRSA annotation here
       # (platform-only; a cross-team annotation is denied by disallow-irsa-annotation-cross-team).
-      serviceAccountName: app-acme
+      serviceAccountName: app-alpha
       # App does not talk to the Kubernetes API — drop the SA token (least privilege). Pod Identity injects its
       # OWN projected token, so this does not affect AWS access. (Kyverno auto-injects this if omitted.)
       automountServiceAccountToken: false
       containers:
-        - name: web
+        - name: storefront
           # Product-scoped ECR image (v3: team-<team>/<product>-<service>), with an EXPLICIT immutable tag/digest
           # — never :latest, never untagged. Cross-team images are denied (restrict-images). The :placeholder tag
           # is the pre-first-deploy seed; each overlay's `images:` pins the signed digest CI promotes per stage
           # (promote-by-PR, #377). The image must be cosign-signed (verify-images-product, Enforce on preprod).
-          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-acme/store-web:placeholder
+          image: 829808296602.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-storefront:placeholder
           ports:
             - containerPort: 8080
           # Resource requests AND limits (cpu + memory) are REQUIRED on every container.
@@ -79,15 +79,15 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: app-acme-store
+  name: app-alpha-shop
   labels:
-    app.kubernetes.io/name: app-acme-store
-    team: acme
+    app.kubernetes.io/name: app-alpha-shop
+    team: alpha
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: app-acme-store
+    name: app-alpha-shop
   minReplicas: 2
   maxReplicas: 10
   metrics:

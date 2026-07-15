@@ -28,16 +28,16 @@ crossplane render environments/demo-dev.yaml ../charts/environment-api/files/com
 ```console
 # list every environment (drop the name); or one environment's SYNCED / READY status
 kubectl --context preprod get xenvironment
-kubectl --context preprod get xenvironment acme-shop-dev
+kubectl --context preprod get xenvironment alpha-shop-dev
 
 # the whole footprint as a tree — fast, and the best "what did this create?" view
-crossplane resource trace xenvironment acme-shop-dev --context preprod
+crossplane resource trace xenvironment alpha-shop-dev --context preprod
 
 # the in-cluster resources only — kubectl-only and fast (the composite label filters)
-kubectl --context preprod get object -l crossplane.io/composite=acme-shop-dev
+kubectl --context preprod get object -l crossplane.io/composite=alpha-shop-dev
 
 # the environment's bound hostnames
-kubectl --context preprod get xenvironment acme-shop-dev -o jsonpath='{.status.domains}'
+kubectl --context preprod get xenvironment alpha-shop-dev -o jsonpath='{.status.domains}'
 ```
 
 > Avoid `kubectl get managed` for this — it fans out over *every* provider CRD (~20s, looks hung). Use
@@ -62,14 +62,14 @@ kubectl --context preprod describe role.iam.aws.upbound.io <mr-name>
 
 ```console
 # the ECR repo lives in the PLATFORM account (the one cross-account hop)
-aws ecr describe-repositories --repository-names team-acme/shop-web --profile platform \
+aws ecr describe-repositories --repository-names team-alpha/shop-storefront --profile platform \
   --query 'repositories[0].repositoryUri' --output text
-# → <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-acme/shop-web
+# → <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-storefront
 
 # the service's IAM role lives in the WORKLOAD account
-aws iam get-role --role-name Pod-acme-shop-dev-web --profile preprod \
+aws iam get-role --role-name Pod-alpha-shop-dev-storefront --profile preprod \
   --query 'Role.Arn' --output text
-# → arn:aws:iam::<workload-acct>:role/Pod-acme-shop-dev-web
+# → arn:aws:iam::<workload-acct>:role/Pod-alpha-shop-dev-storefront
 ```
 
 ## See also

@@ -1,7 +1,7 @@
 # The Life of a Request
 
 Your fix is live. A customer opens their browser and hits
-`https://shop-acme-dev.preprod.aws.refplat.org`, and a few dozen milliseconds later they have a page.
+`https://shop-alpha-dev.preprod.aws.refplat.org`, and a few dozen milliseconds later they have a page.
 
 What happened in those milliseconds between their browser and your pod — and what *didn't*? The second
 question is the more revealing one. It's the cleanest way to see the most important boundary in the
@@ -32,13 +32,13 @@ isn't in the request path.
 
 ## Watch it happen — one request, edge to pod and back
 
-Follow one HTTP GET to `shop`'s `web` service, browser to response. The whole path at a glance, then each
+Follow one HTTP GET to `shop`'s `storefront` service, browser to response. The whole path at a glance, then each
 hop:
 
 ![One HTTP request, edge to pod and back: browser → Cloudflare (NS delegation) → Route53 → the internet-facing NLB → the Cilium Gateway (Envoy, TLS terminated) → HTTPRoute match → the pod in its namespace, and the response back out. An observability envelope wraps the whole path (ambient, not a step); step 4 carries the one control-plane coupling (the Rollout-weighted route); and a strip shows what's *not* in the path — the control plane the request never touches.](images/life-of-a-request.svg)
 
 **1 · The browser — the request begins.** A customer clicks, and their browser fires an `HTTP GET` for
-`shop`'s `web` service at `shop-acme-dev.preprod.aws.refplat.org`. Everything below is the platform
+`shop`'s `storefront` service at `shop-alpha-dev.preprod.aws.refplat.org`. Everything below is the platform
 answering that single request.
 
 **2 · DNS — finding the door.** First that hostname has to become an IP.
@@ -57,8 +57,8 @@ envelope opened at the front desk by someone authorized to read it. One detail t
 special reserved Cilium identity, `ingress`, which matters two steps from now.
 
 **4 · The HTTPRoute — the receptionist routes you.** Here the [Gateway API](https://gateway-api.sigs.k8s.io/)
-does its job. An HTTPRoute matches the request's Host (`shop-acme-dev…`) and path and picks the backend:
-`shop`'s `web` Service. The receptionist reads your appointment and sends you to the right floor.
+does its job. An HTTPRoute matches the request's Host (`shop-alpha-dev…`) and path and picks the backend:
+`shop`'s `storefront` Service. The receptionist reads your appointment and sends you to the right floor.
 
 This is the one place the request touches the deployment story. If `shop` is mid-rollout, that HTTPRoute is
 *weighted* — [Argo Rollouts](https://argo-rollouts.readthedocs.io/en/stable/), through its Gateway-API
@@ -73,7 +73,7 @@ decision by editing the HTTPRoute weights, a data-plane object, then stepped out
 The control plane changes the data plane's configuration and lets the request follow the weights it finds.
 
 **5 · Network policy — the security checkpoint.** Before the traffic reaches a pod, Cilium checks its
-network policy: is the source — Envoy's `ingress` identity — allowed to reach `shop-web`'s pods? The
+network policy: is the source — Envoy's `ingress` identity — allowed to reach `shop-storefront`'s pods? The
 environment's `CiliumNetworkPolicy` must explicitly permit `fromEntities: [ingress]`, or the packet is
 dropped. A badge reader at the floor's entrance: even inside the building, you don't get in without the
 right credential. This is a data-plane wall from [the security model](the-security-model.md) —
@@ -81,7 +81,7 @@ least-privilege connectivity, enforced on every packet.
 
 **6 · Service to pod — the elevator dispatcher.** The Service is a `ClusterIP`, and Cilium — running
 [kube-proxy replacement](https://docs.cilium.io/en/stable/overview/intro/) in eBPF (there is no
-kube-proxy here) — load-balances the connection to one *healthy* pod of whichever `shop-web` Service
+kube-proxy here) — load-balances the connection to one *healthy* pod of whichever `shop-storefront` Service
 (stable or canary) the weighted `HTTPRoute` already picked in step 4, honoring the readiness gates. The
 dispatcher sends you to an available, staffed floor, never a dark one.
 
@@ -91,9 +91,8 @@ credentials it got from Pod Identity (short-lived, scoped, no static keys). If i
 service* — say it calls a `checkout` API — that's an east-west hop, allowed or denied by Cilium network
 policy between pods, encrypted on the wire (WireGuard) and, where a policy sets
 `authentication.mode: required`, mutually authenticated so the two services cryptographically prove who
-they are (SPIFFE identity via SPIRE). This is the live `acme-shop → acme-checkout` showcase —
-[ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md); fleet-wide enforcement is the
-remaining step.
+they are (SPIFFE identity via SPIRE). This is the live `alpha-shop → alpha-checkout` showcase;
+fleet-wide enforcement is the remaining step.
 
 **Observed the whole time — the envelope around every step, not one of them.** The request is being watched without
 anyone instrumenting it by hand. [OpenTelemetry](https://opentelemetry.io/docs/) / eBPF

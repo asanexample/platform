@@ -74,7 +74,7 @@
 <circle class="ac-green" cx="97" cy="662" r="3.5" fill="#1f8a5b"></circle>
 <text class="t-rose mono" x="108" y="666" font-size="12" fill="#a63527">restrict-image-registries</text>
 <circle class="ac-blue" cx="97" cy="684" r="3.5" fill="#2c66c4"></circle>
-<text class="t-rose mono" x="108" y="688" font-size="12" fill="#a63527">restrict-images-<tspan class="t-blue" fill="#2c66c4">acme-shop</tspan></text>
+<text class="t-rose mono" x="108" y="688" font-size="12" fill="#a63527">restrict-images-<tspan class="t-blue" fill="#2c66c4">alpha-shop</tspan></text>
 <text class="muted mono" x="108" y="712" font-size="10" fill="#6c6c73"><tspan class="t-green" fill="#1f8a5b">●</tspan> 4 baseline   <tspan class="t-blue" fill="#2c66c4">●</tspan> 1 per-product</text>
 <line class="divln" x1="92" y1="722" x2="440" y2="722" stroke="#ecc3bc" stroke-width="1"></line>
 <text class="muted" x="92" y="738" font-size="11.5" fill="#6c6c73">Rejected at the door — before anything runs. <tspan class="t-rose mono" fill="#a63527">svc-fail</tspan>: fail-closed.</text>

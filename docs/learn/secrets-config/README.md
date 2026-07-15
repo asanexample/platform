@@ -23,10 +23,10 @@ and keeping the irreducible few on two clean planes — **config-in-git** (SOPS)
   key-policy-as-ACL, the `TG_SOPS_BOOTSTRAP` escape, and where the boundary between SOPS and ESO falls.
 - **[Runtime secrets (ESO + Secrets Manager)](deep-dive-runtime-secrets.md)** — the ClusterSecretStore +
   ExternalSecret mechanism, a live worked example, naming/scoping, keyless-first, and the *designed* tenant
-  self-service road (ADR-070).
+  self-service road.
 - **[Rotation & lifecycle](deep-dive-rotation.md)** — the four-class classification, the three primitives
   (Reloader / age-alerts / refresh-tiers), the one-owner guardrail, the deliberate not-Vault, and the honest
-  built-vs-designed status (ADR-094, mostly design).
+  built-vs-designed status (mostly design).
 
 ## Then
 

@@ -64,18 +64,16 @@ A few ordering constraints are the ones that matter:
 - **The floor comes first, and it's *below* platctl.** The S3 state backend can't be created *by* something
   that needs the S3 state backend — you can't store your state in the bucket you haven't made yet. So
   `state-bootstrap` uses a *local* backend on its first apply, creates the bucket + lock table that
-  every other unit then uses for state — a classic chicken-and-egg break ([ADR-006](../../adrs/006-state-bootstrap-pattern.md)).
+  every other unit then uses for state — a classic chicken-and-egg break.
   This floor (state + the SOPS KMS key) lives *outside* the environments platctl manages, so it's stood up
   once by hand and platctl never touches it.
 - **Cilium first, as bring-your-own CNI.** This is the single most important ordering fact. The cluster runs
   Cilium instead of the AWS VPC CNI. A node with no CNI comes up `NotReady`, and CoreDNS can't schedule
   until *both* CNI and nodes are ready. You can't express "make the cluster, wait for an external Helm
   install, *then* add nodes" inside one module — so EKS is deliberately **split** into `eks → cilium →
-  node-groups → eks-addons`, wired by dependencies ([ADR-008](../../adrs/008-cilium-as-cross-cloud-cni.md),
-  [ADR-009](../../adrs/009-eks-component-separation.md)). *You can't lay carpet (pods) before the subfloor
+  node-groups → eks-addons`, wired by dependencies. *You can't lay carpet (pods) before the subfloor
   (CNI), or move furniture in (CoreDNS) before the floor and walls (nodes) exist.*
-- **Bootstrap, then lock down.** The EKS API is private-only by design
-  ([ADR-010](../../adrs/010-private-eks-api-endpoint.md)) — but during a from-scratch build there's no
+- **Bootstrap, then lock down.** The EKS API is private-only by design — but during a from-scratch build there's no
   in-VPC path yet (Tailscale isn't up), so platctl applies EKS with the public endpoint *temporarily on*,
   then a **lockdown phase** re-applies to slam it shut (after enabling Tailscale split-DNS first, and
   refreshing the DNS records the endpoint churn invalidates). This is the only time the public endpoint is
@@ -160,7 +158,7 @@ including Karpenter's own controller. Deadlock: the one thing that could add cap
 node. Capacity was never the problem; distribution was.
 
 - **Band-aid** (unblock now): `kubectl delete` the Karpenter pod so it reschedules and the rest self-heals.
-- **Durable fix** (merged): the descheduler ([ADR-093](../../adrs/093-descheduler-node-rebalancing.md)) — a
+- **Durable fix** (merged): the descheduler — a
   periodic job that evicts pods off over-utilized nodes so they rebalance onto under-utilized ones (PDB-safe,
   never strands a pod). Live on both clusters. "Just restart Karpenter every morning" was the band-aid; the
   descheduler is what "fix the source" looks like.

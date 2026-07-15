@@ -35,7 +35,7 @@ Two surfaces make it work —
 Backstage, a single pane of glass to see everything, and the scaffolder, golden-path templates to create
 things. And one rule ties them together: the portal never writes to anything directly. Every change is a PR.
 
-This is the BACK stack (ADR-046): Backstage (the form) → ArgoCD (delivery) → Crossplane (the control plane) →
+This is the BACK stack: Backstage (the form) → ArgoCD (delivery) → Crossplane (the control plane) →
 Kubernetes. The order is the whole philosophy. The control plane was built first, and Backstage is a thin
 portal over real, reconciled APIs — never a button that fires an imperative pipeline. The portal makes the
 platform visible and orderable; it doesn't become the platform.
@@ -81,7 +81,7 @@ tab isn't there" is the classic wrong-place error: the plugin ships in the app i
 often a single line elsewhere. Two repos, one portal.
 
 The [Backstage deep dive](deep-dive-the-backstage-portal.md) covers the projection, the direct-Keycloak-OIDC
-auth (Dex is retired), the plugins, and the app-vs-infra split in full.
+auth, the plugins, and the app-vs-infra split in full.
 
 ---
 
@@ -139,7 +139,7 @@ guardrails, and there are three of them:
 3. **The platform derives the dangerous parts, so you never touch them.** You name intent — team, product,
    stage, an access level like `read`/`readwrite`. The platform derives the ECR repo, the namespace, the
    Kyverno image-scope, and, critically, the IAM: least-privilege, deny-set-validated. This is
-   registries-as-single-source (ADR-069): `argocd-apps`, `policy`, and `github-oidc` all read the same
+   registries-as-single-source: `argocd-apps`, `policy`, and `github-oidc` all read the same
    `Product` entry, so there's one truth and no drift between what you asked for and what got wired.
 
 Behind those, the same request is checked by four independent layers: the portal's permission policy, a
@@ -157,12 +157,12 @@ That's why a developer can be handed real power safely — the guardrails aren't
   catalog projection (v3), and the Kubernetes / ArgoCD / Cost plugins. The scaffolder is enabled — team
   members self-serve the non-privileged paths (new-environment / new-resource / request-promotion /
   new-product); privileged templates (`new-team`, offboarding) are gated server-side. Those paths have been
-  proven end to end — the `acme/shop` product went the whole way.
+  proven end to end — the `alpha-shop` product went the whole way.
 - **Known live gaps (from the templates' own headers, not speculation):** `new-product`'s repo-creation step
   403s until the scaffolder GitHub App is broadened org-wide (the registry-PR half works); the gitops Gate's
   auto-merge isn't armed yet, so a reviewer merges even the low-risk cases today.
 - **Designed, not wired:** TechDocs — serving this learning corpus inside Backstage — exists in the image but
-  isn't wired (tracked in #938). It's why these docs use absolute source links: they'll survive the move into
+  isn't wired. It's why these docs use absolute source links: they'll survive the move into
   TechDocs. Also an RDS-backed prod database mode; dev runs in-cluster Postgres today.
 
 The pane of glass and the golden paths are built and exercised. What's maturing is the friction — arming

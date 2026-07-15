@@ -22,7 +22,7 @@ security liability — and how does the platform keep "self-service" from meanin
 
 ## The one idea: declare intent above the claim; the platform derives safety below it
 
-This is the model ADR-073 is built around:
+This is the model the paved road is built around:
 
 > **Abstraction lives *above* the claim; safety lives *below* it.** You declare the resource you want as
 > abstract intent in your Environment claim — *what*, not *how*. The platform provisions it
@@ -46,26 +46,26 @@ Here it is on a real service.
 
 ## The worked example — four resources, one claim
 
-Here's `acme`'s `conformance` service asking for all four resource types, in its Environment claim
-(`gitops/environments/acme/conformance/dev.yaml`) — the entire ask:
+Here's the `bravo/dispatch` `shipments` service asking for all four resource types, in its Environment claim
+(`gitops/environments/bravo/dispatch/dev.yaml`) — the entire ask:
 
 ```yaml
 kind: XEnvironment
 spec:
-  team: acme
-  product: conformance
+  team: bravo
+  product: dispatch
   stage: dev
   services:
-    web:
-      serviceAccount: app-acme
+    shipments:
+      serviceAccount: app-bravo-shipments
       resources:
-        blob:     { kind: objectstore, engine: s3,       access: readwrite }
-        jobs:     { kind: stream,      engine: sqs,       access: readwrite }
-        events:   { kind: stream,      engine: sns,       access: readwrite }
-        sessions: { kind: keyvalue,    engine: dynamodb,  access: readwrite }
+        blob:      { kind: objectstore, engine: s3,       access: readwrite }
+        requests:  { kind: stream,      engine: sqs,       access: readwrite }
+        events:    { kind: stream,      engine: sns,       access: readwrite }
+        shipments: { kind: keyvalue,    engine: dynamodb,  access: readwrite }
 ```
 
-What the developer actually wrote: a logical name (`blob`, `jobs`, …), an abstract kind (`objectstore`,
+What the developer actually wrote: a logical name (`blob`, `requests`, …), an abstract kind (`objectstore`,
 `stream`, `keyvalue`), a concrete engine, and an access level. No ARNs. No IAM. No encryption settings. No
 bucket policy. That's the whole intent.
 
@@ -75,13 +75,13 @@ demo:
 ```console
 # one comma-joined, fully-qualified arg — the short form (`bucket.s3`) makes kubectl
 # read the rest as resource *names* and fail; see the Reference for why.
-$ kubectl -n acme-conformance-dev get \
+$ kubectl -n bravo-dispatch-dev get \
     bucket.s3.aws.m.upbound.io,queue.sqs.aws.m.upbound.io,topic.sns.aws.m.upbound.io,table.dynamodb.aws.m.upbound.io
-NAME                             SYNCED  READY  EXTERNAL-NAME
-…/acme-conformance-dev-…(bucket)   True  True   refplat-acme-conformance-dev-blob-7d258453
-…/acme-conformance-dev-…(queue)    True  True   https://sqs.us-east-1.amazonaws.com/<workload-acct>/refplat-acme-conformance-dev-jobs-d5c2d549
-…/acme-conformance-dev-…(topic)    True  True   refplat-acme-conformance-dev-events-51b1a7ce
-…/acme-conformance-dev-…(table)    True  True   refplat-acme-conformance-dev-sessions-982701e1
+NAME                           SYNCED  READY  EXTERNAL-NAME
+…/bravo-dispatch-dev-…(bucket)   True  True   refplat-bravo-dispatch-dev-blob-7d258453
+…/bravo-dispatch-dev-…(queue)    True  True   https://sqs.us-east-1.amazonaws.com/<workload-acct>/refplat-bravo-dispatch-dev-requests-d5c2d549
+…/bravo-dispatch-dev-…(topic)    True  True   refplat-bravo-dispatch-dev-events-51b1a7ce
+…/bravo-dispatch-dev-…(table)    True  True   refplat-bravo-dispatch-dev-shipments-982701e1
 # (kubectl prints one table per kind; collapsed here. A trailing AGE column is elided.)
 ```
 
@@ -149,10 +149,10 @@ The "how" is the part that's genuinely hard to get right, now impossible to get 
 Self-service without a ceiling is how you wake up to 500 orphaned buckets and a surprise bill. So there's a
 governed middle to the model, between your intent and its realization: every Team declares an envelope — the
 ceiling on what its environments may ask for — and every claim is validated against it before a single
-resource is provisioned. Here's `acme`'s:
+resource is provisioned. Here's `bravo`'s:
 
 ```yaml
-# gitops/teams/acme.yaml
+# gitops/teams/bravo.yaml
 envelope:
   resources:
     allowedEngines: [s3, sqs, sns, dynamodb]   # which engines this team may use at all
@@ -173,14 +173,14 @@ not a blank check.
 ## Getting the coordinates to your app — the resources ConfigMap
 
 A bucket you can't find is useless, so the platform also injects a `<service>-resources` ConfigMap with the
-real, computed coordinates — which is exactly what's live for `conformance`:
+real, computed coordinates — which is exactly what's live for `dispatch`:
 
 ```text
-web-resources ConfigMap:
-  BLOB_BUCKET       = refplat-acme-conformance-dev-blob-7d258453
-  JOBS_QUEUE_URL    = https://sqs.us-east-1.amazonaws.com/<workload-acct>/refplat-acme-conformance-dev-jobs-…
-  EVENTS_TOPIC_ARN  = arn:aws:sns:us-east-1:<workload-acct>:refplat-acme-conformance-dev-events-…
-  SESSIONS_TABLE    = refplat-acme-conformance-dev-sessions-982701e1
+shipments-resources ConfigMap:
+  BLOB_BUCKET         = refplat-bravo-dispatch-dev-blob-7d258453
+  REQUESTS_QUEUE_URL  = https://sqs.us-east-1.amazonaws.com/<workload-acct>/refplat-bravo-dispatch-dev-requests-…
+  EVENTS_TOPIC_ARN    = arn:aws:sns:us-east-1:<workload-acct>:refplat-bravo-dispatch-dev-events-…
+  SHIPMENTS_TABLE     = refplat-bravo-dispatch-dev-shipments-982701e1
 ```
 
 Your app reads `$BLOB_BUCKET` from its environment — it never hardcodes a resource name. The platform owns the
@@ -216,7 +216,7 @@ resource: the managed resource itself (`s3.aws.m.upbound.io/Bucket`, `Queue`, `T
 Crossplane v2 MRs) with its hardening resources (BucketPolicy denying non-TLS, PublicAccessBlock, SSE,
 Versioning), a `RolePolicy` with the derived least-privilege statements appended to the service's Pod-Identity
 role, and the `<service>-resources` ConfigMap. Access → verbs is a lookup per engine; naming is
-`refplat-<team>-<product>-<stage>-<name>-<hash>`. It's exercised end-to-end by `acme/conformance/dev`.
+`refplat-<team>-<product>-<stage>-<name>-<hash>`. It's exercised end-to-end by `bravo/dispatch/dev`.
 
 Adding a new engine (RDS, ElastiCache, …) is a common platform-engineer task with its own recipe — the catalog
 is a floor, not a ceiling. That's the producer side of this module: the how-to
@@ -228,5 +228,4 @@ is a floor, not a ceiling. That's the producer side of this module: the how-to
 - The claim this extends: [The Environment API](../environment-api/orientation.md); where the derived IAM
   lands: [Identity & Access](../identity/orientation.md); the safe-by-default framing:
   [The Security Model](../spine/the-security-model.md).
-- Why it's shaped this way: [ADR-073 Self-Service Cloud Resources](../../adrs/073-self-service-cloud-resources.md).
 - Provision one yourself: the `environment-onboarding` skill.

@@ -26,7 +26,7 @@ and [Foundations](../foundations/orientation.md), which covers the always-on cos
   deferred (the parking tension).
 - **[Operate — guardrails & the practice](deep-dive-operate-guardrails-and-the-practice.md)** — the
   per-team budget enforcer (surface → alert → enforce), AWS Budgets plus Cost Anomaly Detection, and the
-  ADR-092 FinOps operating model with its tool verdicts.
+  FinOps operating model with its tool verdicts.
 
 ## Then
 

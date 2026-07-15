@@ -16,7 +16,7 @@ clusters.
 | helm | 3.21.0 | CLI is debug-only; installs go through the TF helm provider |
 | descheduler | 0.35.1 | v0.35 line = k8s 1.35 compat |
 
-## The AWS estate ([ADR-004](../../adrs/004-account-management-strategy.md)/[005](../../adrs/005-ou-hierarchy-design.md))
+## The AWS estate
 
 - **Accounts (5):** management (governance-only: org, SCPs, TF state backend) · platform (**hub**: shared
   services) · preprod + prod (**spokes**: env clusters + tenant workloads) · test (Terratest sandbox).
@@ -26,7 +26,7 @@ clusters.
   credential in one account can't address another without an explicit cross-account role trust. Namespaces /
   IAM / Kyverno are *soft* boundaries inside one trust domain.
 
-### SCPs — 8 attached ([ADR-003](../../adrs/003-scp-design-philosophy.md), `infra/modules/aws/organizations/scps.tf`)
+### SCPs — 8 attached (`infra/modules/aws/organizations/scps.tf`)
 
 A **ceiling, not a grant**, enforced above the account (even root can't escape). Effective perm =
 intersection(SCPs, IAM). `baseline-guardrails` (deny leave-org / root actions / region changes) ·
@@ -36,7 +36,7 @@ un-forgeable per-team ownership) · `require-tagging` · `restrict-iam-users` (f
 `hipaa-eligible-services` (optional, off). AWS's `FullAWSAccess` is the 8th. **Gotcha:** a new automation
 role often needs an explicit **exempt-role** entry (org-level) or it 403s on tagging/region actions.
 
-### IAM roles ([ADR-007](../../adrs/007-iam-role-model.md)/[040](../../adrs/040-platform-engineer-access-model.md))
+### IAM roles
 
 | Role | Account | Verb |
 | --- | --- | --- |
@@ -44,12 +44,12 @@ role often needs an explicit **exempt-role** entry (org-level) or it 403s on tag
 | **PlatformAdmin** | platform, preprod | **operate, not author** — kubectl debug/exec/drain/restart; read-only AWS minus secret-exfil denies |
 | **TerraformStateAccess** | management | **state** — S3 state bucket + `terraform-locks` DynamoDB only |
 | **OrganizationAccountAccessRole** | all | **break-glass** — audited emergency admin |
-| **DeveloperAccess-\<team\>** | preprod (design) | per-team kubectl — **designed, not built** (#647; only the in-cluster RoleBinding exists) |
+| **DeveloperAccess-\<team\>** | preprod (design) | per-team kubectl — **designed, not built** (only the in-cluster RoleBinding exists) |
 
 Cross-account chain: `aws sso login` (mgmt) → assume **PlatformDeployer** in target → state via
 **TerraformStateAccess** (mgmt). kubectl: assume **PlatformAdmin** → `aws eks get-token` → API over Tailscale.
 
-## Infrastructure as code ([ADR-066](../../adrs/066-sops-encrypted-config-secrets.md))
+## Infrastructure as code
 
 - **Split:** `infra/modules/` (reusable, no provider blocks) vs `infra/live/aws/` (env-specific units).
 - **Config cascade** (each fact in one layer): `root.hcl` → `common.hcl` → `env.hcl` → `region.hcl` /
@@ -61,7 +61,7 @@ Cross-account chain: `aws sso login` (mgmt) → assume **PlatformDeployer** in t
 - **SOPS:** `secrets.enc.yaml` committed encrypted (KMS `alias/platform-sops`), decrypted in-memory at
   plan-time; `TG_SOPS_BOOTSTRAP=1` reads a local plaintext fallback for greenfield.
 
-## Networking ([ADR-015](../../adrs/015-cidr-allocation-strategy.md)/[034](../../adrs/034-transit-gateway-cross-account-connectivity.md)/[035](../../adrs/035-cross-vpc-dns-resolution.md))
+## Networking
 
 - **VPC:** one module, 3 topologies via toggles (private = IGW+NAT [default] · public = IGW no NAT ·
   airgapped = neither). 6 subnet tiers/AZ × 3 AZ = 18: kubernetes /26, endpoints /26, firewall /26, services
@@ -76,7 +76,7 @@ Cross-account chain: `aws sso login` (mgmt) → assume **PlatformDeployer** in t
   `dns_method` modes: `phz` (custom PHZ + dynamic ENI lookup, cheap, chosen) · `resolver_outbound` ·
   `resolver_inbound` (Route53 Resolver endpoints, ~$365/mo). The ENI-lookup script **fails loud**.
 
-## The cluster ([ADR-008](../../adrs/008-cilium-as-cross-cloud-cni.md)/[009](../../adrs/009-eks-component-separation.md)/[010](../../adrs/010-private-eks-api-endpoint.md))
+## The cluster
 
 - **Private-only API:** `endpointPublicAccess: false` (module default false = fail-safe), private true.
   Verified live both clusters.
@@ -88,11 +88,10 @@ Cross-account chain: `aws sso login` (mgmt) → assume **PlatformDeployer** in t
   cert-manager chicken-and-egg). **Gateway ingress identity:** gateway→pod traffic wears Cilium's reserved
   **`ingress` identity (8)** — namespace policy must `fromEntities: ["ingress"]`, not an IP/CIDR match.
 
-## Compute ([ADR-078](../../adrs/078-cluster-elasticity-karpenter.md)/[093](../../adrs/093-descheduler-node-rebalancing.md))
+## Compute
 
 - **System node group:** fixed floor (`t4g.xlarge`, desired 2 / max 3, Graviton) — holds Karpenter, CoreDNS,
-  Cilium operator, the standing stack. Changing `instance_types` is ForceNew (a ~3-min hub blip). Spot
-  workload group retired.
+  Cilium operator, the standing stack. Changing `instance_types` is ForceNew (a ~3-min hub blip).
 - **Karpenter:** instance-flexible NodePool (arm64, bin-pack, consolidate); both clusters run
   `WhenEmptyOrUnderutilized` + `consolidateAfter: 15m` (not the module's `1m` default — a shorter value
   races the Cilium-first startup taint below and Karpenter deletes its own freshly-provisioned node as
@@ -101,15 +100,14 @@ Cross-account chain: `aws sso login` (mgmt) → assume **PlatformDeployer** in t
   (per-cluster anchored `*-karpenter-*`).
 - **Workload autoscaling (HPA):** every scaffolded Service ships a **default HPA** (`k8s/base/hpa.yaml`,
   `autoscaling/v2`, targets the Argo Rollout, CPU 70%; `min 1`/`max 10`, prod overlay `min 2`/`max 20` for
-  the ADR-085 floor; metrics-server the CPU source) — elastic by construction, opt out not in. **The closed
-  loop** (ADR-078 Phase 2, live): HPA adds pods → they go Pending → Karpenter provisions a right-sized node
+  the prod replica floor; metrics-server the CPU source) — elastic by construction, opt out not in. **The closed
+  loop** (live): HPA adds pods → they go Pending → Karpenter provisions a right-sized node
   → load drops → HPA scales pods down → Karpenter consolidates the idle node away. KEDA (event-driven)
   deferred until first needed.
 - **Descheduler:** `LowNodeUtilization` CronJob (platform 40/70% q15m, preprod 50/70% q10m); `nodeFit: true`,
-  respects PDBs, skips system-critical. Fixes post-unpark single-replica pile-up (ADR-093 is stale-marked
-  *Proposed* but is **built + live**, #1106).
+  respects PDBs, skips system-critical. Fixes post-unpark single-replica pile-up.
 
-## Ingress & access ([ADR-017](../../adrs/017-gateway-api-over-ingress.md)/[029](../../adrs/029-preprod-public-ingress-gateway-api.md)/[011](../../adrs/011-tailscale-for-private-cluster-access.md))
+## Ingress & access
 
 - **Ingress flow:** Route53 (ALIAS) → **NLB** → **Cilium Envoy** (TLS terminate) → **HTTPRoute** (Host) →
   ClusterIP → Pod. `gateway` module (ClusterIssuer + Gateway, early) + `gateway-config` (HTTPRoutes, leaf).

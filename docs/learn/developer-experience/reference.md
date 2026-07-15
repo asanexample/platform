@@ -7,14 +7,14 @@ fine).
 
 ## The model — the BACK stack
 
-**B**ackstage (the form / the view) → **A**rgoCD (delivery) → **C**rossplane (control plane) → **K**ubernetes
-(ADR-046). The control plane was built first; Backstage is a thin portal over reconciled APIs, never an
+**B**ackstage (the form / the view) → **A**rgoCD (delivery) → **C**rossplane (control plane) → **K**ubernetes.
+The control plane comes first; Backstage is a thin portal over reconciled APIs, never an
 imperative pipeline. A developer states intent → the scaffolder opens a PR to the git registries → GitOps
 (Gate → ArgoCD registry-sync → Crossplane) reconciles it. The developer names *what*; the platform derives the
 security-sensitive rest — IAM, ECR, namespace, Kyverno scope. The portal never writes directly; every change
 is a PR.
 
-## Backstage — the portal ([ADR-051](../../adrs/051-backstage-developer-portal.md), Phase 2 live)
+## Backstage — the portal (Phase 2 live)
 
 - **App vs infra split:** the app (image, custom plugins, the Cost tab, the inline config schema) is a
   separate repo (`asanexample/backstage`), CI-built and cosign-signed to ECR. This repo controls only the
@@ -40,25 +40,23 @@ is a PR.
   `catalog.rules:[Component,
   Location]` blocks app repos from self-registering Groups/Systems (no ownership spoofing). Git is the source
   of truth — no privileged cluster access, no drift.
-- **Auth = direct Keycloak OIDC** (Dex + oauth2-proxy retired; ADR-051 amendment, ADR-053/059 supersede
-  the ADR-052 Dex broker). Confidential client `backstage`, issuer `…/realms/platform`, `groups` claim →
+- **Auth = direct Keycloak OIDC.** Confidential client `backstage`, issuer `…/realms/platform`, `groups` claim →
   ownership/RBAC; a TF-generated `AUTH_SESSION_SECRET` signs the session cookie. Gotcha: the OIDC issuer
   host is pinned via a pod `hostAlias` to the gateway ClusterIP (looked up per-apply) so token exchange hits
-  Envoy directly, not the flaky NLB hairpin. RBAC (#197): the permission framework gates template runs to the
+  Envoy directly, not the flaky NLB hairpin. RBAC: the permission framework gates template runs to the
   requester's team; team members run the non-privileged templates, while `new-team`/offboarding are admin-gated server-side.
 - **Plugins — all read-only, scoped** (never cluster-admin): Kubernetes (Pod-Identity viewer role,
   `AmazonEKSViewPolicy` — *excludes* Secrets; assumes a cross-account read-only role for preprod; the cluster
   `name` must be the real EKS name or the token 401s; `skipMetricsLookup:true`; surfaces Crossplane MRs on
   workload clusters only). ArgoCD (Roadie plugin, read-only `role:readonly` token; `argocd/app-selector`
-  annotation). Cost tab (ADR-091 A3, platform#1051 — built; the plugin lives in the app image, the infra side
+  annotation). Cost tab (the plugin lives in the app image, the infra side
   is one line — `query_consumer_namespaces=["backstage"]` in the `mimir` unit; renders spend ÷ the team's
-  `Team.spec.envelope.budget`; ADR-091's "Remaining" prose (line 127) is stale — ADR-092 already treats
-  the tab as existing). Audit/My-Access
+  `Team.spec.envelope.budget`). Audit/My-Access
   (borrow history; the one write capability — `backstage-activators` create-only on `Activation`).
 - **Auth-recovery gotcha:** single CNPG instance → after a `keycloak-db` blip the openid-client caches a
   failed discovery (SSO 503) → `kubectl rollout restart deploy/backstage`.
 
-## The scaffolder — golden paths ([ADR-046](../../adrs/046-back-stack-for-developer-self-service.md)/062, live)
+## The scaffolder — golden paths (live)
 
 Templates in `scaffolder/templates/` (registered via `location.yaml`, CODEOWNERS-protected). Each is a
 `kind: Template` (`scaffolder.backstage.io/v1beta3`).
@@ -67,8 +65,8 @@ Templates in `scaffolder/templates/` (registered via `location.yaml`, CODEOWNERS
 | --- | --- | --- | --- |
 | **new-product** | app repo from starter (+ a default HPA, elastic by construction) + Product entry + first `dev` env | new repo + `gitops/products/…` + `…/environments/…/dev.yaml` | reviewer |
 | **new-environment** | an Environment (Product × Stage) | `gitops/environments/<team>/<product>/<stage>.yaml` | reviewer |
-| **new-resource** | self-service S3/SQS/SNS/DynamoDB (ADR-073) | edits the env claim's `services.<svc>.resources` | **auto** — env-claim edit; the prod gate keys on prod *Releases*, not env claims |
-| **request-promotion** | dev→…→prod ladder (#377); same digest up | `gitops/releases/<team>/<product>/<stem>.yaml` | ≤staging **auto** / **prod gated** |
+| **new-resource** | self-service S3/SQS/SNS/DynamoDB | edits the env claim's `services.<svc>.resources` | **auto** — env-claim edit; the prod gate keys on prod *Releases*, not env claims |
+| **request-promotion** | dev→…→prod ladder; same digest up | `gitops/releases/<team>/<product>/<stem>.yaml` | ≤staging **auto** / **prod gated** |
 | **new-team** | `Team` CR (envelope) | `gitops/teams/<name>.yaml` | admin, never auto |
 | **onboard/offboard-person** | `Person` object / delete it | `gitops/people/<name>.yaml` | People Gate |
 | **deprovision-environment/-product** | reversible `lifecycle.phase`; purge=delete | edits/deletes claims | reviewer / admin purge |
@@ -95,9 +93,9 @@ Templates in `scaffolder/templates/` (registered via `location.yaml`, CODEOWNERS
 - **PR by blast radius** — ≤-staging promotion of a signed digest / non-prod resource auto-merges; envelope
   grants + drains are reviewer-merged; prod promotion (release-approver, author≠approver) + product purge +
   offboard need named approval.
-- **Derive-not-specify** (ADR-069): name intent → the platform derives ECR `team-<team>/<product>-<svc>`,
+- **Derive-not-specify:** name intent → the platform derives ECR `team-<team>/<product>-<svc>`,
   namespace `<team>-<product>-<stage>`, Kyverno scope, OIDC role, and least-privilege IAM
-  (deny-set-validated, ADR-073). One truth (`argocd-apps`/`policy`/`github-oidc` all read the `Product`), no
+  (deny-set-validated). One truth (`argocd-apps`/`policy`/`github-oidc` all read the `Product`), no
   drift.
 - **Four authz layers:** portal permission policy → server-side `verify-team-membership` → gitops Gate
   (schema + envelope shift-left: team-matches-product, stage/tier/quota-in-envelope + Composition render) →
@@ -107,12 +105,11 @@ Templates in `scaffolder/templates/` (registered via `location.yaml`, CODEOWNERS
 
 - **Live:** Backstage Phase 2 (`backstage.aws.refplat.org`, direct Keycloak OIDC, catalog projection v3,
   K8s/ArgoCD/Cost plugins); scaffolder enabled (team members self-serve non-privileged templates; `new-team`/offboard admin-gated); new-product/new-environment/new-resource/
-  request-promotion proven e2e (ADR-062 Phase 3 #278–285; `acme/shop` 2026-06-14).
+  request-promotion proven e2e (`alpha/shop`, 2026-06-14).
 - **Known gaps (template headers):** `new-product` repo-creation 403s (scaffolder GitHub App not org-wide yet);
   gitops-Gate auto-merge not armed (a reviewer merges low-risk cases); no scaffolder template for `XAgent`
-  (hand-authored). *(The gate's decommission-first / purge-completeness guard is landed and armed — only a
-  template's own header prose still reads future-tense.)*
-- **Designed / not wired:** TechDocs serving `docs/learn/` in-portal (#938 — plugin present, not wired;
+  (hand-authored). The gate's decommission-first / purge-completeness guard is armed.
+- **Designed / not wired:** TechDocs serving `docs/learn/` in-portal (plugin present, not wired;
   why these docs use absolute source links); RDS database mode.
 
 ## Gotchas (quick)
@@ -127,9 +124,7 @@ Templates in `scaffolder/templates/` (registered via `location.yaml`, CODEOWNERS
 ## Go deeper
 
 Deep dives: [the Backstage portal](deep-dive-the-backstage-portal.md) ·
-[the scaffolder golden paths](deep-dive-the-scaffolder-golden-paths.md). Skill: `backstage-portal`. ADRs:
-[046](../../adrs/046-back-stack-for-developer-self-service.md) ·
-[051](../../adrs/051-backstage-developer-portal.md) · 062 · 069 · 073. Related:
+[the scaffolder golden paths](deep-dive-the-scaffolder-golden-paths.md). Skill: `backstage-portal`. Related:
 [domain model](../domain-model/orientation.md) · [Environment API](../environment-api/orientation.md) ·
 [Delivery](../delivery/orientation.md) · [Onboarding a Product](../products/orientation.md). External:
 [Backstage](https://backstage.io/docs/overview/what-is-backstage) ·

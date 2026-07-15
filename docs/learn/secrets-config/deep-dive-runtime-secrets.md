@@ -11,8 +11,7 @@ second plane. If you already know ESO, the terse version is in the [Reference](r
 
 A Kubernetes [`Secret`](https://kubernetes.io/docs/concepts/configuration/secret/) is not encrypted —
 it's base64-encoded plaintext sitting in etcd. The object itself buys you almost nothing. The whole
-security question is where the value came from and who could see it on the way in. That's what
-[ADR-019](../../adrs/019-external-secrets-operator.md) exists to answer, and the homes it rejected are
+security question is where the value came from and who could see it on the way in. The homes that don't fit are
 worth seeing, because each fails in an instructive way:
 
 - **Secrets in Terraform state** (a `kubernetes_secret` resource). Works, but it couples secret rotation
@@ -22,14 +21,13 @@ worth seeing, because each fails in an instructive way:
   but the encryption key is per-cluster: recreate the cluster and every secret must be re-encrypted, and
   there's no bridge to a cloud store, so you maintain values in two places.
 - **HashiCorp Vault** — the gold standard, and exactly the problem. Vault is its own Tier-0 HA system
-  with unseal procedures and operational weight. This platform just learned that cost with Keycloak and
-  had no appetite for a second such system at this scale.
+  with unseal procedures and operational weight — the kind of cost the platform already carries for
+  Keycloak, and not one it will pay twice at this scale.
 
-The decision: AWS
+The mechanism: AWS
 [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html) is the source
 of truth, and ESO syncs a named secret out of it into an ordinary Kubernetes Secret that any pod mounts
-unmodified. This is the opposite plane from
-[ADR-066](../../adrs/066-sops-encrypted-config-secrets.md)'s SOPS-in-git: that plane holds static
+unmodified. This is the opposite plane from the SOPS-in-git config plane: that plane holds static
 bootstrap identifiers the IaC reads at plan-time; this one holds rotating runtime credentials a live pod
 consumes. Never cross them.
 
@@ -79,8 +77,7 @@ aws-secrets-manager-ssm   23d   Valid    ReadWrite      True
 there is no `auth` block. In the classic ESO tutorial the store carries an `auth.jwt.serviceAccountRef`
 pointing at credentials. Here that stanza is gone — the store authenticates as ESO's own controller pod
 identity (the `external-secrets` ServiceAccount bound to an IAM role via
-[EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html),
-[ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md)). The bridge that hands out secrets
+[EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html)). The bridge that hands out secrets
 holds no secret of its own — the keyless-first posture applied to the secrets machinery itself.
 
 It's a `ClusterSecretStore` (cluster-scoped — it can write a Secret into any namespace), not a namespaced
@@ -201,7 +198,7 @@ Access is bounded in two layers:
    module ships permissive and the unit tightens it — always read the unit, not just the module default.
 2. **Per-tenant path + a Kyverno backstop.** The designed tenant layout paths secrets at
    `…/tenants/<team>/<product>/<stage>`, and a Kyverno policy would deny a team's `ExternalSecret` from
-   targeting another team's path ([ADR-070](../../adrs/070-tenant-app-config-and-secrets.md)). This layer
+   targeting another team's path. This layer
    is designed, not built — see the caveat below.
 
 ## Keyless-first — ESO is the fallback, not the default
@@ -239,7 +236,7 @@ Today a tenant app that needs a `DATABASE_URL` or an API key has no platform-pro
 Grep proves it: `ExternalSecret` appears zero times under `gitops/`, and the Crossplane Environment
 Composition mints none. Tenants get no runtime secrets today; the platform's own services use ESO heavily.
 
-The designed model ([ADR-070](../../adrs/070-tenant-app-config-and-secrets.md), Status: Proposed) is the
+The designed model is the
 Vercel/Heroku shape — push code, set env vars, it runs:
 
 - **Config vs secrets split.** Non-secret config → git, on the claim's `services.<svc>.config`, rendered
@@ -259,11 +256,6 @@ write-through API, ESO wiring, gating, and portal UI are a deferred phase.
 
 ## Gotchas
 
-- **ADR-019 says IRSA; the code says Pod Identity.** [ADR-019](../../adrs/019-external-secrets-operator.md)
-  (dated 2026-05) still describes auth as IRSA (ADR-018). The code has since moved to EKS Pod Identity
-  ([ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md), which supersedes ADR-018's
-  rejection of Pod Identity). The ADR text is stale on that one point; the module and its README are
-  correct. A reminder that ADRs are leads, not proof — verify against the code.
 - **The module default is wide open (`*`).** `secret_path_prefix` defaults to `*` in the module; only the
   live unit narrows it to `platform`. Reuse the module elsewhere without setting it and you've granted
   read on every secret in the account. Always scope at the unit.
@@ -277,9 +269,6 @@ write-through API, ESO wiring, gating, and portal UI are a deferred phase.
 
 ## Go deeper
 
-- **ADRs (source of truth):** [ADR-019 External Secrets Operator](../../adrs/019-external-secrets-operator.md)
-  · [ADR-070 Tenant app config & secrets](../../adrs/070-tenant-app-config-and-secrets.md) (Proposed) ·
-  [ADR-047 Pod Identity as the AWS identity standard](../../adrs/047-pod-identity-as-aws-identity-standard.md).
 - **The code:** [`secret-stores`](https://github.com/asanexample/platform/blob/main/infra/modules/secret-stores/main.tf)
   (the two stores) · [`external-secrets`](https://github.com/asanexample/platform/blob/main/infra/modules/external-secrets/main.tf)
   (IAM + Pod Identity + Helm) · the [external-secrets live unit](https://github.com/asanexample/platform/blob/main/infra/live/aws/platform/us-east-1/platform/external-secrets/terragrunt.hcl)

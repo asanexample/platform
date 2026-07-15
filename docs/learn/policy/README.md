@@ -27,6 +27,3 @@ need it.
 - Architecture (as-built, per-cluster): [the Kyverno policy catalog](../../architecture/kyverno-policy-catalog.md).
 - Author policies (producer side): the `kyverno-policy-authoring` skill. Write compliant workloads (consumer
   side): the `authoring-k8s-workloads` skill + [`compliant-deployment.yaml`](../../examples/compliant-deployment.yaml).
-- Why it's shaped this way: [ADR-014](../../adrs/014-kyverno-as-policy-engine.md) (Kyverno as policy engine),
-  [ADR-046](../../adrs/046-back-stack-for-developer-self-service.md) (the ownership split),
-  [ADR-085](../../adrs/085-workload-availability-graceful-disruption-defaults.md) (the generated PDB).

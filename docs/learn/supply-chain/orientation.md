@@ -23,11 +23,11 @@ The model inverts the naive assumption:
 > shared CI the app team can't tamper with, and the cluster refuses to run anything whose proof doesn't check
 > out.
 
-Three moving parts, and you can see all three on a real image with one command. Here's acme's live `shop-web`
+Three moving parts, and you can see all three on a real image with one command. Here's alpha's live `shop-storefront`
 image, inspected with `cosign`:
 
 ```console
-$ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-acme/shop-web@sha256:f6b37d…
+$ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-storefront@sha256:f6b37d…
 📦 Supply Chain Security Related artifacts …
 └── 🔐 Signatures for an image …          ← it's SIGNED
 └── 💾 Attestations for an image …        ← it carries 2 ATTESTATIONS (SLSA provenance + SBOM)
@@ -36,10 +36,10 @@ $ cosign tree <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-acme/shop-web
 And who signed it, and from where — the trust anchor, pulled from the signing certificate:
 
 ```console
-$ cosign verify … team-acme/shop-web@sha256:f6b37d…
+$ cosign verify … team-alpha/shop-storefront@sha256:f6b37d…
 Issuer:  https://token.actions.githubusercontent.com          ← keyless: signed by a GitHub Actions OIDC identity
 Subject: …/asanexample/trusted-ci/.github/workflows/build-sign.yml@…   ← the SHARED signing workflow
-githubWorkflowRepository: asanexample/acme-shop              ← built from shop's OWN repo (the trust anchor)
+githubWorkflowRepository: asanexample/alpha-shop            ← built from shop's OWN repo (the trust anchor)
 ```
 
 Those three facts are the supply-chain model:
@@ -47,7 +47,7 @@ Those three facts are the supply-chain model:
 1. **It's signed, keylessly.** No private key was used, so there's nothing to steal. The signer is a GitHub
    Actions OIDC identity, cert issued on the spot.
 2. **The signer is the shared `trusted-ci/build-sign.yml` workflow** — not `shop`'s own hand-rolled CI.
-3. **The cert carries `githubWorkflowRepository: asanexample/acme-shop`** — proof the build ran from shop's
+3. **The cert carries `githubWorkflowRepository: asanexample/alpha-shop`** — proof the build ran from shop's
    declared repo. That's what the cluster checks against.
 
 ## Keyless signing — no key to steal
@@ -88,7 +88,7 @@ The "no standing key" instinct is the same one behind Pod Identity in [Identity 
 A signature proves who made it. The attestations prove how and from what, and there are two:
 
 - **SLSA provenance** — a signed statement of the build: which repo, which commit, which workflow produced
-  this exact digest. It's SLSA Build L3 ([ADR-042](../../adrs/042-isolated-build-provenance-slsa-l3.md)): the
+  this exact digest. It's SLSA Build L3: the
   provenance is generated in an isolated workflow the app team cannot write to, so the build can't forge its
   own paperwork. That isolation is the difference between "the build says it's fine" and "an independent,
   tamper-resistant process attests it." ([SLSA](https://slsa.dev/spec/v1.0/levels) grades this on a ladder —
@@ -113,8 +113,8 @@ whole defense.
 ## The thin-caller model — teams don't build this, they call it
 
 Developers find this part surprising: `shop`'s CI doesn't implement any of the above. The signer earlier was
-`asanexample/trusted-ci/build-sign.yml`, not a workflow in the shop repo. That's the design
-([ADR-050](../../adrs/050-shared-build-sign-reusable-workflow.md)): the entire supply-chain backbone — build →
+`asanexample/trusted-ci/build-sign.yml`, not a workflow in the shop repo. That's the design: the entire
+supply-chain backbone — build →
 push to ECR → cosign-sign → provenance → SBOM — lives in one shared, reusable workflow the platform owns, and
 each app's CI is a thin caller of it.
 
@@ -130,7 +130,7 @@ Two things follow:
 
 A signature is only useful if something decides which signatures to trust. The platform's rule is precise and
 registry-derived: an image is trusted only if its signing cert's `githubWorkflowRepository` matches the
-Product's own declared repo. `shop`'s images must be signed from a build that ran in `asanexample/acme-shop`
+Product's own declared repo. `shop`'s images must be signed from a build that ran in `asanexample/alpha-shop`
 (shop's `spec.repo` in the Product registry); a signature from any other repo, even a validly-signed one, is
 rejected. Trust is per-product, derived from the registry — not a blanket "any signed image is fine."
 
@@ -157,7 +157,7 @@ sequenceDiagram
     participant Kyverno
 
     Note over CI,ECR: SIGN — once, when the image is built
-    CI->>Fulcio: OIDC token — "I am build-sign.yml, run for acme-shop"
+    CI->>Fulcio: OIDC token — "I am build-sign.yml, run for alpha-shop"
     Fulcio-->>CI: ~10-minute cert (identity + repo baked in)
     CI->>ECR: push image + signature + CycloneDX SBOM
     SLSA->>ECR: push SLSA provenance (isolated workflow — the build can't forge it)
@@ -200,9 +200,6 @@ can't accidentally ship an unverifiable image. You never touch a signing key, be
   [The Life of a Deployment](../spine/life-of-a-deployment.md); the threat framing:
   [The Security Model](../spine/the-security-model.md).
 - Onboard your app (the thin-caller snippet): the `supply-chain-onboarding` skill.
-- Why it's shaped this way: [ADR-042 isolated provenance (SLSA L3)](../../adrs/042-isolated-build-provenance-slsa-l3.md) ·
-  [ADR-050 shared build-sign](../../adrs/050-shared-build-sign-reusable-workflow.md) ·
-  [ADR-036 GitHub OIDC](../../adrs/036-github-actions-oidc-federation.md).
 - The concepts, explained well (none of this is obvious the first time — these are the on-ramps):
   - [How Sigstore's keyless trust works](https://docs.sigstore.dev/about/security/) — the Fulcio + Rekor +
     OIDC trust root, and why a ~10-minute cert needs no revocation.

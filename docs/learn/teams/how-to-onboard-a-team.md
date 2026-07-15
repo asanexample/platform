@@ -21,11 +21,11 @@ sign-in and roles, see [identity](../identity/orientation.md). Here you just get
   not the Team itself). Both paths below are gated so only an admin can land one.
 - **A name.** `metadata.name` is a bare lowercase slug, `^[a-z][a-z0-9]{1,15}$` — letters and digits, **no
   hyphens**. The team name is parsed back out of `<team>-<product>-<stage>` namespace names, so a hyphen
-  would make that split ambiguous. `acme`, not `a-c-m-e`. (The Backstage form enforces exactly this pattern;
+  would make that split ambiguous. `charlie`, not `c-h-a-r-l-i-e`. (The Backstage form enforces exactly this pattern;
   the Teams Gate's own regex is looser — it permits hyphens and longer names — so on a hand-authored Path B
   PR the reviewer, not the gate, is what catches a stray hyphen.)
 - **An SSO group.** The upstream group this Team maps to (`spec.ssoGroup`). The convention is `Dev-<name>`
-  (so `Dev-acme`); a tenant Team may **not** map to a privileged/platform group. The Teams Gate rejects the
+  (so `Dev-charlie`); a tenant Team may **not** map to a privileged/platform group. The Teams Gate rejects the
   *configured* denied set (today just `platform-admins`, matched case-insensitively) — note `Platform` itself
   is **not** in that set (the platform-owned Team uses it), so CODEOWNERS review, not the gate, is the
   backstop for every other privileged group.
@@ -70,20 +70,20 @@ Team — an existing tenant Team is the model — and adjust.
 
 ### Step 1 — write the registry file
 
-Add `gitops/teams/<name>.yaml`. Here's a complete, annotated example for a new team `acme`:
+Add `gitops/teams/<name>.yaml`. Here's a complete, annotated example for a new team `charlie`:
 
 ```yaml
 apiVersion: platform.refplat.org/v1beta1
 kind: Team
 metadata:
-  name: acme                       # bare slug, no hyphens; ^[a-z][a-z0-9]{1,15}$
+  name: charlie                      # bare slug, no hyphens; ^[a-z][a-z0-9]{1,15}$
   labels:
     app.kubernetes.io/managed-by: argocd
     app.kubernetes.io/part-of: environment-api
 spec:
-  ssoGroup: Dev-acme               # the Keycloak/IdP group this team maps to (identity)
+  ssoGroup: Dev-charlie              # the Keycloak/IdP group this team maps to (identity)
   slack:
-    channel: "C0XXXXXXXXX"         # incident channel id — the triage agent posts here (ADR-084)
+    channel: "C0XXXXXXXXX"         # incident channel id — the triage agent posts here
   envelope:                        # the bound on every Product/Environment this team may author
     allowedTiers: ["standard"]     # compliance tiers an Environment may request
     allowedStages: ["dev", "test", "staging", "prod"]  # stages it may deploy to
@@ -127,9 +127,9 @@ bound; [the domain model](../domain-model/orientation.md#the-team-is-an-envelope
 The non-envelope fields are identity and routing, not bounds: `spec.slack.channel` is the incident channel
 the triage agent posts to, and `spec.pagerduty` / `spec.oncall` point at on-call. A **platform-owned** Team
 may also carry `spec.platformTrust` (cluster-read ClusterRoles + IAM actions past the deny-set) — a
-capability tenants can't request. It's still defined in the Team CRD but is **unused by any live Team today**:
-ADR-082 moved platform agents to the XAgent runtime, which grants their cluster-read/model access directly,
-so the platform Team no longer sets `platformTrust`. Leave it unset for a tenant Team.
+capability tenants can't request. It's defined in the Team CRD but **unused by any live Team**: platform
+agents get their cluster-read/model access directly from the XAgent runtime, not from a Team's
+`platformTrust`. Leave it unset for a tenant Team.
 
 > The Team **CRD does not bound** `quotaCap`, `maxDedicatedIsolation`, or `ssoGroup` — nothing in the
 > schema stops you writing `cpu: "9999"`. The **Teams Gate** (below) is what enforces platform maximums and
@@ -152,12 +152,12 @@ You don't run `terragrunt apply`. Merging to `main` under `gitops/teams/**` fire
 converges the derived units on the in-VPC runner, in order: **keycloak-config → argocd → argocd-apps →
 github-teams**. Out of that one file come:
 
-- **A Keycloak group** — one group per Team (`spec.ssoGroup`, e.g. `Dev-acme`), the team's SSO identity
+- **A Keycloak group** — one group per Team (`spec.ssoGroup`, e.g. `Dev-charlie`), the team's SSO identity
   that apps read from the `groups` claim.
 - **A GitHub org team** — `github-teams` creates the org team (named for the slug) and later grants it
   `push` on each of the team's `<team>-<product>` repos. This is **human ownership only** — org-team
   membership is *not* in the Actions OIDC token, so it never carries supply-chain identity (that anchors on
-  repo name, [ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md)).
+  repo name).
 - **A projected cluster `Team` CR** — ArgoCD's `teams` Application syncs the file into `crossplane-system`
   (at an early sync-wave, so Teams land *before* the environments that reference them). This is the copy
   **Kyverno** reads at `XEnvironment` admission to enforce the envelope.
@@ -191,8 +191,8 @@ must not get wrong — and what a human must check.
 
 **A starting prompt:**
 
-> Onboard a new Team `acme` mapping to SSO group `Dev-acme`, following
-> `docs/learn/teams/how-to-onboard-a-team.md`. Create `gitops/teams/acme.yaml` in the **v1beta1** shape,
+> Onboard a new Team `charlie` mapping to SSO group `Dev-charlie`, following
+> `docs/learn/teams/how-to-onboard-a-team.md`. Create `gitops/teams/charlie.yaml` in the **v1beta1** shape,
 > copying an existing tenant Team's conventions. Envelope: `allowedTiers: ["standard"]`, stages
 > `["dev","test","staging","prod"]`, `quotaCap` cpu `"8"` / memory `16Gi` / pods `40`, `budget.monthlyUSD:
 > 2000`, `maxDedicatedIsolation: { cluster: 0, account: 0 }`, `resources.allowedEngines: ["s3"]`,
@@ -248,10 +248,5 @@ must not get wrong — and what a human must check.
 - The concept: [the domain model — Team as envelope](../domain-model/orientation.md#the-team-is-an-envelope) ·
   identity and the SSO group: [identity](../identity/orientation.md).
 - Onboarding what lives *under* a Team: [onboard a Product](../products/how-to-onboard-a-product.md).
-- Why it's shaped this way: [ADR-063](../../adrs/063-team-as-first-class-git-object.md) (Team as a git
-  object) · [ADR-067](../../adrs/067-idp-domain-model.md) (the domain model) ·
-  [ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md) (org-team ownership) ·
-  [ADR-073](../../adrs/073-self-service-cloud-resources.md) (self-service resources) ·
-  [ADR-091](../../adrs/091-cost-guardrails.md) (budget guardrails).
 - Substrate: [GitOps principles](https://opengitops.dev/) ·
   [Backstage software templates](https://backstage.io/docs/features/software-templates/).

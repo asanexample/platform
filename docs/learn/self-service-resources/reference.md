@@ -19,8 +19,7 @@ services:
 
 - **`kind`** is the abstract class; **`engine`** the concrete implementation; **`access`** your intent.
 - **Built + live today:** `s3` (objectstore), `sqs` + `sns` (stream), `dynamodb` (keyvalue) — all four
-  provisioned & ready on preprod (`acme/conformance/dev`). *(The XRD carries a stale `Phase A: objectstore/s3`
-  comment — all four engines actually ship; see #drift below.)*
+  provisioned & ready on preprod (`bravo/dispatch/dev`).
 
 ## Derived least-privilege IAM (per engine)
 
@@ -59,7 +58,7 @@ Naming: `refplat-<team>-<product>-<stage>-<name>-<hash>` (deterministic, ≤63-c
 ## Front doors (above the claim)
 
 All produce the same governed claim → same validation → same realization. **Built:** PR-as-code, Backstage
-form. **Designed (ADR-073 Phase B):** a natural-language agent. New front doors never touch the safety floor.
+form. **Designed:** a natural-language agent. New front doors never touch the safety floor.
 
 ## Gotchas
 
@@ -70,8 +69,6 @@ form. **Designed (ADR-073 Phase B):** a natural-language agent. New front doors 
 - **The resources are *namespaced* MRs** (`s3.aws.m.upbound.io`, Crossplane v2) — cluster-scoped
   `kubectl get managed` **won't list them**; use `kubectl -n <env-ns> get bucket.s3.aws.m.upbound.io …`.
 - **The floor is non-overridable** — no public access, no non-TLS, no disabling encryption. By design.
-- <a id="drift"></a>**Doc drift:** the XRD's `Phase A: objectstore/s3` comment predates the sqs/sns/dynamodb
-  rollout — all four engines are live. Flagged for a one-line fix.
 
 ## Glossary
 
@@ -85,8 +82,7 @@ form. **Designed (ADR-073 Phase B):** a natural-language agent. New front doors 
 
 - **Extending the catalog** (platform engineers): [add a new resource engine](extending-add-an-engine.md) —
   the producer-side recipe + gotchas.
-- [ADR-073 Self-Service Cloud Resources](../../adrs/073-self-service-cloud-resources.md) · the
-  [Environment API](../environment-api/orientation.md) (the claim) · [Identity & Access](../identity/orientation.md)
+- The [Environment API](../environment-api/orientation.md) (the claim) · [Identity & Access](../identity/orientation.md)
   (where the IAM lands).
 - Substrate: [Crossplane](https://docs.crossplane.io/latest/) ·
   [Upbound AWS provider](https://marketplace.upbound.io/providers/upbound/provider-family-aws) ·

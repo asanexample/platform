@@ -56,17 +56,16 @@ and un-provisionable-by-Karpenter:
 - **Node-pinned DaemonSet pods** that simply cannot be served by an elastic node — a DaemonSet runs one
   pod per node, so it has nowhere to scale up to.
 
-That last category is why the platform system node grew from `t4g.large` to `t4g.xlarge`. The comment in
+That last category is why the platform system node is a `t4g.xlarge`. The comment in
 the unit is blunt about it: the per-node DaemonSet slab (Cilium, Beyla, Alloy, node-exporter, otel) plus
-the standing load saturated the old 2-vCPU node at ~100% CPU — the `alloy-profiles` DaemonSet pod couldn't
+the standing load would saturate a 2-vCPU node at ~100% CPU — the `alloy-profiles` DaemonSet pod couldn't
 even fit. The xlarge buys per-node headroom; Karpenter handles bursts above this floor, never the floor
 itself.
 
 ### The ForceNew trap — a routine-looking apply that briefly severs the cluster
 
-That `t4g.large → t4g.xlarge` change hides the nastiest gotcha in this layer, and
-[ADR-078](../../adrs/078-cluster-elasticity-karpenter.md) records it as an as-built scar. Changing a
-managed node group's `instance_types` is a **ForceNew** attribute in the AWS provider — OpenTofu can't
+Changing the system node group's `instance_types` — say from `t4g.large` to `t4g.xlarge` — hides the
+nastiest gotcha in this layer. It's a **ForceNew** attribute in the AWS provider — OpenTofu can't
 mutate it in place, so it destroys the node group and creates a new one. The module's
 `create_before_destroy` sits only on the launch template, not the group (the group name is fixed), so
 for ~3 minutes the cluster runs on replacement nodes coming up while the old ones drain.
@@ -74,7 +73,7 @@ for ~3 minutes the cluster runs on replacement nodes coming up while the old one
 It bites harder here than on a normal cluster because the in-cluster Tailscale subnet router gets evicted
 during that window — and the subnet router is how you reach the private EKS API (Part D). So a one-line
 instance-type edit, which reads like a trivial resize, briefly makes the private API server unreachable
-from your laptop. The lesson the ADR draws: an `instance_types` change is a deliberate, monitored step,
+from your laptop. The lesson: an `instance_types` change is a deliberate, monitored step,
 planned like a small maintenance, not slipped into a routine apply.
 
 ### Node hardening — three things baked into the launch template
@@ -116,8 +115,8 @@ NAME            TYPE         CAPACITY    ZONE         NODE                      
 default-vtbn6   r6g.medium   on-demand   us-east-1c   ip-10-100-2-28.ec2.internal   True    92m
 ```
 
-Karpenter picked `r6g.medium` — not a type anyone hard-coded. That's the whole point of D1 in
-[ADR-078](../../adrs/078-cluster-elasticity-karpenter.md).
+Karpenter picked `r6g.medium` — not a type anyone hard-coded. That's the whole point of Karpenter's
+instance-flexible provisioning.
 
 ### Why Karpenter, not Cluster Autoscaler
 
@@ -157,9 +156,9 @@ on both clusters means Karpenter can never runaway-provision past the cost guard
 
 ### Three details that keep Karpenter honest
 
-**Auth is Pod Identity, not IRSA.** The controller's IAM role trusts `pods.eks.amazonaws.com` (ADR-047),
+**Auth is Pod Identity, not IRSA.** The controller's IAM role trusts `pods.eks.amazonaws.com`,
 and the `karpenter` ServiceAccount carries no IRSA annotation — the Helm values explicitly set
-`annotations: {}`. This is the platform-wide move away from IRSA for platform add-ons.
+`annotations: {}`. Platform add-ons use Pod Identity rather than IRSA.
 
 **The Cilium-first startup taint.** Every Karpenter node is born with a taint, verified live on the
 NodePool:
@@ -216,9 +215,7 @@ Karpenter adds and removes nodes. It does not move a pod that's already placed �
 the Kubernetes scheduler, which places a pod exactly once and never revisits the decision. That gap is a
 real, bounded failure mode, and it has a name and a date.
 
-A status note: [ADR-093](../../adrs/093-descheduler-node-rebalancing.md) is still marked
-**Proposed**, but the descheduler is built and live on both clusters (shipped in #1106) — the ADR
-header simply lags. Verify against the cluster, not the ADR status. Live proof:
+The descheduler is built and live on both clusters. Live proof:
 
 ```console
 $ kubectl --context platform get cronjob -n kube-system descheduler
@@ -230,7 +227,7 @@ NAME          SCHEDULE       SUSPEND   ACTIVE   LAST SCHEDULE   AGE
 descheduler   */10 * * * *   False     0        2m3s            4d21h
 ```
 
-### The incident that wrote the ADR
+### The incident behind it
 
 On **2026-07-02**, post-unpark, one preprod `t4g.large` absorbed **59 pods — ~99% of CPU requests, 189% of
 memory limits** — while the other node sat at **14 pods (~40%)**. This wasn't a capacity problem: balanced
@@ -244,7 +241,7 @@ capacity was itself starved on the very node it would have relieved. Autoscaling
 Why does everything pile onto one node? After a staggered unpark, the "emptiest node" — the one
 the scheduler prefers — is the first node up, and a dozen independent single-replica controllers
 (argo-rollouts, external-dns, kube-state-metrics, …) each independently pick it. `topologySpreadConstraints`
-(ADR-085) don't help: they spread the replicas of one workload, not independent workloads. And manual
+don't help: they spread the replicas of one workload, not independent workloads. And manual
 `kubectl delete` doesn't reliably fix it either — the scheduler frequently re-pins the pod to the same hot
 node.
 
@@ -279,7 +276,7 @@ exactly that through the `DefaultEvictor`:
   now. This is the guard against the failure mode a naive `kubectl delete` hits: rebalancing never strands
   a pod `Pending`.
 - **Respects [PodDisruptionBudgets](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/)** —
-  the ADR-085 workload PDBs and the CNPG database PDBs are never violated.
+  the workload PDBs and the CNPG database PDBs are never violated.
 - **`evictSystemCriticalPods: false`** — pods at
   [`system-cluster-critical`](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/)
   and above (Karpenter, CoreDNS) are left in place. The descheduler doesn't move them — it protects them
@@ -297,9 +294,9 @@ descheduler moves existing pods between existing nodes — the gap neither of th
 
 ## Part D — the staff door: reaching a cluster with no public endpoint
 
-The EKS API is **private-only** (ADR-010) — no public endpoint at all. So how do you run `kubectl`? Not
+The EKS API is **private-only** — no public endpoint at all. So how do you run `kubectl`? Not
 through a hole in the wall; through the campus's internal corridors. The primary path is
-[Tailscale](https://tailscale.com/) (ADR-011), verified live as a `Connector`:
+[Tailscale](https://tailscale.com/), verified live as a `Connector`:
 
 ```console
 $ kubectl --context platform get connector
@@ -372,7 +369,7 @@ reconnects within ~2 seconds. It's the door that still opens when the building's
 ### Operate, not author
 
 One security note ties Parts A–C together. Whether you arrive via Tailscale or SSM, the role
-`kubectl` assumes is **`PlatformAdmin`**, and ADR-040 rescoped it to operate, not author. Concretely:
+`kubectl` assumes is **`PlatformAdmin`**, scoped to operate, not author. Concretely:
 the EKS access entry grants the AWS-managed `AmazonEKSViewPolicy` (broad read) plus a `platform-operator`
 ClusterRole scoped to operate, not author. It grants `create` on the debug verbs — `pods/exec`,
 `pods/portforward`, `pods/eviction` (drain), and throwaway debug pods (`pods` + `pods/ephemeralcontainers`,
@@ -384,7 +381,7 @@ no `create` on `apps`/Deployments and no arbitrary-CRD authoring. You can debug,
 your heart's content; you cannot hand-create a Deployment or edit a system namespace. Authoring goes through
 GitOps — even the humans who run the platform hold no standing power to rewrite it by hand. (The one real residual: `pods/exec` lets a
 shell read that pod's mounted secrets and reach its Pod-Identity credentials — a deliberate trade for
-debuggability, noted in the ADR.)
+debuggability.)
 
 ---
 
@@ -403,8 +400,6 @@ debuggability, noted in the ADR.)
   cluster, and must be applied before first provision.
 - **The 8 GiB floor is a kubelet-stability floor, not a preference.** The ~3.2 GiB DaemonSet slab exhausts
   a 4 GiB node and flaps it `NotReady`; `min_instance_memory_mib = 6144` keeps it stable.
-- **The descheduler's ADR says Proposed; the cluster says live.** Trust the CronJob (`AGE 4d21h`), not the
-  header. Verify status against primary sources.
 - **`nodeFit: true` is the difference between rebalancing and an outage.** Without it, eviction can strand a
   pod `Pending` — which is exactly why naive `kubectl delete` isn't a fix.
 - **Userspace Tailscale isn't a preference — it's coexistence with Cilium.** Kernel mode silently corrupts
@@ -415,14 +410,6 @@ debuggability, noted in the ADR.)
 
 ## Go deeper — source of truth
 
-- [ADR-078 — Cluster elasticity (Karpenter + workload autoscaling)](../../adrs/078-cluster-elasticity-karpenter.md)
-  — the two-layer model, Cluster-Autoscaler rejection, the startup-taint and SCP as-built notes.
-- [ADR-093 — Descheduler for node rebalancing](../../adrs/093-descheduler-node-rebalancing.md) — the
-  2026-07-02 incident and the LowNodeUtilization thresholds (status lags reality — it's live).
-- [ADR-011 — Tailscale for private cluster access](../../adrs/011-tailscale-for-private-cluster-access.md)
-  and [ADR-010 — Private EKS API endpoint](../../adrs/010-private-eks-api-endpoint.md).
-- [ADR-040 — Platform engineer access model](../../adrs/040-platform-engineer-access-model.md) — the
-  operate-not-author rescoping of `PlatformAdmin`.
 - Modules: [`aws/eks-node-group`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/eks-node-group/main.tf),
   [`aws/karpenter`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/karpenter/main.tf)
   (+ the [NodePool chart](https://github.com/asanexample/platform/blob/main/infra/modules/aws/karpenter/charts/nodepool/templates/nodepool.yaml)),

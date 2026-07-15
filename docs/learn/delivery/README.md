@@ -13,7 +13,7 @@ ideally [Life of a Deployment](../spine/life-of-a-deployment.md).
 ## Read in this order
 
 1. **[Orientation](orientation.md)** — the one idea (*you move a digest up a ladder; reconcilers converge each
-   rung*), the three reconcilers (auto-promoter · ArgoCD · Rollout), and a real `acme-shop` climb from dev to
+   rung*), the three reconcilers (auto-promoter · ArgoCD · Rollout), and a real `alpha-shop` climb from dev to
    prod.
 2. **[Reference](reference.md)** — look-up: the `Release` schema, the per-Product ApplicationSet, the
    promotion paths and the ladder, the Rollout canary, the gotchas that bite, and a glossary.
@@ -22,9 +22,5 @@ ideally [Life of a Deployment](../spine/life-of-a-deployment.md).
 
 - The end-to-end flow: [The Life of a Deployment](../spine/life-of-a-deployment.md) · the runtime side:
   [The Life of a Request](../spine/life-of-a-request.md).
-- Architecture (as-built): [Promotion & Release](../../architecture/promotion-and-release.md).
+- Architecture: [Promotion & Release](../../architecture/promotion-and-release.md).
 - Extend it: the `argocd-app-delivery` house skill.
-- Why it's shaped this way: [ADR-021](../../adrs/021-argocd-for-gitops.md) (ArgoCD),
-  [ADR-071](../../adrs/071-digest-promotion-via-control-plane.md) (digest promotion),
-  [ADR-056](../../adrs/056-progressive-delivery-and-safe-rollback.md) (progressive delivery),
-  [ADR-069](../../adrs/069-delivery-source-of-truth-product-environment.md) (delivery source of truth).

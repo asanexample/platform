@@ -49,17 +49,16 @@ internal emails to every scraper on earth.
 
 ## Why committed-encrypted beats a runtime store — for this class
 
-This is the crux of ADR-066. Four reasons, each mapping to an alternative the ADR explicitly
-[rejected](../../adrs/066-sops-encrypted-config-secrets.md):
+This is the crux. Four reasons, each answering a home that doesn't fit this class:
 
 1. **It's build-time config the IaC reads before a secret store is reachable.** Terragrunt evaluates
    `secrets.enc.yaml` at config-load — before any provider assumes a role, before the S3 backend is even
    configured (the backend bucket name itself comes from this file). You can't fetch it from Secrets
    Manager, because you may be bootstrapping the very account that contains Secrets Manager. The config that
    stands up the platform can't depend on the platform being up.
-2. **Single source of truth, zero drift.** The rejected "materialize it in CI from a store" design creates a
-   second copy — the store's, and each operator's local one — that silently diverge. The ADR calls that
-   drift *"disqualifying"*: a stale store yields a CI apply that differs from what an operator would produce.
+2. **Single source of truth, zero drift.** A "materialize it in CI from a store" design creates a
+   second copy — the store's, and each operator's local one — that silently diverge. That
+   drift is *disqualifying*: a stale store yields a CI apply that differs from what an operator would produce.
    In git, CI and every laptop read the exact same bytes.
 3. **Versioned and PR-reviewable.** Because the ciphertext is committed, a change to it is a diff in a pull
    request. You can't read the values, but you can see that a value changed, when, and by whom — the same
@@ -207,23 +206,21 @@ encrypted or not. SOPS answers "which account is preprod?"; it must never answer
 
 ## Gotchas
 
-- **The `sops` binary is not how CI decrypts — and it's not where the ADR says it is.** ADR-066 §5 claims
-  `sops` is pinned in `/.tool-versions`, baked into the `gha-runner` image, and installed by `mise install`.
-  Verified against primary source, none of the automated-install claims hold: `sops` is absent from
+- **The `sops` binary is not how CI decrypts.** `sops` is absent from
   [`.tool-versions`](https://github.com/asanexample/platform/blob/main/.tool-versions) and from the
   [gha-runner Dockerfile](https://github.com/asanexample/platform/blob/main/docker/gha-runner/Dockerfile)
   (which bakes tofu/terragrunt/kubectl/helm/awscli only). Yet CI decrypts config fine — because
   `sops_decrypt_file` is a Terragrunt built-in that decrypts in-process using the SOPS Go library. It shells
   out to nothing; it needs `kms:Decrypt`, not the CLI. The `sops` binary is required only to edit the file
   (`sops infra/live/aws/secrets.enc.yaml`, which re-encrypts on save). So a local operator who ran
-  `mise install` and expected `sops` would not have it — a real doc-drift worth filing against the ADR.
+  `mise install` won't have `sops` — install it separately to edit the file.
 - **`prevent_destroy` plus teardown tooling must exclude this unit.** The key encrypts the committed file, so
   destroying `platform-sops` makes `secrets.enc.yaml` permanently undecryptable and bricks any rebuild.
   `prevent_destroy` is the seatbelt in the module, but it's belt-and-suspenders: `platctl` teardown must also
-  skip the unit, exactly like the S3 state backend (ADR-006). This is a bootstrap-floor resource.
+  skip the unit, exactly like the S3 state backend. This is a bootstrap-floor resource.
 - **The preprod operator grant is load-bearing, not symmetry.** You might read the three operator accounts
   (mgmt/platform/preprod) as tidy uniformity. It isn't: the bootstrap-tier `preprod/iam-roles` unit runs
-  account-direct (it predates `PlatformDeployer`, so it can't assume the management base role) and it
+  account-direct — it can't assume the management base role — and it
   decrypts `secrets.enc.yaml` at config-eval. Drop the preprod grant and a from-scratch rebuild fails on
   preprod.
 - **Editing needs an SSO-admin identity, not the runner.** The runner is decrypt-only by design, so it
@@ -233,9 +230,6 @@ encrypted or not. SOPS answers "which account is preprod?"; it must never answer
 
 ## Go deeper
 
-- **Source of truth:** [ADR-066](../../adrs/066-sops-encrypted-config-secrets.md) (the decision plus rejected
-  alternatives, including the *drift is disqualifying* argument and the KMS-vs-age choice); ADR-006 (the S3
-  state bootstrap — the analogous "exists before everything" floor).
 - **The code:**
   [`sops-kms` module](https://github.com/asanexample/platform/blob/main/infra/modules/aws/sops-kms/main.tf)
   (the three statement classes plus the `ArnLike` comment),

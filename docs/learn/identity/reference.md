@@ -34,43 +34,41 @@ Catalog today: `developer`, `team-admin`, `platform-operator`, `access-admin`, `
 
 ## Projection — where access lands
 
-Each tool decides access internally, so the platform derives its native config from `(Person × Role)`
-([ADR-089](../../adrs/089-governance-registry-topology.md)/[ADR-090](../../adrs/090-governance-identity-model.md)):
+Each tool decides access internally, so the platform derives its native config from `(Person × Role)`:
 
 - **AWS** — Identity Center permission sets (console/CLI), per team.
 - **Apps (ArgoCD, Backstage, Grafana)** — Keycloak realm roles / per-team groups, brokered via OIDC.
-- **Cluster** — per-team RBAC (ADR-039/040).
+- **Cluster** — per-team RBAC.
 - **Coming** — GitHub teams, PagerDuty on-call, Slack.
 
-## Temporary power (ADR-088)
+## Temporary power
 
 - An **`on-demand`** grant declares *eligibility* (who may borrow what) — but the projection generators
   **deliberately exclude on-demand grants** from the standing config, so the access **doesn't exist** in any
   system until activated.
 - **Activate** = a step-up (re-prompt a **passkey**, the `acr.loa.map` seam) + a **TTL**; extend in windows,
   then re-borrow. **Auto-revoked** on expiry, loudly audited.
-- **Built + live** (ADR-088, 2026-06-30): the eligibility model, the passkey step-up seam, *and* the
+- **Built + live**: the eligibility model, the passkey step-up seam, *and* the
   activation **operator** (a Kubebuilder controller that mints the live grant and expires it on TTL), with a
   Backstage front door.
 
 ## Workload identity
 
-- **EKS Pod Identity** (ADR-041/047): a pod assumes a scoped IAM role via its ServiceAccount — short-lived,
+- **EKS Pod Identity**: a pod assumes a scoped IAM role via its ServiceAccount — short-lived,
   **no static keys**. Provisioned per-Service by [the Environment Composition](../environment-api/orientation.md)
-  (e.g. `Pod-<team>-<product>-<stage>-<svc>`). The platform's own add-ons moved off IRSA to Pod Identity too.
-- **Agents — a richer machine subject** ([ADR-074](../../adrs/074-agentic-workloads-platform.md)): an agent
+  (e.g. `Pod-<team>-<product>-<stage>-<svc>`). The platform's own add-ons use Pod Identity too.
+- **Agents — a richer machine subject**: an agent
   gets its own Pod Identity plus a three-identity authority model — its own identity, its tool/model grant,
   and on-behalf-of-user delegation — where effective authority is the intersection of the agent grant and the
   human's scope, enforced by trusted boundary code (never the agent) and attenuating across chains. It's the
-  same access model, with agents as grant subjects (ADR-068 extended), bounded by graduated autonomy
-  ([ADR-086](../../adrs/086-autonomous-agent-access.md)). Largely designed today; the full treatment is the
-  coming Agentic platform module.
+  same access model, with agents as grant subjects, bounded by graduated autonomy. Largely designed today;
+  the full treatment is the coming Agentic platform module.
 
 ## Keycloak — the pluggable seam
 
-- Keycloak is the **IdP of record** for the workforce (ADR-053/059); it *brokers* a corporate IdP if one
-  exists, so the platform never becomes the identity monopoly. Apps get **direct OIDC** to Keycloak (Dex
-  retired). Admin plane hardened (passkey + sealed break-glass, ADR-087).
+- Keycloak is the **IdP of record** for the workforce; it *brokers* a corporate IdP if one
+  exists, so the platform never becomes the identity monopoly. Apps get **direct OIDC** to Keycloak. Admin
+  plane hardened (passkey + sealed break-glass).
 
 ## Gotchas
 
@@ -78,11 +76,9 @@ Each tool decides access internally, so the platform derives its native config f
   honest model verifies intent-vs-effected + drift, because a system could be changed out-of-band. Don't
   assume the console matches git without checking.
 - **Per-team *cluster* (kubectl) access isn't fully provisioned.** The v3 Composition emits only the
-  in-cluster `developers` RoleBinding, **not** the `DeveloperAccess-<team>` IAM role + EKS access entry
-  ([#647](https://github.com/asanexample/platform/issues/647) closed superseded by OIDC-native cluster auth
-  [#364](https://github.com/asanexample/platform/issues/364), still unbuilt) — use `platctl kubeconfig` /
-  PlatformAdmin until built. (This is why *this shell* reads with PlatformAdmin but can't write to tenant
-  namespaces.)
+  in-cluster `developers` RoleBinding, **not** the `DeveloperAccess-<team>` IAM role + EKS access entry —
+  OIDC-native cluster auth is designed, not yet built — use `platctl kubeconfig` / PlatformAdmin until built.
+  (This is why *this shell* reads with PlatformAdmin but can't write to tenant namespaces.)
 - **On-demand grants are invisible in every console** until activated — that's the point, not a bug.
 
 ## Glossary
@@ -96,12 +92,7 @@ Each tool decides access internally, so the platform derives its native config f
 
 ## Go deeper
 
-- [Identity & Access Strategy (north star)](../../architecture/identity-and-access-strategy.md) ·
-  [ADR-053](../../adrs/053-identity-and-cross-system-authorization-strategy.md) ·
-  [ADR-059](../../adrs/059-identity-topology-pluggable-idp-seam.md) ·
-  [ADR-068 access model](../../adrs/068-product-scoped-and-cross-team-access-model.md) ·
-  [ADR-088 temporary power](../../adrs/088-temporary-power-activation.md) ·
-  [ADR-084 owner routing](../../adrs/084-platform-identity-directory-and-owner-resolution.md).
+- [Identity & Access Strategy (north star)](../../architecture/identity-and-access-strategy.md).
 - Substrate: [NIST Zero Trust](https://csrc.nist.gov/pubs/sp/800/207/final) ·
   [EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) ·
   [Keycloak](https://www.keycloak.org/documentation).

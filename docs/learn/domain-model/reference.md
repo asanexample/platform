@@ -31,11 +31,11 @@ Developer ──granted──▶ Product (explicit, cross-team — an AccessGran
 
 ## Agents (`XAgent`) — a second deployment shape
 
-A Product can deploy as an **agent** instead of an Environment. `XAgent` (ADR-082) is a sibling claim to
+A Product can deploy as an **agent** instead of an Environment. `XAgent` is a sibling claim to
 `XEnvironment` — same `team` / `product` ownership — but hub-placed and shaped for an AI agent: a `model`,
 an `autonomy` limit (`propose-only` = read + suggest, never act), a `trigger`, and `awsPermissions`, with
 no stage/namespace grid. The reference agent is `triage-copilot` (`gitops/agents/`, owned by team
-`platform`). Full treatment belongs to the **agentic-platform** module (planned); the runtime is ADR-082.
+`platform`). Full treatment belongs to the **agentic-platform** module (planned).
 
 ## Stage vs Placement
 
@@ -49,10 +49,10 @@ no stage/namespace grid. The reference agent is `triage-copilot` (`gitops/agents
 
 | Derived name | Pattern | Example |
 | --- | --- | --- |
-| Namespace / Environment name | `<team>-<product>-<stage>` (`…-<customer>-<stage>` per-customer) | `acme-shop-dev` |
-| Image / [ECR](https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html) path | `team-<team>/<product>-<service>` | `team-acme/shop-web` |
-| Generated host | `<product>-<team>-<stage>.<baseDomain>` | `shop-acme-dev.preprod.aws.refplat.org` |
-| [Pod-Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) role | `Pod-<team>-<product>-[<customer>-]<stage>-<service>` | `Pod-acme-shop-dev-web` |
+| Namespace / Environment name | `<team>-<product>-<stage>` (`…-<customer>-<stage>` per-customer) | `alpha-shop-dev` |
+| Image / [ECR](https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html) path | `team-<team>/<product>-<service>` | `team-alpha/shop-storefront` |
+| Generated host | `<product>-<team>-<stage>.<baseDomain>` | `shop-alpha-dev.preprod.aws.refplat.org` |
+| [Pod-Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) role | `Pod-<team>-<product>-[<customer>-]<stage>-<service>` | `Pod-alpha-shop-dev-storefront` |
 
 Any derived identifier that would exceed its length ceiling (namespace 63, IAM role 64) is
 truncate-and-hashed deterministically — friendly in the common case, always valid in the edge case.
@@ -61,14 +61,14 @@ truncate-and-hashed deterministically — friendly in the common case, always va
 
 The bound on every Product/Environment a Team may author — enforced at
 [admission](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/)
-([Kyverno](https://kyverno.io/docs/) on the projected `Team` CR). Team `acme`'s, live:
+([Kyverno](https://kyverno.io/docs/) on the projected `Team` CR). Team `alpha`'s, live:
 
 ```yaml
 envelope:
   allowedTiers: ["standard"]                         # an Environment tier outside this set → rejected
   allowedStages: ["dev","test","uat","staging","prod"]
   quotaCap: { cpu: "8", memory: 16Gi, pods: 40 }     # per-Environment ceiling AND aggregate cap
-  budget: { monthlyUSD: 2000 }                        # ADR-091 cost guardrail
+  budget: { monthlyUSD: 2000 }                        # cost guardrail
   maxDedicatedIsolation: { cluster: 0, account: 0 }  # 0 = pooled only (no dedicated cluster/account)
   resources: { allowedEngines: ["s3","sqs","sns","dynamodb"], maxPerEnvironment: 10 }
 ```
@@ -94,8 +94,8 @@ re-declared.
   need it, and a Crossplane go-template can't cross-CR-lookup the Product. Denormalized on purpose.
 - **One repo : one Product** (but one Product : many Services). A monorepo is fine; a repo spanning two
   Products is not — image identity would be ambiguous.
-- **The deployed digest is *not* in the Environment claim.** It lives in a separate `Release` record
-  (ADR-071), because a digest changes every build and the human-authored claim shouldn't churn. The claim
+- **The deployed digest is *not* in the Environment claim.** It lives in a separate `Release` record,
+  because a digest changes every build and the human-authored claim shouldn't churn. The claim
   declares *what* runs; the Release says *which image*.
 - **`Customer` only attaches at prod/uat** for `per-customer` products; it's forbidden on
   dev/test/staging (those stay internal/pooled).
@@ -103,8 +103,6 @@ re-declared.
 ## Source of truth
 
 - [Platform Domain API](../../architecture/platform-domain-api.md) — the normative schema (every field).
-- [ADR-067](../../adrs/067-idp-domain-model.md) — the decision + rationale (ownership ≠ access,
-  stage ≠ placement, isolation as a dial).
 - Registries: [`gitops/teams`](https://github.com/asanexample/platform/tree/main/gitops/teams),
   [`gitops/products`](https://github.com/asanexample/platform/tree/main/gitops/products),
   [`gitops/environments`](https://github.com/asanexample/platform/tree/main/gitops/environments).

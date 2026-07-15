@@ -38,7 +38,7 @@ them. (The domain model walks a claim through that fence request by request —
 
 ## The record — a Team in git
 
-Onboarding a Team is adding one file, `gitops/teams/<team>.yaml`. Here is `acme`'s, envelope and all (trimmed
+Onboarding a Team is adding one file, `gitops/teams/<team>.yaml`. Here is `alpha`'s, envelope and all (trimmed
 for brevity — labels, comments, and a few optional fields elided; the [reference](reference.md) has the full
 field-by-field schema):
 
@@ -46,9 +46,9 @@ field-by-field schema):
 apiVersion: platform.refplat.org/v1beta1
 kind: Team
 metadata:
-  name: acme
+  name: alpha
 spec:
-  ssoGroup: Dev-acme               # the IDENTITY half — the IdP/Keycloak group this team maps to
+  ssoGroup: Dev-alpha              # the IDENTITY half — the IdP/Keycloak group this team maps to
   envelope:                        # the GOVERNANCE half — the bound on everything the team may ask for
     allowedTiers:  [standard]      # compliance tiers an Environment may request
     allowedStages: [dev, test, uat, staging, prod]
@@ -63,7 +63,7 @@ Two halves, and that's the whole shape worth holding in your head. `spec.ssoGrou
 identity-provider group whose members are the team (see [Identity](../identity/orientation.md)).
 `spec.envelope` is *what the team may do* — the fence. Nearly everything the platform builds for the team
 derives from those two fields; a couple of optional records — incident routing (`spec.slack` / `spec.pagerduty`,
-which drive the triage agent and the team's PagerDuty on-call, ADR-084) — ride on the same object.
+which drive the triage agent and the team's PagerDuty on-call) — ride on the same object.
 
 `kind: Team` is a real cluster CRD — cluster-scoped and data-only; it provisions nothing, it's just the
 admission-relevant mirror of the envelope. But the file in git is the source of truth: ArgoCD syncs it into the
@@ -75,10 +75,10 @@ both worlds.
 Merge that file and the platform converges a handful of things off it, each keyed on the one Team
 (`metadata.name`):
 
-- **A Keycloak group** — one group per Team (`Dev-acme`), the SSO identity the team signs in as; apps read the
+- **A Keycloak group** — one group per Team (`Dev-alpha`), the SSO identity the team signs in as; apps read the
   bare group name from the token. (Plumbing: [Identity](../identity/orientation.md).)
 - **A GitHub org team** — the human *ownership* grant. When the team owns a Product, this org team is granted
-  `push` on that product's repo ([ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md)). One caveat
+  `push` on that product's repo. One caveat
   worth keeping: org-team membership never rides in the CI token, so it carries **no** supply-chain authority —
   image trust always anchors on the repo, never on team membership.
 - **A Backstage group** — the Team projected into the developer portal's catalog, so ownership shows up where
@@ -118,7 +118,7 @@ A Team is the root of the ownership tree ([domain model](../domain-model/orienta
 
 - A **Team** owns Products and declares the envelope that bounds them.
 - A **Product** is one application the team owns ([Onboarding a Product](../products/orientation.md)).
-- An **Environment** is a Product at a stage (`acme-shop-dev`), claimed within the envelope
+- An **Environment** is a Product at a stage (`alpha-shop-dev`), claimed within the envelope
   ([Environment API](../environment-api/orientation.md)).
 
 Onboard the Team first: a Product PR is rejected if its Team doesn't exist yet, and an Environment claim is
@@ -131,6 +131,3 @@ rejected if the envelope doesn't allow it.
 - The `Team` CR schema, field by field, with the honest gotchas: the [Reference](reference.md).
 - The concept this module builds on: [the Team as an envelope](../domain-model/orientation.md#the-team-is-an-envelope) ·
   the people-and-roles half: [Identity](../identity/orientation.md).
-- Why it's shaped this way: [ADR-063](../../adrs/063-team-as-first-class-git-object.md) (Team as a first-class
-  git object) · [ADR-067](../../adrs/067-idp-domain-model.md) (the domain model) ·
-  [ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md) (org-Team ownership).

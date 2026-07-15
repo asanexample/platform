@@ -17,7 +17,7 @@ The single idea everything else hangs off:
 ## The frame: a control plane with no door to the street
 
 Start with the door — it's the cheapest thing to verify and the easiest to get wrong. The EKS API
-endpoint is private-only ([ADR-010](../../adrs/010-private-eks-api-endpoint.md)). Ask the live platform
+endpoint is private-only. Ask the live platform
 cluster what its endpoint posture is — and note the `--output json`, because `--output text` prints these
 booleans in *alphabetical column order* with no headers and will happily convince you public access is on
 when it isn't:
@@ -52,7 +52,7 @@ And the default is *closed*. The module's `endpoint_public_access` variable defa
 ```hcl
 variable "endpoint_public_access" {
   description = "Enable the public API server endpoint. Defaults to false — private-only is the house
-                 policy (ADR-010); reach the API over Tailscale/SSM. Set true only deliberately..."
+                 policy; reach the API over Tailscale/SSM. Set true only deliberately..."
   type        = bool
   default     = false
 }
@@ -78,7 +78,7 @@ resource "aws_eks_cluster" "this" {
 
 Normally EKS pre-installs three DaemonSets for you: the AWS VPC CNI, kube-proxy, and CoreDNS. Setting
 `bootstrap_self_managed_addons = false` tells AWS to install none of the networking — no CNI, no
-kube-proxy ([ADR-008](../../adrs/008-cilium-as-cross-cloud-cni.md)). This is deliberate: if the AWS VPC CNI
+kube-proxy. This is deliberate: if the AWS VPC CNI
 were installed, it would fight Cilium for control of pod networking. So the cluster comes up able to
 *authenticate* API calls but unable to give a single pod an IP address.
 
@@ -90,7 +90,7 @@ cluster, *then* create the node groups" inside a single module — the Helm prov
 endpoint to even configure itself, which is a circular dependency if it lives in the same module that
 *creates* the cluster.
 
-The answer ([ADR-009](../../adrs/009-eks-component-separation.md)) is to split the build into four ordered
+The answer is to split the build into four ordered
 Terragrunt units, each its own module and its own state file:
 
 ```text
@@ -132,7 +132,7 @@ State isolation is a feature — a failed `node-groups` apply can't corrupt the 
 separation hands you a loaded gun. The units apply in the order above and **destroy in reverse**
 (`eks-addons` → `node-groups` → `cilium` → `eks`). Destroying the `cilium` unit *by itself*, out of order,
 rips the CNI out from under every running node — pods keep existing but lose all networking, cluster-wide,
-instantly. ADR-009 flags this explicitly as the one risk the separation introduces. The four units make it
+instantly. This is the one risk the separation introduces. The four units make it
 *impossible to build the cluster in the wrong order*, but they do nothing to stop you *destroying* one in
 the wrong order. `terragrunt destroy` in the `cilium` directory is a cluster outage with a friendly-looking
 plan.
@@ -221,14 +221,14 @@ to mint certificates. The obvious tool is [cert-manager](https://cert-manager.io
 as *pods*, and pods need a CNI, and the CNI is the very thing being installed. Reaching for cert-manager to
 bootstrap Cilium's own certs is a perfect circular dependency. So the AWS plumbing pins
 `hubble.tls.auto.method = "helm"` — the Helm chart generates the certs itself, in-process, needing nothing
-already running in the cluster. It's a deliberate trade (ADR-008 lists it as a negative: Hubble's certs
+already running in the cluster. It's a deliberate trade (Hubble's certs
 aren't integrated with the platform's cert-manager) accepted to break the cycle.
 
 **The Gateway API ingress identity — the one that bites people writing policy.** Cilium's Gateway API runs
 an external [Envoy](https://gateway-api.sigs.k8s.io/) proxy — the `cilium-envoy` DaemonSet you saw above —
 with `hostNetwork`. When Envoy forwards a request to your backend pod, the packet's source is **not** the
 node's IP and **not** the `host` identity you'd guess. Cilium stamps it with a *reserved* identity —
-**`ingress`, identity number 8** ([ADR-008](../../adrs/008-cilium-as-cross-cloud-cni.md)).
+**`ingress`, identity number 8**.
 
 Why this matters: Cilium enforces network policy by **identity**, not by IP. If you write a
 CiliumNetworkPolicy to protect an environment namespace and you allow traffic by CIDR (`ipBlock`), it
@@ -288,12 +288,6 @@ this for you (`enable-gateway-api-secrets-sync=true`, `gateway-api-secrets-names
 
 ## Source of truth
 
-- **[ADR-010 — Private-Only EKS API Endpoint](../../adrs/010-private-eks-api-endpoint.md)** — the double
-  gate, the per-cluster status, and the one bootstrap exception where the public endpoint is toggled.
-- **[ADR-009 — EKS Component Separation](../../adrs/009-eks-component-separation.md)** — the four units, the
-  alternatives rejected (monolith + provisioners, monolith + `depends_on`), and the destroy-order risk.
-- **[ADR-008 — Cilium as Cross-Cloud CNI](../../adrs/008-cilium-as-cross-cloud-cni.md)** — BYOCNI, the
-  overlay datapath, `kubeProxyReplacement`, the ingress identity, Hubble TLS, and the `cloud_provider` model.
 - **Code:** `infra/modules/aws/eks/main.tf` (`bootstrap_self_managed_addons`, endpoint config) and
   `infra/modules/aws/eks/variables.tf` (the fail-safe `endpoint_public_access = false` default);
   `infra/modules/cilium/main.tf` (the `cloud_plumbing.aws` block — `kubeProxyReplacement`, Hubble method,

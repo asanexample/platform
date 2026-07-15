@@ -5,8 +5,8 @@ A lookup page. The [orientation](orientation.md) covers the model behind it.
 ## The engine
 
 - **[Kyverno](https://kyverno.io/docs/) v1.18.1**, HA, on the cluster's admission webhook — evaluates
-  every resource create/update. It layers above the native **Pod Security Admission `baseline`** floor
-  (ADR-014): PSA is the backstop, Kyverno expresses what PSA can't — registry scoping, hostname allow-lists,
+  every resource create/update. It layers above the native **Pod Security Admission `baseline`** floor:
+  PSA is the backstop, Kyverno expresses what PSA can't — registry scoping, hostname allow-lists,
   per-product rules.
 - The `policy` module holds no team data. Per-product values are derived from the **`Product` registry**
   (`fileset` + `yamldecode`) at apply time.
@@ -17,17 +17,17 @@ A lookup page. The [orientation](orientation.md) covers the model behind it.
 | --- | --- | --- |
 | **validate** | reject a non-compliant resource at admission | `disallow-latest-tag`, `require-requests-limits`, `require-pod-probes`, `restrict-image-registries`, `restrict-images-<env>`, `require-prod-replica-floor` |
 | **mutate** | rewrite the resource on the way in (inject safe defaults) | `mutate-pod-defaults` (drop caps, `allowPrivilegeEscalation:false`, `seccomp:RuntimeDefault`, automount off), `mutate-workload-labels` (`team`), `mutate-topology-spread` |
-| **generate** | create a companion resource alongside it | `generate-workload-pdb` (a `maxUnavailable:1` PDB per workload, ADR-085) |
+| **generate** | create a companion resource alongside it | `generate-workload-pdb` (a `maxUnavailable:1` PDB per workload) |
 
 ## The policy catalog (shape)
 
 - **Baseline (platform-wide, Phase 1):** latest-tag, requests/limits, probes, seccomp, privilege-escalation,
   registry allow-list, default-namespace, wildcard-RBAC, cluster-admin binding, workload naming/labels.
 - **Mutate (Phase 2):** securityContext + automount defaults, `team` label, topology spread.
-- **Generate (ADR-085):** the per-workload PodDisruptionBudget.
+- **Generate:** the per-workload PodDisruptionBudget.
 - **Per-product (derived, per environment namespace):** `restrict-images-<team>-<product>-<stage>` (only
   `…/team-<team>/<product>-*` images) and `restrict-route-hostnames-<…>` (only the Environment's hostnames).
-  **Owned by the [Environment Composition](../environment-api/orientation.md)** (ADR-046) — rendered with the
+  **Owned by the [Environment Composition](../environment-api/orientation.md)** — rendered with the
   namespace.
 - **Supply chain (Phase 3, cosign keyless, Enforce):** `verify-images-product-<team>-<product>` (signed) +
   `verify-attestations-product-<team>-<product>` (SBOM + SLSA provenance). Platform-owned, per product.
@@ -50,15 +50,15 @@ Full per-cluster catalog + status: [`kyverno-policy-catalog.md`](../../architect
   The top-level `spec.validationFailureAction` is deprecated and defaults to `Audit`, so
   `kubectl get clusterpolicy -o …spec.validationFailureAction` lies — it shows `Audit` even where rules
   Enforce. Read the per-rule field, or just test admission. This asymmetry is a latent fail-open risk on a
-  security control; [#1184](https://github.com/asanexample/platform/issues/1184) tracks a guard.
+  security control.
 - **A per-policy `matchConditions` doesn't skip the aggregated webhook.** Kyverno serves all policies
   through one aggregated webhook. To make it ignore a resource you need a global engine matchCondition,
-  not a per-policy one (#830).
+  not a per-policy one.
 - **A `generate` rule's match is immutable.** You can't change an existing generate rule's match in place —
-  add a new rule (burned ADR-056 #856).
+  add a new rule.
 - **Availability policies don't match `Rollout` by default.** `require-prod-replica-floor`,
   `generate-workload-pdb`, and `mutate-topology-spread` only match `argoproj.io/v1alpha1/Rollout` when
-  `enable_rollout_kind = true` (default off — a Kyverno rule can't name an absent CRD, #7839). Pod-level
+  `enable_rollout_kind = true` (default off — a Kyverno rule can't name an absent CRD). Pod-level
   policies cover Rollout pods automatically via ReplicaSet autogen. See the
   [Delivery reference](../delivery/reference.md).
 - **The platform exempts itself.** System namespaces (kube-system, kyverno, argocd, karpenter, …) are
@@ -76,8 +76,7 @@ Full per-cluster catalog + status: [`kyverno-policy-catalog.md`](../../architect
 
 ## Go deeper
 
-- [Kyverno policy catalog](../../architecture/kyverno-policy-catalog.md) (as-built, per-cluster) ·
-  [ADR-014](../../adrs/014-kyverno-as-policy-engine.md).
+- [Kyverno policy catalog](../../architecture/kyverno-policy-catalog.md) (as-built, per-cluster).
 - Author policies: the `kyverno-policy-authoring` skill. Write compliant workloads:
   `authoring-k8s-workloads` + [`compliant-deployment.yaml`](../../examples/compliant-deployment.yaml).
 - Substrate: [Kyverno](https://kyverno.io/docs/) ·

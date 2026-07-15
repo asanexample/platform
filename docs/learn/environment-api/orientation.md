@@ -13,7 +13,7 @@
 
 A team wants somewhere to run a new service. Not just a namespace — they need the *whole* footprint: a
 namespace with sensible limits, an image registry scoped to them, AWS permissions for the app, network
-rules, the policy guardrails. The old way to get all that is a pile of tickets and a week of waiting.
+rules, the policy guardrails. Getting all that by hand is a pile of tickets and a week of waiting.
 
 On this platform you write one short YAML file, open a pull request, and a few minutes after it merges
 the whole footprint exists — and stays correct afterward. The machine that makes that true is the
@@ -67,13 +67,13 @@ finishes, always closing the gap); what doesn't is "one dial, one number."
 
 Hold onto that picture. Now watch a real one get built.
 
-## Watch one get built: `acme-shop-dev`
+## Watch one get built: `alpha-shop-dev`
 
-There is a real environment on the platform called `acme-shop-dev`. That name isn't arbitrary — it's three
-coordinates from the platform's ownership model: a **Team** (`acme` — who owns it), a **Product** (`shop` —
+There is a real environment on the platform called `alpha-shop-dev`. That name isn't arbitrary — it's three
+coordinates from the platform's ownership model: a **Team** (`alpha` — who owns it), a **Product** (`shop` —
 the thing they're building), and a **Stage** (`dev` — where on the dev → prod ladder this copy sits). An
 *environment* is exactly that: one Product at one Stage, and its name is always `<team>-<product>-<stage>`.
-So `acme-shop-dev` reads as "Team acme's `shop` product, in dev."
+So `alpha-shop-dev` reads as "Team alpha's `shop` product, in dev."
 
 That Team → Product → Stage model stands on its own — the
 [domain model](../domain-model/orientation.md) covers it; here we just need the coordinates so the name
@@ -83,21 +83,21 @@ makes sense. This environment has run untouched for weeks; we'll follow it end t
 
 This is the meaningful spec of the file that asks for the environment (its header comments, the
 `requested-by` annotation, and a `preview: true` flag are elided for clarity). It lives in git, at
-[`gitops/environments/acme/shop/dev.yaml`](https://github.com/asanexample/platform/tree/main/gitops/environments):
+[`gitops/environments/alpha/shop/dev.yaml`](https://github.com/asanexample/platform/tree/main/gitops/environments):
 
 ```yaml
 apiVersion: platform.refplat.org/v1beta1
 kind: XEnvironment
 metadata:
-  name: acme-shop-dev
+  name: alpha-shop-dev
 spec:
-  team: acme
+  team: alpha
   product: shop
   stage: dev
   tier: standard
   services:
-    web:
-      serviceAccount: app-acme
+    storefront:
+      serviceAccount: app-alpha
 ```
 
 That's the **claim** — a statement of desired state. Note what's *not* in it: no account IDs, no registry
@@ -127,15 +127,15 @@ continuously makes the cluster match git.) After the sync, the `XEnvironment` ob
 **preprod** cluster:
 
 ```console
-$ kubectl --context preprod get xenvironment acme-shop-dev
+$ kubectl --context preprod get xenvironment alpha-shop-dev
 NAME             SYNCED   READY   COMPOSITION   AGE
-acme-shop-dev    True     True    environment   15d
+alpha-shop-dev    True     True    environment   15d
 ```
 
 `SYNCED=True` means Crossplane accepted the claim. `READY=True` means everything it built is healthy.
 `COMPOSITION=environment` is the name of the machine that built it — which is what we look at next.
 
-> 📸 **Screenshot:** ArgoCD showing the `environments` Application with the `acme-shop-dev`
+> 📸 **Screenshot:** ArgoCD showing the `environments` Application with the `alpha-shop-dev`
 > `XEnvironment` synced and healthy — the "nothing is applied by hand" picture. Spec in
 > [_screenshots.md](_screenshots.md).
 
@@ -149,17 +149,17 @@ it:
 ![The footprint a single Environment claim creates, drawn as a tree: the XEnvironment claim at the root, with everything the Composition provisioned hanging off it — the ECR repository and its policies, the IAM role and Pod Identity association in the workload account, and the in-cluster objects (namespace, quota, network policy, RoleBinding, Kyverno). The console trace below is the literal proof of the same tree.](images/seventeen-real-things.svg)
 
 ```console
-$ crossplane resource trace xenvironment acme-shop-dev --context preprod
+$ crossplane resource trace xenvironment alpha-shop-dev --context preprod
 NAME                                       SYNCED  READY  STATUS
-XEnvironment/acme-shop-dev                 True    True   Available
-├─ Repository/acme-shop-dev-…              True    True   Available
-├─ RepositoryPolicy/acme-shop-dev-…        True    True   Available
-├─ LifecyclePolicy/acme-shop-dev-…         True    True   Available
-├─ Role/acme-shop-dev-…                    True    True   Available
-├─ PodIdentityAssociation/acme-shop-dev-…  True    True   Available
-├─ Object/acme-shop-dev-…                  True    True   Available
+XEnvironment/alpha-shop-dev                 True    True   Available
+├─ Repository/alpha-shop-dev-…              True    True   Available
+├─ RepositoryPolicy/alpha-shop-dev-…        True    True   Available
+├─ LifecyclePolicy/alpha-shop-dev-…         True    True   Available
+├─ Role/alpha-shop-dev-…                    True    True   Available
+├─ PodIdentityAssociation/alpha-shop-dev-…  True    True   Available
+├─ Object/alpha-shop-dev-…                  True    True   Available
 │    …(12 Object rows total — the in-cluster resources)…
-└─ Object/acme-shop-dev-…                  True    True   Available
+└─ Object/alpha-shop-dev-…                  True    True   Available
 ```
 
 (That tree view is `crossplane resource trace`; the [reference](reference.md) has the exact command and a
@@ -172,7 +172,7 @@ Grouped:
 **In the cluster** (the twelve `Object/…` rows):
 
 - the [**Namespace**](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
-  `acme-shop-dev` itself,
+  `alpha-shop-dev` itself,
 - a [**ResourceQuota**](https://kubernetes.io/docs/concepts/policy/resource-quotas/) and
   [**LimitRange**](https://kubernetes.io/docs/concepts/policy/limit-range/) (the cost/blast-radius
   guardrails),
@@ -193,29 +193,29 @@ Grouped:
 **In AWS** — the app's identity and its image registry:
 
 - an [**IAM Role**](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html)
-  `Pod-acme-shop-dev-web` and a
+  `Pod-alpha-shop-dev-storefront` and a
   [**PodIdentityAssociation**](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) —
   together, how the app's pod gets AWS permissions without any static keys,
 - an [**ECR Repository**](https://docs.aws.amazon.com/AmazonECR/latest/userguide/what-is-ecr.html)
-  `team-acme/shop-web` (plus its lifecycle + cross-account pull policy) — the image registry, scoped to
+  `team-alpha/shop-storefront` (plus its lifecycle + cross-account pull policy) — the image registry, scoped to
   exactly this team and product.
 
 Here are three of those, live, so you can see they're real and not diagrams:
 
 ```console
-$ kubectl --context preprod get ns acme-shop-dev --show-labels
+$ kubectl --context preprod get ns alpha-shop-dev --show-labels
 NAME             STATUS   AGE   LABELS
-acme-shop-dev    Active   15d   platform.refplat.org/team=acme,platform.refplat.org/product=shop,
+alpha-shop-dev    Active   15d   platform.refplat.org/team=alpha,platform.refplat.org/product=shop,
                                 platform.refplat.org/stage=dev,platform.refplat.org/tier=standard,
                                 pod-security.kubernetes.io/enforce=baseline, ...
 
-$ kubectl --context preprod get resourcequota -n acme-shop-dev
+$ kubectl --context preprod get resourcequota -n alpha-shop-dev
 NAME                REQUEST                                          LIMIT
 environment-quota   requests.cpu: 50m/4, requests.memory: 64Mi/8Gi  limits.cpu: 250m/4, ...
 
-$ kubectl --context preprod get clusterpolicy | grep acme-shop-dev
-restrict-images-acme-shop-dev             Ready
-restrict-route-hostnames-acme-shop-dev    Ready
+$ kubectl --context preprod get clusterpolicy | grep alpha-shop-dev
+restrict-images-alpha-shop-dev             Ready
+restrict-route-hostnames-alpha-shop-dev    Ready
 ```
 
 Those two policies are worth a pause. [**Kyverno**](https://kyverno.io/docs/) is the platform's *policy
@@ -224,14 +224,14 @@ cluster door that inspects every resource at
 [**admission**](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) (the
 instant it's submitted) and turns away anything that breaks the rules; the
 [domain model](../domain-model/orientation.md) grounds it more.
-`restrict-images-acme-shop-dev` is one such rule: a
+`restrict-images-alpha-shop-dev` is one such rule: a
 [pod](https://kubernetes.io/docs/concepts/workloads/pods/) in this namespace can *only* run images from
-`team-acme/shop-*`. The environment doesn't just *get* a registry — it comes with an admission rule that
+`team-alpha/shop-*`. The environment doesn't just *get* a registry — it comes with an admission rule that
 says "you may only run your own images." The footprint includes its own guardrails.
 
 ### 4. The whole flow, in one picture
 
-![The whole flow in one picture: you edit `gitops/environments/acme/shop/dev.yaml` and merge a PR into git (the source of truth); ArgoCD syncs it to the preprod cluster as the XEnvironment `acme-shop-dev`; the Composition reconciles it into cluster objects (namespace, quota, netpol, RoleBinding, Kyverno), an IAM role plus Pod Identity in the workload account, and an ECR repo in the platform account — the one cross-account hop. Every branch is watched forever.](images/environment-build-flow.svg)
+![The whole flow in one picture: you edit `gitops/environments/alpha/shop/dev.yaml` and merge a PR into git (the source of truth); ArgoCD syncs it to the preprod cluster as the XEnvironment `alpha-shop-dev`; the Composition reconciles it into cluster objects (namespace, quota, netpol, RoleBinding, Kyverno), an IAM role plus Pod Identity in the workload account, and an ECR repo in the platform account — the one cross-account hop. Every branch is watched forever.](images/environment-build-flow.svg)
 
 One thing to notice: the ECR repo lives in a **different AWS account** (the platform account) from
 everything else (the workload account). That single cross-account reach is deliberate — image registries
@@ -296,7 +296,7 @@ The `True True` you keep seeing isn't decoration — it's the loop reporting in.
 carries two conditions you'll learn to read at a glance:
 
 ```console
-$ kubectl --context preprod get role.iam.aws.upbound.io acme-shop-dev-... \
+$ kubectl --context preprod get role.iam.aws.upbound.io alpha-shop-dev-... \
     -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
 Ready=True (Available)
 Synced=True (ReconcileSuccess)
@@ -343,8 +343,8 @@ crossplane render environments/demo-dev.yaml \
 ```
 
 (The offline fixtures use a `demo` product — same shape as `shop`.) You'll get the same kind of footprint
-you saw above: a namespace `acme-demo-dev`, an ECR repo `team-acme/demo-web`, a role
-`Pod-acme-demo-dev-web`, and the rest. (Its sibling `./render.sh` renders the fixtures *and* asserts the
+you saw above: a namespace `alpha-demo-dev`, an ECR repo `team-alpha/demo-web`, a role
+`Pod-alpha-demo-dev-web`, and the rest. (Its sibling `./render.sh` renders the fixtures *and* asserts the
 footprint.)
 
 Now the real exercise — **predict, then check.** Open `environments/demo-dev.yaml`, change `stage: dev` to
@@ -354,8 +354,8 @@ Now the real exercise — **predict, then check.** Open `environments/demo-dev.y
 <summary>Answer</summary>
 
 The *shape* is identical — the same footprint — but every name that embeds the stage shifts: the
-namespace becomes `acme-demo-test`, the IAM role `Pod-acme-demo-test-web`. One thing pointedly does
-**not** change: the ECR repo path stays `team-acme/demo-web` — it's keyed on product + service, not
+namespace becomes `alpha-demo-test`, the IAM role `Pod-alpha-demo-test-web`. One thing pointedly does
+**not** change: the ECR repo path stays `team-alpha/demo-web` — it's keyed on product + service, not
 stage, because images are *promoted* between stages, not rebuilt per stage. If you predicted that, you've
 got the model: the claim is a template of intent, and the Composition is a pure function of it.
 
@@ -387,8 +387,8 @@ If something feels off, it's probably one of these — the wrong models people m
   declare intent, and the loop reconciles it over the next moments. `READY=True` is how you know reality
   has caught up.
 
-> 📸 **Screenshot:** Backstage's catalog view of `acme-shop-dev` — the platform's *own* picture of the
-> environment, listing the namespace, the `team-acme/shop-web` registry, the `Pod-acme-shop-dev-web`
+> 📸 **Screenshot:** Backstage's catalog view of `alpha-shop-dev` — the platform's *own* picture of the
+> environment, listing the namespace, the `team-alpha/shop-storefront` registry, the `Pod-alpha-shop-dev-storefront`
 > role, and its policies as owned resources. A nice "the system sees what you built" capstone. Spec in
 > [_screenshots.md](_screenshots.md).
 
@@ -406,5 +406,3 @@ the [environment onboarding runbook](../../runbooks/environment-onboarding.md).
 - [Reference](reference.md) — full mechanism, glossary, gotchas, and curated Crossplane learning links.
 - [Crossplane Environment API](../../architecture/crossplane-environment-api.md) — the as-built
   architecture doc.
-- [ADR-067](../../adrs/067-idp-domain-model.md) (the Team/Product/Service/Environment model) and
-  [ADR-048](../../adrs/048-federated-per-cluster-crossplane.md) (why it's federated per cluster).

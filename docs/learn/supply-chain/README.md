@@ -25,6 +25,3 @@ skip to the [Reference](reference.md).
   [The Life of a Deployment](../spine/life-of-a-deployment.md). The threat framing:
   [The Security Model](../spine/the-security-model.md).
 - Onboard your app (the thin-caller snippet): the `supply-chain-onboarding` skill.
-- Why it's shaped this way: [ADR-042](../../adrs/042-isolated-build-provenance-slsa-l3.md) (isolated SLSA L3
-  provenance), [ADR-050](../../adrs/050-shared-build-sign-reusable-workflow.md) (shared build-sign),
-  [ADR-036](../../adrs/036-github-actions-oidc-federation.md) (GitHub OIDC).

@@ -7,9 +7,8 @@ built is a tape recorder.
 
 ## The honest headline
 
-Everything below describes a design. [ADR-086](../../adrs/086-autonomous-agent-access.md) — which specifies
-how autonomy would work — carries the status header **"Proposed (draft / sketch — 2026-06-27)"**, and it
-means it. The grader doesn't exist. The reversibility registry doesn't exist. The action-time policy engine
+Everything below describes a design — and it is genuinely just a design, not something the platform runs
+yet. The grader doesn't exist. The reversibility registry doesn't exist. The action-time policy engine
 doesn't exist. The `autonomy.mode` field in the live API is schema-locked so it *cannot express* anything but
 propose-only. There is exactly one shipped artifact in this whole topic, and it governs nothing: a hardened
 S3 bucket that records incidents so that someday, if the rest gets built, there's a corpus to grade against.
@@ -23,7 +22,7 @@ the easiest area in the platform to oversell.
 Propose-only is safe and it's real: a fully hijacked triage agent can, at worst, post an ignored Slack
 message. But a suggestion-only agent can't *auto-remediate* — restart a wedged pod at 3 a.m., scale to absorb
 load, roll back a bad deploy — the cases where waiting for a human to click approve defeats the point of
-having the agent. ADR-086 opens with the two wrong answers to that: **propose-only forever** (safe, but caps
+having the agent. There are two wrong answers to that: **propose-only forever** (safe, but caps
 the platform's value) and **give a trusted agent broad `operate`** (powerful, but a prompt-injected agent
 holding standing operate is the single worst case in the system). The design lives in the narrow middle.
 
@@ -38,7 +37,7 @@ it never removes the rail.
 
 ## The design: autonomy is graduated, per-class, earned, and machine-bounded
 
-The core decision (ADR-086) is a single sentence, and each adjective does work:
+The core decision is a single sentence, and each adjective does work:
 
 > Autonomy is **graduated, per-action-class, earned, and machine-bounded — never a global property of an
 > agent.**
@@ -71,7 +70,7 @@ stateDiagram-v2
 ### The five conditions — all must hold
 
 An agent may act autonomously on an action-class **only when every one** of these is true; miss any and the
-action falls back to propose-and-gate (the propose-only path, unchanged):
+action falls back to propose-and-gate (the propose-only path you have today):
 
 1. the class is inside the agent's **explicit capability envelope** (an allow-list, not "operate");
 2. the class is **reversible or bounded-impact** — this is the *license* for autonomy;
@@ -84,7 +83,7 @@ Two of these deserve unpacking — they're the parts most likely to be built wro
 
 ### The reversibility registry — the crux, and it's platform-owned
 
-The hardest, most safety-critical piece is deciding *which action-classes are even eligible*. ADR-086 puts
+The hardest, most safety-critical piece is deciding *which action-classes are even eligible*. The design puts
 this in a **platform-owned classification registry** — never author-set, never agent-set — that classifies
 each class by reversibility × blast radius:
 
@@ -134,12 +133,11 @@ validator, not by a human reviewer.
 **The two sibling fields are theatre, honestly labelled.** `maxConcurrent` (default `4`) and `tokenBudget`
 sit right beside `mode`, and the XRD's own description says they are **"informational to the Composition,
 enforced by the agent."** They are *not* a platform-level circuit breaker — the Composition doesn't wire them
-to anything that can halt the agent. The design (ADR-086 §"circuit breakers, budgets, rate limits") wants a
+to anything that can halt the agent. The design wants a
 real breaker that trips and falls back to the gated path; what exists is a hint the agent's own code may
 honor. Believe the description, not the field name.
 
-**The grader, registry, and policy engine are all unbuilt** — and ADR-086 says so in its own Consequences:
-*"the grader, reversibility registry, and action-time policy remain unbuilt."* The whole thing is gated on an
+**The grader, registry, and policy engine are all unbuilt.** The whole thing is gated on an
 **eval-as-a-service** that doesn't exist.
 
 **There is one inert artifact worth knowing about.** The "Triage Agent" dashboard
@@ -152,8 +150,7 @@ design's conservatism shows even in the mock.
 
 ## The one thing that's real: the forward-capture substrate
 
-Here's the built piece, and it's good engineering precisely *because* it does so little. Merged as **#1074**
-(2026-07-01), it's the module
+Here's the built piece, and it's good engineering precisely *because* it does so little. It's the module
 [`agent-eval-store`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/agent-eval-store/main.tf)
 plus its live unit, standing up a single S3 bucket: **`platform-agent-eval-corpus`**. It captures real triage
 episodes as fixtures — `{alert-group, telemetry snapshot, structured label, rubric}` — and does **nothing
@@ -226,9 +223,8 @@ CI regression suite on every prompt, model, or tool change**. The grading is set
 **top-1 / top-3 culprit-service**, **failure-class accuracy**, and the strict gate **change-attribution** —
 each replayed `k` times with a **`pass^k` consistency** check that fails on flapping (right 6 times in 10 is
 not "promoted"). Calibration is scored too, not just correctness: a correct *abstention* is rewarded; a
-confident-but-wrong root cause is scored *worse* than admitting uncertainty. Feasibility was proven by a spike
-on **2026-06-24/25** on a **12-fixture corpus** — result **GO** — which is exactly why the capture substrate
-got built. But "GO on feasibility" is not "grader shipped"; the grader still lives in the backlog.
+confident-but-wrong root cause is scored *worse* than admitting uncertainty. The grader itself is not yet
+wired as a CI gate — it lives in the backlog.
 
 ## Where the whole thing actually sits today
 
@@ -259,12 +255,6 @@ ladder; it *is* the safety model until eval-as-a-service exists to justify anyth
 
 ## Go deeper
 
-- [ADR-086](../../adrs/086-autonomous-agent-access.md) — the autonomy design in full (Proposed): the five
-  conditions, the reversibility registry, the action-time boundary, the graduation ladder.
-- [ADR-080](../../adrs/080-triage-copilot.md) — the reference agent and, in D6/D10/D11, the eval mechanism:
-  fault-injection oracle, `pass^k`, calibration scoring, and the accept/correct/dismiss feedback capture.
-- [ADR-074](../../adrs/074-agentic-workloads-platform.md) — the substrate ADR-086 extends; the `auto-policy-gate`
-  seam it leaves open.
 - The built substrate:
   [`agent-eval-store/main.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/aws/agent-eval-store/main.tf)
   · its [live unit](https://github.com/asanexample/platform/blob/main/infra/live/aws/platform/us-east-1/platform/agent-eval-store/terragrunt.hcl)

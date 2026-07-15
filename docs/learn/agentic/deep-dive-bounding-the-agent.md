@@ -10,8 +10,7 @@ the cage.
 An agent is a **governed principal, not a pod.** A normal pod you bound because bugs happen. An agent
 you bound because its brain is a non-deterministic model you don't control, fed untrusted input —
 alerts, logs, diffs, all of it a prompt-injection surface, and every published defense against prompt
-injection can be bypassed individually
-([ADR-074](../../adrs/074-agentic-workloads-platform.md)). So the rule is blunt: **never trust the
+injection can be bypassed individually. So the rule is blunt: **never trust the
 model's behavior — bound its capability in advance.** A perfectly hijacked agent must still be unable
 to exceed its badge.
 
@@ -24,7 +23,7 @@ doesn't, and its improvisation *is* the risk. So the bounds are hard, external t
 rely on goodwill.
 
 The rest is six independent bounds, then the admission gates that keep them un-bypassable, then the one
-idea that ties them together — the lethal trifecta — and the one place the code is leaner than the ADR.
+idea that ties them together — the lethal trifecta — and the precise scope of the kill-switch.
 
 ## Bound 1 — identity: a scoped badge, keyless
 
@@ -32,7 +31,7 @@ The agent runs under a **named [ServiceAccount](https://kubernetes.io/docs/conce
 (`triage-copilot`, from the `XAgent`'s `metadata.name`) and gets AWS credentials through
 **[EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html)** — the Composition
 mints a `PodIdentityAssociation` binding that SA to a per-agent IAM role (`Pod-platform-agent-triage-copilot`).
-Pod Identity ([ADR-041](../../adrs/041-pod-identity-for-tenant-workloads.md)/047) means **no key is
+Pod Identity means **no key is
 ever minted, baked into the image, or parked in a Secret to be stolen** — the pod gets short-lived SigV4
 credentials at runtime, scoped to exactly what the claim declared. No long-lived secret exists whose
 theft is a breach.
@@ -85,7 +84,7 @@ The agent's IAM role carries exactly two kinds of statement (`composition.yaml`,
    model-access agreement are what actually gate *which* model answers.
 2. **`awsPermissions.policyStatements` — deny-set-validated extras.** Anything beyond the model grant is
    an explicit statement in the claim, validated against the **same escalation deny-set as a tenant
-   environment** ([ADR-062](../../adrs/062-self-service-tenant-provisioning.md) §4): the services `iam`,
+   environment**: the services `iam`,
    `sts`, `organizations`, `account` and any bare `*` wildcard are rejected. And if the platform sets
    `permissionsBoundaryArn`, the minted role is
    **[permissions-boundary](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html)-capped**
@@ -100,8 +99,8 @@ tiny, named, deny-set-clean extension.
 
 The sentence that matters most is a design property, not a promise: **the agent's single write action is
 posting a message** to the incident surface. There is no write, exec, or remediation verb anywhere in its
-grant — not in the ClusterRole, not in the IAM policy, and (per [ADR-080](../../adrs/080-triage-copilot.md)
-D4) no remediation tool is wired into the codebase at all. "Propose, don't act" isn't a prompt instruction
+grant — not in the ClusterRole, not in the IAM policy, and no remediation tool is wired into the codebase
+at all. "Propose, don't act" isn't a prompt instruction
 it might ignore; it's an IAM-and-code fact. The worst case of a fully hijacked agent is an ignored Slack
 message.
 
@@ -140,16 +139,15 @@ agent literally cannot phone home: no arbitrary internet egress, so no exfiltrat
 ## Bound 5 — the data boundary: what may enter the model's context
 
 Bounds 1–4 govern reach; this one governs *content* — because the moment raw telemetry enters a model's
-prompt, you've made a data-handling decision ([ADR-076](../../adrs/076-agent-observability.md) D3,
-[ADR-080](../../adrs/080-triage-copilot.md) D5). The rules, verbatim on the read side:
+prompt, you've made a data-handling decision. The rules, verbatim on the read side:
 
 - **Metadata is always allowed** — token counts, cost, latency, tool names, verdicts, metric series,
   trace/span metadata, structured-log *fields*, deploy facts, k8s status. Enough for most triage, with no
   free-form content.
 - **Raw prompt/response content only behind a per-compliance-tier redaction gate, and in-cluster only —
-  never shipped to a SaaS observability backend.** The nuance ADR-076 is careful about: prompts already
+  never shipped to a SaaS observability backend.** The nuance worth noting: prompts already
   transit Bedrock, so the rule is "no SaaS-obs *side-channel*," not "content never leaves."
-- **Regulated tiers ([hipaa/pci](../../adrs/013-compliance-tier-model.md)) are metadata-only, permanently**
+- **Regulated tiers (hipaa/pci) are metadata-only, permanently**
   — content capture off, because reliable secret/PII redaction of free-form text is itself an unsolved,
   best-effort problem (same class as prompt-injection detection), and the platform refuses to rely on it
   as a guarantee.
@@ -180,16 +178,16 @@ reconciles from the claim. It's a dead-man's switch: it doesn't ask the agent to
 fuel, at a layer the auto-healer can't undo. The fixture `triage-copilot-suspended.yaml` exists precisely
 to render-test that suspend drops the association while keeping the slot.
 
-The honest caveat, where the code is leaner than the ADR: ADR-082 D7 says suspend *also* drops the
-Alertmanager route (no triggers). The code doesn't do that. The `trigger` field is XRD-documented as
-"Informational — the Alertmanager route is wired separately (Phase 5)," and nothing in the Composition
-gates it. So the **code-verified kill is the Bedrock cut** — which is sufficient: no creds, no reasoning;
-a firing alert just reaches a defanged agent. Rely on the credential removal, not on triggers stopping.
+The scope of the kill is precise: it drops the Bedrock credentials, not the Alertmanager trigger. The
+`trigger` field is XRD-documented as "Informational — the Alertmanager route is wired separately (Phase 5),"
+and nothing in the Composition gates it. So the **kill is the Bedrock cut** — which is sufficient: no creds,
+no reasoning; a firing alert just reaches a defanged agent. Rely on the credential removal, not on triggers
+stopping.
 
 ## The admission plane — keeping the bounds un-bypassable
 
 Six bounds are only as good as the gate that stops a claim from redefining them. Three layers,
-defense-in-depth (ADR-082 D6):
+defense-in-depth:
 
 1. **XRD enums — the primary guard.** The `XAgent` schema (`xagent-xrd.yaml`) constrains by *type*:
    `placement.cluster` enum `["platform"]` (hub-only), `model.provider` enum `["bedrock","none"]`, and —
@@ -206,15 +204,15 @@ defense-in-depth (ADR-082 D6):
    Both are installed **after** `agent-api`, so the policy exists before any claim can be admitted.
 
 Above all three, `gitops/agents/` is admin-gated: a platform admin, not the author, must approve the PR,
-because authoring an agent grants cluster-read + Bedrock (author ≠ approver for a privileged change,
-ADR-074). And because the agent's image now lands on the hub, the hub inherits the `verify-images` /
+because authoring an agent grants cluster-read + Bedrock (author ≠ approver for a privileged change).
+And because the agent's image lands on the hub, the hub inherits the `verify-images` /
 `verify-attestations` cosign policies for the agent's Product — the signed-image guarantee follows the
 workload.
 
 ## The one idea that ties it together — the lethal trifecta
 
-Step back and the six bounds are really one defense. The "lethal trifecta" (Simon Willison's framing,
-cited in ADR-080) is the combination that makes an LLM agent dangerous: **private data + untrusted content +
+Step back and the six bounds are really one defense. The "lethal trifecta" (Simon Willison's framing) is
+the combination that makes an LLM agent dangerous: **private data + untrusted content +
 an exfiltration path.** Triage genuinely has the first two — telemetry is private, and logs and diffs
 are attacker-influenceable content. The whole safety argument is that the third leg does not exist:
 
@@ -237,9 +235,9 @@ sits at ~0 by construction, so any nonzero reading is a loud signal.
 - **The kill-switch bites the Composition, not the Deployment.** `kubectl scale 0` is reverted by ArgoCD
   self-heal; only `lifecycle.phase: suspended` (which drops the Pod Identity association) actually stops
   the agent. Know which layer owns which resource.
-- **Suspend drops creds, not triggers — today.** ADR-082 D7's "also drops the Alertmanager route" is a
-  design statement the Composition doesn't yet implement (the route is Phase-5, wired separately). Rely on
-  the credential cut. This is the kind of ADR-says-vs-code-does gap the verification gate exists for.
+- **Suspend drops creds, not triggers.** The kill-switch removes the Bedrock credentials; it does not drop
+  the Alertmanager route (that route is wired separately, Phase 5). Rely on the credential cut — no creds, no
+  reasoning, so a firing alert just reaches a defanged agent.
 - **`autonomy.mode` is a one-value enum on purpose.** If you can't set it to `autonomous`, that's not a
   missing feature to file — it's the safety floor, schema-locked until eval-as-a-service exists
   ([autonomy deep dive](deep-dive-autonomy-and-evaluation.md)).
@@ -258,12 +256,6 @@ production. The model is ready for it; the code isn't there yet.
 
 ## Go deeper
 
-- **ADRs (source of truth):** [ADR-074](../../adrs/074-agentic-workloads-platform.md) (the agentic platform,
-  *Proposed*), [ADR-082](../../adrs/082-platform-agent-runtime-xagent.md) D5–D8 (identity, admission gate,
-  kill-switch, lane posture — *built + live*), [ADR-080](../../adrs/080-triage-copilot.md) D4/D5 (zero-infra
-  authority, data boundary + model hosting, the lethal-trifecta analysis),
-  [ADR-076](../../adrs/076-agent-observability.md) D3 (the data boundary),
-  [ADR-041](../../adrs/041-pod-identity-for-tenant-workloads.md) (keyless Pod Identity).
 - **The code:** the [agent Composition](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/agent-api/files/composition.yaml)
   (identity, IAM, the network policies, the kill-switch gate), the
   [obs-read ClusterRole](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/agent-api/templates/platform-trust-cluster-roles.yaml)
@@ -274,8 +266,8 @@ production. The model is ready for it; the code isn't there yet.
 - **External:** [EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html)
   (AWS docs; ~10 min; the keyless-credential model), [CiliumNetworkPolicy](https://docs.cilium.io/en/stable/security/policy/)
   (Cilium docs, we run v1.19.x; ~15 min; why identity-based egress ≠ `ipBlock`), and Simon Willison's
-  ["lethal trifecta"](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/) (the framing ADR-080 cites;
-  ~5 min).
+  ["lethal trifecta"](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/) (the framing this doc's
+  safety argument turns on; ~5 min).
 - **Sideways:** [Bounding vs. the runtime](deep-dive-the-xagent-runtime.md) · [Autonomy & evaluation](deep-dive-autonomy-and-evaluation.md)
   · [Identity & access](../identity/orientation.md) (the three-identities thread) ·
   [Agent observability](../observability/deep-dive-agent-observability.md) (the data boundary, on the telemetry side).

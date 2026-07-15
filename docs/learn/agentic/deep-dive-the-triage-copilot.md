@@ -4,26 +4,25 @@ The platform runs one live agent, and it exercises the whole agentic model end t
 webhook, evidence gets gathered, a triage card lands in Slack, and someone gets pinged. This follows that
 agent through the loop. The frame to keep in mind is that an agent here is a contractor you don't trust —
 bounded by its badge, allowed to propose but never act. Every claim below is traceable to the real claim,
-Composition, and ADRs.
+the Composition, and the code.
 
 ## What's verified, and what isn't
 
 Everything here is checked against primary source: the `XAgent` claim
 ([`gitops/agents/triage-copilot.yaml`](https://github.com/asanexample/platform/blob/main/gitops/agents/triage-copilot.yaml)),
-the agent Composition, the XRD schema, the platform `Team` / `Product` registries, the observability
-dashboard JSON, and [ADR-080](../../adrs/080-triage-copilot.md) / [ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md).
-Where a thing is designed but not built, or where I couldn't live-verify, I say so. The hub cluster is
-parked this session, so nothing here was confirmed by `kubectl` — it's read off code, ADR status headers,
-and git history. The agent's own loop code (Go) lives in a separate app repo
+the agent Composition, the XRD schema, the platform `Team` / `Product` registries, and the observability
+dashboard JSON. Where a thing is designed but not built, or where I couldn't live-verify, I say so. The hub
+cluster is parked this session, so nothing here was confirmed by `kubectl` — it's read off code and git
+history. The agent's own loop code (Go) lives in a separate app repo
 (`asanexample/platform-triage-copilot`); this infra repo defines the claim, runtime, identity-directory
-backend, and observability, so a few loop internals below come from the ADR's as-built notes rather than
+backend, and observability, so a few loop internals below come from documented as-built notes rather than
 code in front of me.
 
 ## The job, in one line
 
 > **Shorten the time from "an alert fired" to "a human knows where to look, and who owns it."**
 
-That's the entire mandate ([ADR-080](../../adrs/080-triage-copilot.md), D1). It does not fix anything. It
+That's the entire mandate. It does not fix anything. It
 reads and proposes; a human acts. Two everyday roles cover it, and the whole agent falls out of them:
 
 - **A triage nurse.** Reads the vitals, ranks who's sickest, flags the doctor with a one-line summary and
@@ -32,19 +31,19 @@ reads and proposes; a human acts. Two everyday roles cover it, and the whole age
 
 > **Where the metaphor breaks:** a real nurse can, in extremis, start CPR — she has hands. This agent has
 > none. "Never remediates" isn't professional restraint it might abandon under pressure; it's the literal
-> absence of any write/exec/remediation permission in its identity (D4). A perfectly hijacked triage
+> absence of any write/exec/remediation permission in its identity. A perfectly hijacked triage
 > copilot still can't touch production, because there is no tool wired in that could. Autonomous trigger,
 > never autonomous action — that distinction is the single most important fact in this module.
 
 ## The loop, traced end to end
 
-An alert fires. Here's the whole path, each step tied to its ADR clause.
+An alert fires. Here's the whole path, each step traced to the code.
 
 ```mermaid
 flowchart TD
   A[Alertmanager webhook<br/>alert-GROUP, not one alert] --> B[Scope blast radius<br/>from labels]
   B --> C[Gather read-only evidence<br/>Mimir · Loki · Tempo · k8s read]
-  C --> D[Change-correlation D2<br/>which PR's rollout straddles the alert?]
+  C --> D[Change-correlation<br/>which PR's rollout straddles the alert?]
   D --> E[Rank hypotheses<br/>each backed by evidence DEEP-LINKS]
   E --> F[resolveOwner<br/>namespace -> Product -> Team]
   F --> G[Triage card -> Slack<br/>summary · ranked causes · disposition]
@@ -54,7 +53,7 @@ flowchart TD
 ```
 
 **1 — Trigger, and the unit of work.** The trigger is an Alertmanager webhook
-(`spec.trigger.kind: alertmanager-webhook`). The subtlety that matters (D9): the unit of triage is the
+(`spec.trigger.kind: alertmanager-webhook`). The subtlety that matters: the unit of triage is the
 Alertmanager *alert-group*, not the individual alert. A cascade that trips 20 alerts arrives as one grouped
 notification → one triage, not twenty. Alertmanager's grouping, inhibition, and throttling do most of the
 storm control for free; the agent adds cache-dedup on the group fingerprint, a concurrency cap, and a
@@ -70,11 +69,10 @@ series and its neighbours (PromQL/Mimir), correlated logs for the window (LogQL/
 traces (Tempo), and pod / event / rollout state (k8s read). The as-built agent routes each alert to one of
 five playbooks (`crashloop / oom / not_ready / latency / default`), each gathering only the tools that
 carry signal for its failure mode. The playbook is chosen before any untrusted content is read —
-Plan-Then-Execute, so a malicious log line can't redirect which tools get called (control-flow integrity,
-ADR-080 design grounding).
+Plan-Then-Execute, so a malicious log line can't redirect which tools get called (control-flow integrity).
 
 **4 — Change-correlation (the highest-yield move).** Most incidents are change-induced, so the agent's
-strongest single heuristic (D2) is to find the PR/commit whose ArgoCD rollout window straddles the alert,
+strongest single heuristic is to find the PR/commit whose ArgoCD rollout window straddles the alert,
 pull the scoped diff, and join the failure signature to the change. A Tempo stack-frame in
 `payments.Charge()` against a 14:02 PR that modified `payments.Charge()` is a near-certain lead. "Change" is
 deliberately broad — app-code diffs, GitOps/manifest edits, and Kyverno-policy changes alike, since config
@@ -89,14 +87,14 @@ Grafana/Tempo — the responder can click straight to the panel.
 **7 — Post the triage card.** To the incident channel (Slack, `#platform-incidents`). The card carries a
 plain-English summary, the ranked hypotheses with confidence and evidence deep-links, the
 change-correlation lead, a suggested next diagnostic step (never an executed fix), and a disposition ∈
-`{confident-lead, weak-leads, insufficient-evidence}` (D10/D11).
+`{confident-lead, weak-leads, insufficient-evidence}`.
 
 **8 — The calibrated handoff.** This is what makes it safe to trust. The dangerous failure isn't silence —
 it's a confident-wrong RCA that sends responders down the wrong path and lengthens the outage. So "I don't
 know" is an answer the agent is allowed to give. Below a confidence floor it defaults to
 `insufficient-evidence`: it surfaces the raw evidence plus "no strong hypothesis — here's what I looked at,
 paging a human," instead of fabricating a cause. The eval scores this deliberately — a correct abstention on
-a hard case scores well; a confident-wrong scores *worse than* an abstain (D6/D10).
+a hard case scores well; a confident-wrong scores *worse than* an abstain.
 
 ## The claim, walked line by line
 
@@ -111,8 +109,7 @@ each field is a hard bound, not a preference:
 - `placement.cluster: platform` — hub-only, and the why matters. The signals it reads (cross-tenant
   Mimir/Loki/Tempo, ArgoCD sync history) are hub-resident. It sits outside the tenant Environment/Kyverno
   namespace model on purpose: it's platform-system infrastructure like the obs stack itself, not a tenant
-  workload. (An earlier design routed it through the tenant model onto preprod, where hub obs is
-  unreachable — [ADR-082](../../adrs/082-platform-agent-runtime-xagent.md) restored hub placement.)
+  workload — which is why it runs on the hub, where that hub-resident obs is reachable.
 - `model.provider: bedrock`, `id: us.anthropic.claude-sonnet-4-6` — pinned, a cross-region inference
   profile. Reached through a platform-owned `Model` port over the Bedrock `Converse` API (via
   `aws-sdk-go-v2`), deliberately not the Anthropic SDK. Converse is one API shape across all Bedrock models
@@ -137,11 +134,11 @@ each field is a hard bound, not a preference:
   around.
 
 There is no PR-based act path and no remediation tool anywhere — not in the identity, not in the
-Composition, not (per the ADR) in the app codebase. "Never remediates" is an IAM and code fact.
+Composition, not in the app codebase. "Never remediates" is an IAM and code fact.
 
 ## Tools: all read, one write
 
-The agent's grounded tools (ADR-080 as-built notes) are all reads except one write:
+The agent's grounded tools are all reads except one write:
 
 | Tool | Reads | Purpose |
 |---|---|---|
@@ -151,17 +148,16 @@ The agent's grounded tools (ADR-080 as-built notes) are all reads except one wri
 | `query_metrics` | Beyla RED (Mimir) | request rate/errors/latency |
 | `query_traces` | Tempo | the slow span |
 | `query_logs` | Loki | correlated log lines for the window |
-| **post triage card** | — (**write**) | the one write the model makes: a Slack message; the eval-corpus `PutObject` is the only other write (not a tool the model calls). The agent never pages PagerDuty *itself* (its egress has no PagerDuty endpoint) — paging is the platform Alertmanager's critical receiver, which **is** wired to PagerDuty (Events-API-v2, keyed by the `pagerduty` unit) and *was* live, but the PagerDuty **trial account lapsed (~2026-07-07) so paging is currently offline** — critical alerts reach Slack + SNS + the dead-man's switch meanwhile |
+| **post triage card** | — (**write**) | the one write the model makes: a Slack message; the eval-corpus `PutObject` is the only other write (not a tool the model calls). The agent never pages PagerDuty *itself* (its egress has no PagerDuty endpoint) — paging is the platform Alertmanager's critical receiver, which is wired to PagerDuty (Events-API-v2, keyed by the `pagerduty` unit); critical alerts also reach Slack, SNS, and the dead-man's switch |
 
-The Slack surface is delivered over Socket Mode — a private agent (no inbound, ADR-010) can't host a public
+The Slack surface is delivered over Socket Mode — a private agent (no inbound) can't host a public
 Slack Request URL, so it dials out over a WebSocket. That's why the Composition's egress is widened to
 `*.slack.com` (alongside Bedrock and `api.github.com`) — verified in its CiliumNetworkPolicy.
 
 ## Owner-routing — split so a directory bug can't misfire a page
 
-Once the agent has a lead, who gets told? [ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)
-answers it, and the design's spine is a separation: resolution (facts) is split from mention policy (the
-page decision).
+Once the agent has a lead, who gets told? The design's spine is a separation: resolution (facts) is split
+from mention policy (the page decision).
 
 `resolveOwner({namespace, culpritGithubLogin?}) → {person?, team, on_call, tiers}` returns identity facts
 only — it knows nothing of severity, disposition, or paging. It reads the git source of truth (the `Team` /
@@ -189,7 +185,7 @@ Two guardrails make this safe:
   the page decision lives with the consumer that holds the incident context.
 - Email is never a join key. In this org a person's GitHub/Slack/PagerDuty emails differ; commit emails are
   often `noreply`. Identities link only by explicit assertion — Keycloak brokers GitHub/Slack/PagerDuty as
-  federated identities carrying the native id (D2/D3). The culprit-author path filters bots (`[bot]`,
+  federated identities carrying the native id. The culprit-author path filters bots (`[bot]`,
   `web-flow`, known CI identities) and degrades an unlinked author to the team floor plus a "link your
   accounts" nudge.
 
@@ -198,9 +194,8 @@ Two guardrails make this safe:
 - **Built + live:** the team-floor path — `resolveOwner(namespace) → team → Slack channel` — and the
   `applyMentionPolicy` ladder/gate. The platform `Team` registry carries the `slack.channel` for
   `#platform-incidents` today (verified), and per-team PagerDuty on-call structure has a foundation landed
-  (ADR-084 Phase 0 built/live; Phase 2 foundation #932; the `platform-directory` + `pagerduty` modules
-  exist).
-- **Outstanding (ADR-084 Phase 1/3, and the ADR is still *Proposed*):** full person-level linking —
+  (the `platform-directory` + `pagerduty` modules exist).
+- **Outstanding:** full person-level linking —
   one-click OAuth, Keycloak brokering GitHub/Slack/PagerDuty, and the authoritative culprit-author
   `@mention` across all three. So today most routing lands on the team floor — exactly as designed to
   degrade. Don't overstate a live "ping the commit author" flow; it's designed, largely unbuilt.
@@ -212,12 +207,12 @@ lands as `triage_feedback_total{verdict, triage_disposition}` (verified in the d
 `sum(rate(triage_feedback_total[1h])) by (verdict)` and accept-rate by disposition) and accrues into the
 forward-capture corpus. That corpus (`platform-agent-eval-corpus`, write-once, keep-forever) is the one
 shipped piece of the autonomy story — the flight-data recorder installed before the plane is certified for
-autopilot. The grader (fault-injection corpus, `pass^k` scoring) still lives in the app-repo spike; wiring
-it as a CI regression gate is the next quality lever. The autonomy ladder itself is a Proposed sketch —
+autopilot. The grader (fault-injection corpus, `pass^k` scoring) lives in the app-repo spike; wiring
+it as a CI regression gate is the next quality lever. The autonomy ladder itself is designed, not built —
 don't imply a live autonomy tier.
 
-The agent is watched by the very stack it queries — the "Triage Agent (ADR-076)" dashboard (verified
-title). The `invoke_agent → chat → execute_tool` spans, token/cost metrics, and disposition mix are the
+The agent is watched by the very stack it queries — the "Triage Agent" dashboard. The
+`invoke_agent → chat → execute_tool` spans, token/cost metrics, and disposition mix are the
 subject of the observability module's
 [agent-observability deep dive](../observability/deep-dive-agent-observability.md).
 
@@ -237,14 +232,10 @@ subject of the observability module's
 - **Resolution is split from mention-policy for a reason.** A directory bug should never be able to fire a
   page. Collapse the two "for simplicity" and you hand a data bug the power to wake the wrong person.
 - **Most routing lands on the team floor today** — and that's correct, not broken. Person-level author
-  mentions are Phase 1/3, outstanding.
+  mentions are designed but outstanding.
 
 ## Go deeper
 
-- **ADRs (source of truth):** [ADR-080](../../adrs/080-triage-copilot.md) (the agent — job, loop,
-  data boundary, eval, storm control, calibrated handoff) · [ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)
-  (owner-resolution + mention policy) · [ADR-082](../../adrs/082-platform-agent-runtime-xagent.md) (the
-  `XAgent` runtime it rides) · [ADR-076](../../adrs/076-agent-observability.md) (how it's observed).
 - **Code:** the claim
   [`gitops/agents/triage-copilot.yaml`](https://github.com/asanexample/platform/blob/main/gitops/agents/triage-copilot.yaml) ·
   the [agent Composition](https://github.com/asanexample/platform/blob/main/infra/modules/crossplane/charts/agent-api/files/composition.yaml)

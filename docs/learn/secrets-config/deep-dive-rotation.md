@@ -6,26 +6,25 @@ thing — how a static credential gets changed without knocking a workload over,
 of that is **built** versus **designed**.
 
 Read this part first, because it reframes everything below: automated rotation **does not exist** today.
-No rotation controller, no age metric, no timer. What exists is a classification
-([ADR-094](../../adrs/094-secret-rotation-strategy.md), Status: **Proposed**, 2026-07-04) plus a manual
-runbook covering four secrets. Everything below that sounds like machinery is a design the ADR decides
-and phases — it isn't running, and we flag the line each time.
+No rotation controller, no age metric, no timer. What exists is a classification plus a manual
+runbook covering four secrets. Everything below that sounds like machinery is a design — it isn't
+running, and we flag the line each time.
 
 ## The problem — and why the scary half is already done
 
 Most of the win is already banked. Every **identity** credential on the platform is short-lived and
 federated: humans authenticate through AWS SSO, CI through [GitHub Actions
 OIDC](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect),
-and every pod→AWS call through [EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html)
-([ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md)). There are **no long-lived IAM
+and every pod→AWS call through [EKS Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html).
+There are **no long-lived IAM
 access keys anywhere** — the `restrict-iam-users` SCP forbids creating them. Those credentials expire
 on their own; rotating them is the cloud's problem, not ours. That's the hard half of rotation, and the
 [identity plane](../identity/orientation.md) already covers it.
 
 What's left is a bounded set of static values that Terraform (or [CloudNativePG](https://cloudnative-pg.io/))
 generates once and parks in [AWS Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html)
-for the cluster's lifetime. ADR-094's Context reports that the second-pass tech-debt audit (#811) found
-all 23 platform + 3 preprod secrets at `Rotation: null` — Keycloak OIDC client secrets, seed-user
+for the cluster's lifetime. All 23 platform + 3 preprod secrets sit at `Rotation: null` — Keycloak OIDC
+client secrets, seed-user
 passwords, Grafana admin, in-cluster Postgres passwords, the Backstage session and oauth2-proxy cookie
 secrets, and the externally-minted tokens (GitHub App keys, Tailscale, Cloudflare, PagerDuty).
 
@@ -47,7 +46,7 @@ secret by a mechanism that matches who controls it and whether both sides move t
 
 ## The classification — four classes
 
-ADR-094's core decision: difficulty is a function of who owns the value and whether both sides are
+The core idea: difficulty is a function of who owns the value and whether both sides are
 controllable. Four classes, one mechanism each.
 
 | Class | Owns both sides? | Mechanism | Examples |
@@ -55,7 +54,7 @@ controllable. Four classes, one mechanism each.
 | **A — Terraform two-sided** | Yes — TF/CNPG owns the credential *and* its consumer | `time_rotating` keeper on `random_password` + a scheduled `terragrunt apply` on the ARC runners → both sides move in lockstep, no drift | Keycloak OIDC client secrets (the archetype); Grafana admin; Backstage session; oauth2-proxy cookie; CNPG `managed.roles` passwords |
 | **B — External provider** | No — value minted by a third party | Native SM rotation Lambda *only* where the provider supports new-before-revoke overlap; else scheduled-manual + expiry alerting, blast-radius-ordered | GitHub App keys; Tailscale; PagerDuty; Cloudflare; GitHub/Slack IdP secrets |
 | **C — Keyless** | N/A — no static secret exists | **Nothing to rotate.** Keep *expanding* this class | GitHub OIDC; all Pod Identity (incl. CNPG backups); AWS SSO; annual KMS key rotation |
-| **D — Tenant** | Don't exist yet (rebuild-gated) | Design rotation in from day one; do not retrofit | (future — [ADR-070](../../adrs/070-tenant-app-config-and-secrets.md)) |
+| **D — Tenant** | Don't exist yet (rebuild-gated) | Design rotation in from day one; do not retrofit | (future) |
 
 Most platform secrets are Class A, and Class A rotation is nearly free — Terraform already owns both
 sides. The archetype is the Keycloak OIDC client secret. In the `keycloak-config` module (verified in
@@ -86,11 +85,11 @@ The genuinely-manual residual is small: **GitHub App private keys** (GitHub has 
 key — UI only, though multiple keys can be active at once so the swap is zero-downtime), the **GitHub and
 Slack IdP secrets** (console-only resets), and the **Tailscale API key** (90-day expiry, console-only, and
 it's the bootstrap credential — chicken-and-egg to mint its own successor). These get scheduled-manual plus
-the age-alert primitive. And one secret gets deleted rather than rotated: the `argocd-pat` GitHub PAT is
-retired in favor of a GitHub App, moving it from Class B into Class C. The best kind of rotation is a secret
+the age-alert primitive. And one class of secret gets deleted rather than rotated: replacing a GitHub PAT
+with a GitHub App moves it from Class B into Class C entirely. The best kind of rotation is a secret
 that ceases to exist.
 
-> Design intent, not verified ground truth. ADR-094 explicitly flags that the provider rotate-API claims —
+> Design intent, not verified ground truth. The provider rotate-API claims —
 > the Cloudflare roll endpoint, the Tailscale/PagerDuty provider resources — must be re-confirmed against
 > current provider docs before wiring. Treat the table as the plan, not a promise.
 
@@ -115,14 +114,14 @@ get the consumer to use it, then prove it happened.
    Deployment/Rollout/StatefulSet when the value changes. This is what turns rotation from a manual dance
    into a hands-off event, and it serves every class. Two hard constraints: it must be scoped to only
    ESO-owned Secrets (a cluster-wide restart-on-any-change is a foot-gun), and it must respect
-   PodDisruptionBudgets and graceful-drain ([ADR-085](../../adrs/085-workload-availability-graceful-disruption-defaults.md))
+   PodDisruptionBudgets and graceful-drain
    — otherwise a rotation becomes an availability event, which defeats the point.
 2. **Rotation observability** *(not built)*. A scheduled Lambda/CronJob reads `DescribeSecret.LastChangedDate`
    and emits a `secret_age_days` metric into the LGTM+P stack; Grafana alerts to PagerDuty when a secret
    exceeds its per-class max age. This upgrades the runbook's "Future: Automated Expiry Notifications" stub
    into a real signal.
-3. **Refresh-interval tiers** *(defined but never wired)*. [ADR-024](../../adrs/024-secrets-management-architecture.md)
-   defined 24h / 1h / 15m ESO `refreshInterval` tiers — shorter for rotation-eligible secrets, so a rotated
+3. **Refresh-interval tiers** *(defined but never wired)*. The refresh-tier design specifies
+   24h / 1h / 15m ESO `refreshInterval` tiers — shorter for rotation-eligible secrets, so a rotated
    value lands promptly. Verified live: every ExternalSecret today syncs at a flat 1h; the tiers exist only
    on paper.
 
@@ -143,7 +142,7 @@ per secret.**
 - **Class B (SM-native rotation owns it):** Terraform must `ignore_changes` on the secret version and must
   not manage the `random_password` at all.
 
-The owner is recorded per secret in the inventory ADR-094 seeds — that inventory is the actual Phase-0
+The owner is recorded per secret in the inventory — that inventory is the actual Phase-0
 deliverable.
 
 > Same building: send two locksmiths to the same door on the same morning and each installs *their* lock
@@ -152,11 +151,11 @@ deliverable.
 
 ## Why not Vault
 
-Isn't this what [HashiCorp Vault](https://developer.hashicorp.com/vault) is for? Deliberately, no. Both
-ADR-024 and ADR-070 park Vault behind an explicit revisit trigger: a real need for **dynamic / leased**
+Isn't this what [HashiCorp Vault](https://developer.hashicorp.com/vault) is for? Deliberately, no. The
+strategy parks Vault behind an explicit revisit trigger: a real need for **dynamic / leased**
 secrets, or a hard **cross-cloud-neutral-backend** requirement. Rotating static secrets fires neither.
 ESO + Secrets Manager + Pod Identity already cover the need; Vault would be a whole new Tier-0 system to run
-— the operational cost the platform just paid for Keycloak — and keyless-first (Class C) keeps shrinking the
+— the operational cost the platform already carries for Keycloak — and keyless-first (Class C) keeps shrinking the
 problem rather than adding a system to manage it. The strongest rotation strategy isn't a better vault; it's
 fewer secrets.
 
@@ -166,7 +165,7 @@ Where each piece actually stands:
 
 | Piece | Status | Verified against |
 | --- | --- | --- |
-| ADR-094 (classification + owner inventory) | **Proposed** — design half only | ADR Status header, 2026-07-04 |
+| Classification + owner inventory | **Design only** — no cluster resources | — |
 | Stakater Reloader | **Not deployed** — no module exists | Only `reloader` hits are Alloy `configReloader = { enabled = false }` sidecars in `observability-alloy` / `observability-events` — a false positive |
 | `time_rotating` / `aws_secretsmanager_secret_rotation` | **Zero** in the codebase | grep — only vendored provider changelogs |
 | Rotation-age metric / alert | **Not built** | The only secrets alerts in `observability/alerts/curated.yaml` are `ExternalSecretNotReady` / `ClusterSecretStoreNotReady` — **sync-failure** alerts, not age |
@@ -176,7 +175,7 @@ Where each piece actually stands:
 The phasing: **P0** = ADR + inventory (no cluster). **P1** = deploy Reloader, age metrics/alerts, refresh
 tiers, `time_rotating` scaffolding, scheduled CI-apply — author now, verify preprod after unpark. **P2** =
 Class A lowest-risk-first (oauth2-proxy cookie & Backstage session → Keycloak OIDC → Grafana → CNPG). **P3**
-= Class B. **P4** = Class D folds into ADR-070. All verification is gated on unpark, preprod before platform.
+= Class B. **P4** = Class D folds into the tenant road. All verification is gated on unpark, preprod before platform.
 
 So: nothing above is automated today. Rotation is a classification design plus a four-secret manual runbook
 — and that's fine. The hard half (identity) is done, and the static-secret half now has a coherent plan
@@ -193,7 +192,7 @@ instead of a pile of one-off Lambdas.
   something you compute, not something the API tracks for you (yet).
 - **A rotation that ignores PDBs is an outage generator.** Reloader restarting every replica of a
   single-owner Deployment at once = downtime. Rotation must ride the same graceful-drain / PDB machinery as
-  any other rollout (ADR-085). "Change the locks" only works if you hand out the new keys without locking
+  any other rollout. "Change the locks" only works if you hand out the new keys without locking
   everyone out mid-swap.
 - **The "external" secret that's secretly Class A.** Tailscale OAuth feels like a third-party token you must
   rotate by hand, but it's a `tailscale_oauth_client` Terraform resource — re-apply mints a new one. Check
@@ -203,13 +202,6 @@ instead of a pile of one-off Lambdas.
 
 ## Go deeper
 
-- [ADR-094 — Secret Rotation Strategy](../../adrs/094-secret-rotation-strategy.md) — the classification,
-  the Class-B breakdown, the phasing, and the single-owner guardrail (source of truth for this doc).
-- [ADR-024 — Secrets Management Architecture](../../adrs/024-secrets-management-architecture.md) — the
-  refresh-interval tiers and the Vault revisit trigger. [ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md)
-  (keyless pod→AWS, the Class-C engine), [ADR-070](../../adrs/070-tenant-app-config-and-secrets.md) (the
-  Class-D tenant road), [ADR-085](../../adrs/085-workload-availability-graceful-disruption-defaults.md) (the drain/PDB machinery
-  Reloader must respect).
 - [Runbook — Secret Rotation Procedures](../../runbooks/secret-rotation.md) — the live four-secret manual
   path and the compromised-secret response.
 - `infra/modules/keycloak-config/main.tf` — the Class-A archetype: one `random_password.client` written to

@@ -2,7 +2,7 @@
 
 ## The question
 
-You're a developer on the `acme` team. You fix a one-line bug in the `shop` product's `web` service, open
+You're a developer on the `alpha` team. You fix a one-line bug in the `shop` product's `storefront` service, open
 a PR, and merge it. You go make coffee. By the time you're back, the fix is serving real users.
 
 What actually happened in those few minutes? Not the tidy arrows on an architecture slide — the real
@@ -59,14 +59,14 @@ out ten times:
 
 ![Ten control planes drawn as a column of thermostats — human merge, then CI build/sign/attest, promotion, the Gate, ArgoCD, Kyverno admission, Argo Rollouts canary, Karpenter/Cilium/Pod Identity, Gateway/cert-manager, and observability/on-call. Each watches one thing and reconciles its slice of the world toward the git-declared desired state. Nobody pushes; every plane pulls.](images/delivery-pipeline-vertical.svg)
 
-Ten planes. We'll walk each — what it does, why it exists, the idea it's built on — following the `web`
-service of `acme`'s `shop` from your merge to live traffic.
+Ten planes. We'll walk each — what it does, why it exists, the idea it's built on — following the `storefront`
+service of `alpha`'s `shop` from your merge to live traffic.
 
 ---
 
 ## 1 · You merge (your repo)
 
-Your PR lands on `main` in `asanexample/acme-shop`. That's it. That is the **last thing a human does by
+Your PR lands on `main` in `asanexample/alpha-shop`. That's it. That is the **last thing a human does by
 hand** in this entire story (well — until a human *chooses* to approve the production release near the end).
 Everything from here is a machine noticing that something changed.
 
@@ -86,7 +86,7 @@ Docker-and-security YAML into every app; you call the platform's versions and in
 Your CI thinly calls two shared workflows, which together do three things:
 
 1. **Builds** your code into a container image *(build-sign workflow)*.
-2. **Pushes** it to the platform's registry as `team-acme/shop-web@sha256:…`, then **cosign-signs** it and
+2. **Pushes** it to the platform's registry as `team-alpha/shop-storefront@sha256:…`, then **cosign-signs** it and
    records a software bill of materials *(still the build-sign workflow)*.
 3. **Attests** it — a *separate, isolated* provenance workflow writes the SLSA build attestation from its own
    identity. This is the part worth teaching, because it's the platform's answer to a whole category of attack.
@@ -102,7 +102,7 @@ identity (the GitHub Actions run proving "I am the `build-sign` workflow of this
 signature, and records it in a public transparency log. Then a *separate, isolated* provenance workflow writes a
 [**SLSA provenance**](https://slsa.dev/) attestation — a signed statement describing *how and where this
 image was built* (which repo, which commit, which workflow). Keeping provenance in its own workflow and identity
-is what earns the SLSA L3 "isolated builder" guarantee (ADR-042).
+is what earns the SLSA L3 "isolated builder" guarantee.
 
 ![Supply-chain trust: the CI build emits a signed image and a SLSA provenance attestation, each bound to the build's own identity — the repo, the commit, the isolated workflow. The signature proves the image wasn't altered; the provenance proves exactly how and where it was built.](images/supply-chain-trust.svg)
 
@@ -117,13 +117,13 @@ Nothing is deployed yet. This stage's only job is to turn your merge into a **tr
 its **digest** — a value we're about to lean on hard.
 
 *Its own module: **[Supply chain](../supply-chain/orientation.md)** — keyless signing, isolated SLSA
-provenance, the thin-caller model, verify-at-admission (ADR-042/050).*
+provenance, the thin-caller model, verify-at-admission.*
 
 ## 3 · The digest is promoted — into a *different* repo
 
 This is the first place the platform diverges from what you'd expect.
 
-First, *why a digest?* The image has a name (`team-acme/shop-web`) and it could have a tag (`:latest`,
+First, *why a digest?* The image has a name (`team-alpha/shop-storefront`) and it could have a tag (`:latest`,
 `:v1.2`). But tags are **mutable nicknames** — `:latest` can point at one image today and a different one
 tomorrow; two people saying "latest" can mean two different things. A **digest** (`sha256:f6b37d…`) is a
 **content fingerprint**: it's computed from the image's bytes, so it names *one exact image, forever*.
@@ -135,13 +135,13 @@ the platform repo** — a completely different repository — editing exactly on
 record for this stage.
 
 ```yaml
-# gitops/releases/acme/shop/dev.yaml   (in the PLATFORM repo, not yours)
+# gitops/releases/alpha/shop/dev.yaml   (in the PLATFORM repo, not yours)
 apiVersion: platform.refplat.org/v1beta1
 kind: Release
 spec:
-  environmentRef: acme-shop-dev
+  environmentRef: alpha-shop-dev
   services:
-    web:
+    storefront:
       digest: sha256:f6b37d…        # ← the freshly built, signed image
 ```
 
@@ -153,9 +153,8 @@ Why go to all that trouble to write a digest into a *foreign* repo? Two reasons,
   bots pushing to it. If deployment worked by having CI push a digest back into your repo, you'd have to
   *un*-protect the branch you most want protected. So the deployed digest lives elsewhere.
 - **One auditable source of truth for "what is running where."** That `Release` file *is* the record of the
-  deployed version of `acme-shop`'s `web` in dev. Not a dashboard, not a log — a version-controlled file
-  with a full git history of every promotion. ([ADR-071](../../adrs/071-digest-promotion-via-control-plane.md)
-  has the full rationale.)
+  deployed version of `alpha-shop`'s `storefront` in dev. Not a dashboard, not a log — a version-controlled file
+  with a full git history of every promotion.
 
 ## 4 · The Gate merges it (the promotion ladder)
 
@@ -182,8 +181,7 @@ Our `dev` change is at the bottom rung, so it auto-merges. The digest is now com
 repo's `main`. Which means: **git has changed.** And something is always watching git.
 
 *Its own module, later: **Promotion & release** — the full ladder, Release-keyed delivery, the approver
-role. Source: [Promotion & Release](../../architecture/promotion-and-release.md),
-[ADR-071](../../adrs/071-digest-promotion-via-control-plane.md).*
+role. Source: [Promotion & Release](../../architecture/promotion-and-release.md).*
 
 ## 5 · ArgoCD notices, and syncs (delivery)
 
@@ -196,9 +194,9 @@ Mechanically: a per-Product **ApplicationSet** turns each `Release` record into 
 Application pulls your service's Kubernetes manifests from your app repo's `k8s/overlays/dev` folder — and
 **injects the promoted digest** over the `:placeholder` the overlay ships with. (So your overlay never has
 to contain a real digest either; the platform supplies it at sync time from the Release.) ArgoCD then
-applies the finished manifests to the `acme-shop-dev` namespace on the preprod cluster.
+applies the finished manifests to the `alpha-shop-dev` namespace on the preprod cluster.
 
-Look at what was *already sitting there*, waiting for this workload to arrive: the `acme-shop-dev`
+Look at what was *already sitting there*, waiting for this workload to arrive: the `alpha-shop-dev`
 namespace, its dedicated image registry, its scoped AWS permissions, its network policies and resource
 quotas. None of that was created just now. **[The Environment API](../environment-api/orientation.md)
 provisioned it earlier** — when the *Environment* was first declared — using the very same reconcile-toward-
@@ -209,7 +207,7 @@ model.)
 ![Provision once, deploy many: the environment's namespace, image registry, scoped AWS permissions, network policies, and quotas were all provisioned earlier — when the Environment was first declared. This deploy just drops the workload into the already-built, furnished namespace.](images/provision-once-deploy-many.svg)
 
 *Its own module: **[Delivery](../delivery/orientation.md)** — ArgoCD, ApplicationSets, the promotion
-ladder, and Rollouts, in depth (ADR-021/069).*
+ladder, and Rollouts, in depth.*
 
 ## 6 · Kyverno admits it (policy)
 
@@ -242,7 +240,7 @@ This is **policy as code**: the rules that used to live in a wiki page nobody re
 head, are executable and enforced identically every time, on every cluster.
 
 *Its own module: **[Policy & admission](../policy/orientation.md)** — Kyverno, the three verbs
-(validate/mutate/generate), the catalog, audit→enforce (ADR-014).*
+(validate/mutate/generate), the catalog, audit→enforce.*
 
 ## 7 · The Rollout canaries it (progressive delivery)
 
@@ -271,7 +269,7 @@ safety system bolted on — it's *built out of* the observability the platform a
 Rollout runs on every stage, by the time a change reaches prod its canary logic has already rehearsed at
 dev, test, uat, and staging. Prod is the *last* performance, never the dress rehearsal.
 
-*Its own module, later: **Progressive delivery** (Argo Rollouts, metric analysis, auto-rollback — ADR-056).*
+*Its own module, later: **Progressive delivery** (Argo Rollouts, metric analysis, auto-rollback).*
 
 ## 8 · It gets a machine to run on (the substrate)
 
@@ -285,7 +283,7 @@ more planes engage, each watching for its own cue.
   and clears it when they leave.* Just-in-time capacity instead of a standing, costly reservation. (What
   *made* the pods unschedulable? Often the service's **default HPA** scaling replicas up under load — more
   pods than the current nodes can hold. When load falls the HPA scales them back down, and Karpenter
-  consolidates the now-idle node away: the same loop run in reverse — ADR-078 Phase 2.)
+  consolidates the now-idle node away: the same loop run in reverse.)
 - **A network to speak on.** [**Cilium**](https://docs.cilium.io/en/stable/overview/intro/), the cluster's
   CNI (Container Network Interface), wires the new pod into the pod network — assigns it an address, and
   enforces which other pods it's allowed to talk to. *It's the switchboard: it connects your pod's line
@@ -297,15 +295,15 @@ more planes engage, each watching for its own cue.
   secret. *It's a visitor badge, not a copied master key* — issued on arrival, scoped to exactly what this
   workload may touch, and it expires. Nothing to leak, nothing to rotate, nothing to steal from a repo.
 
-*Their own modules, later: **Nodes & compute** (Karpenter — ADR-078), **The cluster & CNI** (Cilium —
-ADR-008), **Workload identity** (Pod Identity — ADR-041).*
+*Their own modules, later: **Nodes & compute** (Karpenter), **The cluster & CNI** (Cilium),
+**Workload identity** (Pod Identity).*
 
 ## 9 · Traffic finds it (ingress)
 
 The pods are running and healthy — but the internet can't reach them yet. That last hop is **ingress**, and
 the platform routes it through the [**Gateway API**](https://gateway-api.sigs.k8s.io/) (the modern
 successor to Kubernetes Ingress). A resource called an **HTTPRoute** maps the Environment's public
-hostname — `shop-acme-dev.preprod.aws.refplat.org`, which the Environment API generated and which Kyverno
+hostname — `shop-alpha-dev.preprod.aws.refplat.org`, which the Environment API generated and which Kyverno
 just confirmed this team is allowed to use — to your service.
 
 External requests arrive at the cluster's gateway (Cilium's built-in Envoy proxy), where TLS is terminated
@@ -314,15 +312,14 @@ using a certificate that [**cert-manager**](https://cert-manager.io/docs/) obtai
 pods.
 
 > Picture a **large office's front desk.** Visitors don't wander the building looking for the right room;
-> they arrive at reception, which knows the directory ("`shop-acme-dev` → the `web` team's floor") and
+> they arrive at reception, which knows the directory ("`shop-alpha-dev` → the `storefront` team's floor") and
 > sends them to the right place. TLS is the sealed courier envelope the message travels in so nobody can
 > read or tamper with it on the way. The HTTPRoute is the line in reception's directory; cert-manager keeps
 > the envelopes stocked.
 
 The fix is now live — reachable, encrypted, routed only to healthy pods.
 
-*Its own module, later: **Ingress & traffic** (Gateway API, cert-manager, the hostname convention —
-ADR-017/060).*
+*Its own module, later: **Ingress & traffic** (Gateway API, cert-manager, the hostname convention).*
 
 ## 10 · Everything watches it (observability & on-call)
 
@@ -343,15 +340,15 @@ live nervous system, feeding decisions in real time.
 
 Which is the last loop: those signals feed **SLOs** (service-level objectives — an explicit target like
 "99.9% of requests succeed"). If a service starts *burning through* its error budget too fast, an alert
-fires and routes to `acme`'s **on-call** — the platform knows *which team owns this workload* and pages
+fires and routes to `alpha`'s **on-call** — the platform knows *which team owns this workload* and pages
 *them*, not a generic ops pager — and the triage copilot may post a first-pass diagnosis before a human
 even opens their laptop. ([SLO-based alerting](https://sre.google/workbook/alerting-on-slos/) is a whole
 discipline; the platform bakes it in.)
 
 The loop never truly closes. Long after your merge, every thermostat is still running, still watching.
 
-*Their own modules, later: **Observability** (the stack, the four signals, SLOs — ADR-043/077),
-**On-call & owner routing** (PagerDuty, the triage copilot — ADR-084/080).*
+*Their own modules, later: **Observability** (the stack, the four signals, SLOs),
+**On-call & owner routing** (PagerDuty, the triage copilot).*
 
 ---
 
@@ -428,11 +425,7 @@ control plane): [The Life of a Request](life-of-a-request.md).
 - [Foundations](../foundations/orientation.md) — the substrate (accounts · network · cluster · nodes · access) *(built)*. [Observability](../observability/orientation.md) *(built)*.
 
 **Source of truth (as-built):**
-[Promotion & Release](../../architecture/promotion-and-release.md) ·
-[ADR-071 digest promotion](../../adrs/071-digest-promotion-via-control-plane.md) ·
-[ADR-056 progressive delivery](../../adrs/056-progressive-delivery-and-safe-rollback.md) ·
-[ADR-014 Kyverno](../../adrs/014-kyverno-as-policy-engine.md) ·
-[ADR-021 ArgoCD](../../adrs/021-argocd-for-gitops.md).
+[Promotion & Release](../../architecture/promotion-and-release.md).
 
 **Learn the substrate itself (optional depth, never required to follow the story above):**
 [GitOps](https://opengitops.dev/) · [ArgoCD](https://argo-cd.readthedocs.io/en/stable/) ·

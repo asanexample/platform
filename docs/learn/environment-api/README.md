@@ -12,7 +12,7 @@ real. That's the whole floor.
 
 ## Read in this order
 
-1. **[Orientation](orientation.md)** — start here. Watch the real `acme-shop-dev` environment get built
+1. **[Orientation](orientation.md)** — start here. Watch the real `alpha-shop-dev` environment get built
    end to end, and leave able to explain how it works.
 2. **[Reference](reference.md)** — the full claim spec, everything the Composition provisions, a glossary,
    the gotchas that bite, and links for learning Crossplane itself.
@@ -39,5 +39,3 @@ Depth on one hard mechanism, once you have the model:
 - Onboard/operate an environment: the `environment-onboarding` skill +
   [runbook](../../runbooks/environment-onboarding.md)
 - Change the machine itself: the `crossplane-composition-authoring` skill
-- Why it's shaped this way: [ADR-067](../../adrs/067-idp-domain-model.md) (domain model),
-  [ADR-048](../../adrs/048-federated-per-cluster-crossplane.md) (federated per cluster)

@@ -37,15 +37,15 @@ Both shapes at once — the ownership tree (a Team owns Products, each owning Se
 (products down the side, stages across the top, every filled cell an Environment), and the Service that runs
 inside each Environment cell, which is what ties the two together:
 
-![Two shapes in one picture. Ownership is a tree: Team acme owns Products (shop, checkout, conformance), and each Product owns Services. Deployment is a grid: products down the side, stages across the top (dev, test, staging, prod), and every filled cell is an Environment — one product at one stage. A Service runs inside each Environment cell, which is what connects the tree to the grid; a product promotes up the ladder, filling a cell at each stage.](images/tree-and-grid.svg)
+![Two shapes in one picture. Ownership is a tree: Team alpha owns Products (shop and checkout) and Team bravo owns dispatch, and each Product owns Services. Deployment is a grid: products down the side, stages across the top (dev, test, staging, prod), and every filled cell is an Environment — one product at one stage. A Service runs inside each Environment cell, which is what connects the tree to the grid; a product promotes up the ladder, filling a cell at each stage.](images/tree-and-grid.svg)
 
 The cells tell an illustrative story. Say `shop` calls `checkout` — then the two must promote *together*,
 since you wouldn't run `shop` in prod without the `checkout` it depends on. A standalone product promotes on
-its own (here, `conformance` simply hasn't gone past test). An Environment is just a cell that's been filled
-in, and the grid grows as a product promotes.
+its own, at its own pace (in this illustration, `dispatch` simply hasn't gone past test). An Environment is
+just a cell that's been filled in, and the grid grows as a product promotes.
 
-That's the typical shape. This reference platform is still young, so its live grid is currently sparser —
-you'll see the actual environments a few sections down. Same shape, just less filled in.
+That's the typical shape. This reference platform is small, so its live grid has just a couple of products —
+you'll see the actual environments a few sections down. Same shape, fewer rows.
 
 Where the spreadsheet picture breaks, worth naming so you don't over-trust it: a cell in a real spreadsheet
 is inert data, but an Environment is a live, running namespace. (A
@@ -58,10 +58,10 @@ promotes up its row *in order*, and related products move *together* (the `shop`
 The grid maps *what exists*; it doesn't claim any cell can be filled in isolation.
 
 Keep these separate because it's the model's central move: who owns a thing and where it runs are different
-questions. `shop` is owned by `acme` (one place in the tree) but runs in several cells of the grid (dev,
+questions. `shop` is owned by `alpha` (one place in the tree) but runs in several cells of the grid (dev,
 prod, …). Everything else follows from holding those two shapes in your head.
 
-## Follow one for real: Team `acme`
+## Follow one for real: Team `alpha`
 
 Walk a real team down the tree and across the grid. Everything below is live on the platform.
 
@@ -70,8 +70,8 @@ Walk a real team down the tree and across the grid. Everything below is live on 
 ```console
 $ kubectl --context preprod get teams
 NAME       SSO GROUP    STAGES                                  ENVIRONMENTS
-acme       Dev-acme     ["dev","test","uat","staging","prod"]
-globex     Dev-globex   ["dev","test","uat","staging","prod"]
+alpha      Dev-alpha    ["dev","test","uat","staging","prod"]
+bravo      Dev-bravo    ["dev","test","uat","staging","prod"]
 platform   Platform     ["dev","prod"]
 ```
 
@@ -79,42 +79,50 @@ A Team is an owner: an SSO group (single sign-on — your company login; the gro
 plus an envelope (what it's *allowed* to do — more in a moment). A team owns no infrastructure of its own;
 it owns Products.
 
-**The Products** — the middle of the tree. Here's every product on the platform; three are `acme`'s (the
-others belong to teams `globex` and `platform`):
+**The Products** — the middle of the tree. Here's every product on the platform; two are `alpha`'s —
+`shop` and `checkout` (the rest belong to teams `bravo` and `platform`):
 
 ```console
 $ kubectl --context preprod get products
 NAME                       TEAM       REPO                                  TENANCY
-acme-checkout              acme       asanexample/acme-checkout             pooled
-acme-conformance           acme       asanexample/acme-conformance          pooled
-acme-shop                  acme       asanexample/acme-shop                 pooled
-globex-widgets             globex     asanexample/globex-widgets            pooled
+alpha-checkout             alpha      asanexample/alpha-checkout            pooled
+alpha-shop                 alpha      asanexample/alpha-shop                pooled
+bravo-dispatch             bravo      asanexample/bravo-dispatch            pooled
+platform-flagship          platform   asanexample/platform-flagship         pooled
 platform-triage-copilot    platform   asanexample/platform-triage-copilot   pooled
 ```
 
 A Product is a deployable thing a team builds — here, `shop`. It maps to exactly one repository
-(`asanexample/acme-shop`), and that's where its Services live. A Service is a single running component (a
-web frontend, an API); `shop` has one, called `web`. One repo can hold several services (a monorepo), but a
-repo always belongs to exactly one Product — which is why each service's image (its packaged, runnable
-build — a *container image*) is named per-product (we'll see that in the naming).
+(`asanexample/alpha-shop`), and that's where its Services live. A Service is a single running component (a
+web frontend, an API); `shop`'s web frontend is its `storefront` service. One repo can hold several services
+(a monorepo) — `shop` is one, bundling `storefront` alongside `catalog`, `cart`, and more — but a repo
+always belongs to exactly one Product, which is why each service's image (its packaged, runnable build — a
+*container image*) is named per-product (we'll see that in the naming).
 
 **The Environments** — the grid. Each cell where a Product meets a Stage that actually exists:
 
 ```console
 $ kubectl --context preprod get xenvironment   # AGE column elided — it drifts
-NAME                    SYNCED   READY   COMPOSITION
-acme-checkout-dev       True     True    environment
-acme-conformance-dev    True     True    environment
-acme-shop-dev           True     True    environment
-acme-shop-prod          True     True    environment
-globex-widgets-dev      True     True    environment
+NAME                     SYNCED   READY   COMPOSITION
+alpha-shop-dev           True     True    environment
+alpha-shop-test          True     True    environment
+alpha-shop-uat           True     True    environment
+alpha-shop-staging       True     True    environment
+alpha-shop-prod          True     True    environment
+bravo-dispatch-dev       True     True    environment
+bravo-dispatch-test      True     True    environment
+bravo-dispatch-uat       True     True    environment
+bravo-dispatch-staging   True     True    environment
+bravo-dispatch-prod      True     True    environment
 ```
 
-There's the live list — the actual environments on the platform right now, across teams `acme` and
-`globex`. It's sparser than the typical grid above (this reference platform is still young), but the shape
-is identical: every row is a product, every filled cell an Environment — *a Product at a Stage*,
-`(product × stage)`. (For products that serve external customers, prod environments add a third coordinate —
-a Customer — but `shop` is pooled, so it's just product × stage.)
+There's the live list — the actual environments on the platform right now, across teams `alpha` and
+`bravo`. It's smaller than the typical grid above (fewer products on this young reference platform), but the
+shape is identical: every row is a product, every filled cell an Environment — *a Product at a Stage*,
+`(product × stage)`. Both demo products have promoted the whole way up the ladder, so each fills all five
+stages. (`alpha`'s other product, `checkout`, is registered but not yet deployed, so it has no environment
+row.) (For products that serve external customers, prod environments add a third coordinate — a Customer —
+but `shop` is pooled, so it's just product × stage.)
 
 ### The names are just coordinates
 
@@ -123,15 +131,15 @@ model's coordinates, in a fixed order:
 
 | Name you'll see | Pattern | Reads as |
 | --- | --- | --- |
-| namespace `acme-shop-dev` | `<team>-<product>-<stage>` | acme's shop, in dev |
-| image `team-acme/shop-web` | `team-<team>/<product>-<service>` | acme's shop's web service |
-| host `shop-acme-dev.preprod.aws.refplat.org` | `<product>-<team>-<stage>.<domain>` | shop, acme, dev |
+| namespace `alpha-shop-dev` | `<team>-<product>-<stage>` | alpha's shop, in dev |
+| image `team-alpha/shop-storefront` | `team-<team>/<product>-<service>` | alpha's shop's storefront service |
+| host `shop-alpha-dev.preprod.aws.refplat.org` | `<product>-<team>-<stage>.<domain>` | shop, alpha, dev |
 
 Read one and you can read all of them — the same coordinates in different orders.
 
 Two things about that host trip people up. First, the `preprod` in it isn't a typo next to `dev`: `dev` is
-the *stage*; `preprod` is the *cluster* these run on. Today both `shop-acme-dev.preprod…` and
-`shop-acme-prod.preprod…` sit on the same preprod cluster — the stage (dev vs prod) changes, the cluster
+the *stage*; `preprod` is the *cluster* these run on. Today both `shop-alpha-dev.preprod…` and
+`shop-alpha-prod.preprod…` sit on the same preprod cluster — the stage (dev vs prod) changes, the cluster
 (preprod) doesn't. Stage (where on the promotion ladder) and placement (which cluster) are separate
 concerns; the platform decides placement. Second, the coordinate order flips — namespace is
 `team-product-stage`, the host is `product-team-stage` — purely for subdomain readability; no meaning hides
@@ -145,19 +153,19 @@ connects them, and it's the one that makes the whole model click. A Product has 
 - its **Services** — what it's *made of* (the running components), the same list at every stage;
 - its **Environments** — *where it runs* (one cell per stage).
 
-And a Service runs inside each Environment. `shop`'s `web` service runs in `acme-shop-dev` (a copy in dev)
-*and* in `acme-shop-prod` (a copy in prod) — one service, deployed into two environments.
+And a Service runs inside each Environment. `shop`'s `storefront` service runs in `alpha-shop-dev` (a copy
+in dev) *and* in `alpha-shop-prod` (a copy in prod) — one service, deployed into two environments.
 
-That's the deeper reason the two names are shaped differently. The image `team-acme/shop-web` is the
+That's the deeper reason the two names are shaped differently. The image `team-alpha/shop-storefront` is the
 *service's identity* — product + service — and it doesn't change as the service climbs the stages. The
-namespace `acme-shop-dev` is the *environment* — product + stage — the place a copy of it runs. Identity
+namespace `alpha-shop-dev` is the *environment* — product + stage — the place a copy of it runs. Identity
 stays put; the place changes per stage.
 
 ## The Team is an *envelope*
 
 One more idea, because it's what makes self-service safe. A Team isn't just a label at the top of the tree —
 it's a boundary. Its `envelope` sets the bounds on everything its Products and Environments may do. Team
-`acme`'s, from its registry file (`gitops/teams/acme.yaml`):
+`alpha`'s, from its registry file (`gitops/teams/alpha.yaml`):
 
 ```yaml
 envelope:
@@ -167,7 +175,7 @@ envelope:
   budget: { monthlyUSD: 2000 }
 ```
 
-![The Team as an envelope. The acme envelope sets the bounds — allowed tiers, allowed stages, a quota cap, and a monthly budget. Four submitted environments are checked against it: the ones whose tier, stage, and size fall inside the bounds are accepted (✓); one that steps outside — a disallowed tier or an over-quota request — is rejected at admission (✗).](images/team-envelope.svg)
+![The Team as an envelope. The alpha envelope sets the bounds — allowed tiers, allowed stages, a quota cap, and a monthly budget. Four submitted environments are checked against it: the ones whose tier, stage, and size fall inside the bounds are accepted (✓); one that steps outside — a disallowed tier or an over-quota request — is rejected at admission (✗).](images/team-envelope.svg)
 
 A couple of terms in there: a tier is the hardening/compliance level an environment runs at — `standard` for
 ordinary apps; regulated ones like `pci` (payment-card data) or `hipaa` (health data) force stronger
@@ -190,12 +198,12 @@ now, "admission = the bouncer at the cluster door" is all you need.)
 Run four requests through admission against that envelope, and every accept or reject lands for the same
 reason each time:
 
-1. A `shop` environment at the `pci` tier — **rejected**; `pci` isn't in acme's `allowedTiers`
+1. A `shop` environment at the `pci` tier — **rejected**; `pci` isn't in alpha's `allowedTiers`
    (`["standard"]`).
-2. `acme-shop-dev` asking for 12 CPUs — **rejected**; 12 exceeds the `quotaCap` of 8.
+2. `alpha-shop-dev` asking for 12 CPUs — **rejected**; 12 exceeds the `quotaCap` of 8.
 3. A `shop` environment in a stage called `canary` — **rejected**; `canary` isn't in `allowedStages` (and
    isn't a real stage at all).
-4. `acme-shop-dev` at the `standard` tier, 4 CPUs — **accepted**; both are inside the envelope.
+4. `alpha-shop-dev` at the `standard` tier, 4 CPUs — **accepted**; both are inside the envelope.
 
 Every rejection is the same move: the bounds live on the Team, and the bouncer checks each request against
 them at admission. That's the whole trick to safe self-service.
@@ -253,5 +261,4 @@ the model when they need it. Git is the source of truth; the cluster holds a liv
 - [Environment API](../environment-api/orientation.md) — how a single Environment (grid cell) gets
   provisioned.
 - Reference (this module): the [full noun-by-noun schema, relationships, and naming](reference.md).
-- Source of truth: [Platform Domain API](../../architecture/platform-domain-api.md) (the normative schema)
-  and [ADR-067](../../adrs/067-idp-domain-model.md) (the decision + rationale).
+- Source of truth: [Platform Domain API](../../architecture/platform-domain-api.md) (the normative schema).

@@ -16,7 +16,7 @@ the security modules, so read at least [Policy & admission](../policy/orientatio
    Two metaphors carry it: a building rated for a hazard it's never withstood, and a security system designed
    to print an audit trail it doesn't yet print.
 2. **[Reference](reference.md)** — the dense lookup: the tier model and its enum drift, the envelope
-   validation, what the tier actually toggles today, the controls-as-compliance table, the ADR-055 assurance
+   validation, what the tier actually toggles today, the controls-as-compliance table, the assurance
    gap, the status ledger, and the gotchas.
 
 There are no deep dives — the mechanisms live in the security modules this module is a lens over.

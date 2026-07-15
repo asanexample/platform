@@ -56,12 +56,12 @@ Watch all three verbs on a real workload, starting with the one you meet first w
 ## Verb 1 — validate: watch a bad workload get turned away
 
 A genuinely non-compliant Deployment — a stock `nginx:latest`, no resource limits, no probes — dry-run
-against a real environment namespace (`acme-shop-dev`). Kyverno's answer, verbatim (lightly trimmed):
+against a real environment namespace (`alpha-shop-dev`). Kyverno's answer, verbatim (lightly trimmed):
 
 ```text
 Error from server: admission webhook "validate.kyverno.svc-fail" denied the request:
 
-resource Deployment/acme-shop-dev/learn-policy-demo was blocked due to the following policies
+resource Deployment/alpha-shop-dev/learn-policy-demo was blocked due to the following policies
 
 disallow-latest-tag:
   … Using the ':latest' tag is not allowed; pin an immutable version.
@@ -71,8 +71,8 @@ require-requests-limits:
   … CPU and memory requests and limits are required on every container.
 restrict-image-registries:
   … Image registry not allowed. Environment images must come from <platform-acct>.dkr.ecr.us-east-1.amazonaws.com
-restrict-images-acme-shop-dev:
-  … shop workloads may only run images under <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-acme/shop-
+restrict-images-alpha-shop-dev:
+  … shop workloads may only run images under <platform-acct>.dkr.ecr.us-east-1.amazonaws.com/team-alpha/shop-
 ```
 
 There's a lot of the model in those few lines:
@@ -82,7 +82,7 @@ There's a lot of the model in those few lines:
   and paging someone at 2 a.m.
 - The rules stack from general to specific. `disallow-latest-tag`, `require-pod-probes`,
   `require-requests-limits`, and `restrict-image-registries` are **baseline** policies — platform-wide, every
-  namespace. But `restrict-images-acme-shop-dev` is **per-product**: *shop* workloads may run only *shop's*
+  namespace. But `restrict-images-alpha-shop-dev` is **per-product**: *shop* workloads may run only *shop's*
   images. That second layer is how one cluster safely holds many teams (more on where it comes from below).
 - It's `validate.kyverno.svc-fail` — the webhook is *failing closed*. That word "fail" is doing real work;
   we'll come back to it.
@@ -132,20 +132,20 @@ you'd otherwise forget — all at admission, all as code.
 You saw two layers in the rejection. Here's the structure, because it's how one cluster safely serves many
 teams:
 
-![Where policies come from: the platform module (written once, no team data) and each XEnvironment claim (derived by the Environment Composition) converge into one enforced set — baseline, supply-chain, and per-product scoping — colored by owner per ADR-046.](images/rule-provenance.svg)
+![Where policies come from: the platform module (written once, no team data) and each XEnvironment claim (derived by the Environment Composition) converge into one enforced set — baseline, supply-chain, and per-product scoping — colored by owner.](images/rule-provenance.svg)
 
 - **Baseline policies** are platform-wide and hold no team data — `disallow-latest-tag`,
   `require-requests-limits`, `restrict-image-registries`, the securityContext backstops. Written once,
   applied everywhere.
-- **Per-product policies** are derived, not hand-written. `restrict-images-acme-shop-dev` ("shop may only run
+- **Per-product policies** are derived, not hand-written. `restrict-images-alpha-shop-dev` ("shop may only run
   shop's images") and `restrict-route-hostnames-…` ("shop may only claim its own hostnames") are generated
   per environment by the [Environment Composition](../environment-api/orientation.md) — it reads each
   `XEnvironment` claim's team/product (the ECR path and its allowed hostnames) and stamps out the scoping
   policy. (The `Product`-registry `fileset`+`yamldecode` derivation applies to the platform-owned
   `verify-images`/`verify-attestations` policies below.) The policy module itself contains *zero*
-  team-specific values ([ADR-014](../../adrs/014-kyverno-as-policy-engine.md)); teams come and go by changing
+  team-specific values; teams come and go by changing
   the registry, not the engine.
-- There's also an **ownership split** ([ADR-046](../../adrs/046-back-stack-for-developer-self-service.md)): the
+- There's also an **ownership split**: the
   per-product scoping policies (`restrict-images`, `restrict-route-hostnames`) are owned by the
   [Environment Composition](../environment-api/orientation.md) — it renders them alongside the namespace, so a
   new environment gets its guardrails atomically. The platform-owned supply-chain policies (`verify-images`,
@@ -176,9 +176,7 @@ confirm it's right, then make it bite.
 > `validate.failureAction` — the older top-level `spec.validationFailureAction` is deprecated and shows a
 > misleading default of `Audit` even where rules are `Enforce`. Enforcement *is* real (the rejection above
 > proves it), but that means our fail-*closed* posture rests on the per-rule field correctly overriding a
-> deprecated default — with no live guard that it stays that way. We filed
-> [#1184](https://github.com/asanexample/platform/issues/1184) to add a synthetic "assert a bad workload is
-> still rejected" check, so enforcement can never silently fall open unnoticed.
+> deprecated default — read the per-rule field, not the deprecated spec default, when you check enforcement.
 
 ## When it breaks — the ones you'll actually hit
 
@@ -209,8 +207,7 @@ PodDisruptionBudget. Write the app; let the guardrails fill in the rest. Full au
 - The full catalog, the mutate/generate specifics, and the gotchas: the [Reference](reference.md).
 - Admission in the flow: [The Life of a Deployment](../spine/life-of-a-deployment.md); as a security wall:
   [The Security Model](../spine/the-security-model.md).
-- Source of truth (as-built): [the Kyverno policy catalog](../../architecture/kyverno-policy-catalog.md) ·
-  [ADR-014 Kyverno as policy engine](../../adrs/014-kyverno-as-policy-engine.md).
+- Source of truth (as-built): [the Kyverno policy catalog](../../architecture/kyverno-policy-catalog.md).
 - Author policies (producer side): the `kyverno-policy-authoring` skill. Write compliant workloads (consumer
   side): the `authoring-k8s-workloads` skill.
 - Substrate: [Kyverno](https://kyverno.io/docs/) ·

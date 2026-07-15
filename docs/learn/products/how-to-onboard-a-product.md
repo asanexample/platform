@@ -18,7 +18,7 @@ the [orientation](orientation.md) first for the *why*.
   need one first. It seeds a new `<team>-<product>` repo from the golden starter. You only need an existing
   repo for the manual Path B. Either way, one Product is one repo — that's the supply-chain trust anchor —
   and multiple Services live in that one repo.
-- **A name.** The Product's `metadata.name` is `<team>-<product>` (e.g. `acme-shop`), lowercase-kebab.
+- **A name.** The Product's `metadata.name` is `<team>-<product>` (e.g. `alpha-shop`), lowercase-kebab.
 
 ## What you're actually doing
 
@@ -51,7 +51,7 @@ registry file — it creates your application:
      shared build-sign pipeline, so your first push builds, signs, and attests with zero setup;
    - the owning GitHub team's `push` on the repo is granted later, by the `github-teams` derived unit on
      reconcile, not at repo creation. The `<team>-` prefix is also the supply chain's unspoofable team
-     identity ([ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md));
+     identity;
    - it opens a platform PR with your `Product` registry file and a first dev Environment claim.
 4. Review and merge that PR → [What happens on merge](#what-happens-on-merge). Because the CI is pre-wired
    and a dev Environment is claimed, you're moments from a running app, not just a registry entry.
@@ -62,17 +62,17 @@ Want to see exactly what gets written, or bringing an existing repo? Use Path B.
 
 ### Step 1 — create the registry file
 
-Add `gitops/products/<team>/<product>.yaml`. Here's a complete, annotated example for a new `acme` product
+Add `gitops/products/<team>/<product>.yaml`. Here's a complete, annotated example for a new `alpha` product
 called `checkout`:
 
 ```yaml
 apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata:
-  name: acme-checkout            # <team>-<product>, lowercase-kebab
+  name: alpha-checkout           # <team>-<product>, lowercase-kebab
 spec:
-  team: acme                     # MUST be an existing Team (gitops/teams/acme.yaml)
-  repo: asanexample/acme-checkout # the ONE repo sourcing this product — the trust anchor
+  team: alpha                    # MUST be an existing Team (gitops/teams/alpha.yaml)
+  repo: asanexample/alpha-checkout # the ONE repo sourcing this product — the trust anchor
   tenancy: pooled                 # pooled | per-customer
   defaultIsolation:
     compute: dedicated-namespace  # shared-namespace | dedicated-namespace | dedicated-nodes |
@@ -89,7 +89,7 @@ Field notes (full schema in the [reference](reference.md)):
 - `spec.defaultIsolation.compute` — the floor; most products want `dedicated-namespace`. Regulated tiers
   force higher.
 - `spec.domains` — leave `[]` to start; add `{host: shop.example.com, dns: managed}` later when you have a
-  custom hostname (ADR-061).
+  custom hostname.
 
 ### Step 2 — open the PR
 
@@ -118,7 +118,7 @@ Either way `registry-reconcile` runs, and out of it come:
 - a keyless CI push role federated to `spec.repo` (your pipeline can now push images, no stored keys),
 - the `verify-images-product-<p>` / `verify-attestations-product-<p>` Kyverno policies,
 - one AppProject plus ApplicationSet ready to deliver your Environments,
-- the owning org-Team `push` grant on the `<team>-<product>` repo (ADR-072).
+- the owning org-Team `push` grant on the `<team>-<product>` repo.
 
 The per-Service ECR repositories (`team-<team>/<product>-<svc>`) aren't part of this apply — they're
 provisioned by the Crossplane Environment Composition when you *claim an Environment*, not by
@@ -135,7 +135,7 @@ or to add more stages, do them explicitly:
 
 1. **Wire your app's CI** to the shared signing pipeline so its images are signed and attested (Path A:
    already wired). → the `supply-chain-onboarding` skill / [Supply chain](../supply-chain/orientation.md).
-2. **Create an Environment** — a Product *at a stage* (`acme-checkout-dev`) via an `XEnvironment` claim
+2. **Create an Environment** — a Product *at a stage* (`alpha-checkout-dev`) via an `XEnvironment` claim
    (Path A: a dev one was claimed for you; add test / staging / prod the same way).
    → the `environment-onboarding` skill / [Environment API](../environment-api/orientation.md).
 3. **Deploy and promote** across stages. → [Delivery](../delivery/orientation.md).
@@ -158,10 +158,10 @@ it's getting the *identity* fields wrong. A typo'd `repo` breaks the trust ancho
 
 **A starting prompt:**
 
-> Onboard a new Product `acme-checkout` owned by team `acme`, repo `asanexample/acme-checkout`, following
-> `docs/learn/products/how-to-onboard-a-product.md`. Create `gitops/products/acme/checkout.yaml` matching
-> the schema and the existing files' conventions (`metadata.name: acme-checkout`, `tenancy: pooled`,
-> `defaultIsolation.compute: dedicated-namespace`, `domains: []`). **Verify the team `acme` exists in
+> Onboard a new Product `alpha-checkout` owned by team `alpha`, repo `asanexample/alpha-checkout`, following
+> `docs/learn/products/how-to-onboard-a-product.md`. Create `gitops/products/alpha/checkout.yaml` matching
+> the schema and the existing files' conventions (`metadata.name: alpha-checkout`, `tenancy: pooled`,
+> `defaultIsolation.compute: dedicated-namespace`, `domains: []`). **Verify the team `alpha` exists in
 > `gitops/teams/` first** — if not, stop and tell me. Open a PR with *only* that one file. Do not touch any
 > derived infra (IAM, policies, ArgoCD) — those are reconciled automatically on merge.
 
@@ -195,8 +195,6 @@ it's getting the *identity* fields wrong. A typo'd `repo` breaks the trust ancho
 - Next steps: `supply-chain-onboarding` + `environment-onboarding` skills;
   [Supply chain](../supply-chain/orientation.md) · [Environment API](../environment-api/orientation.md) ·
   [Delivery](../delivery/orientation.md).
-- Why it's shaped this way: [ADR-069](../../adrs/069-delivery-source-of-truth-product-environment.md) ·
-  [ADR-067](../../adrs/067-idp-domain-model.md).
 - Substrate: [GitOps principles](https://opengitops.dev/) ·
   [GitHub OIDC](https://docs.github.com/en/actions/concepts/security/openid-connect) ·
   [Backstage software templates](https://backstage.io/docs/features/software-templates/).

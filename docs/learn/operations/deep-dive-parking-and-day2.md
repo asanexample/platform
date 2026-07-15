@@ -30,7 +30,7 @@ cabinets.
 The one structural fact that makes the ordering hard: there is exactly one managed node group per cluster —
 `system`, which hosts the platform controllers (verified live: `aws eks list-nodegroups` returns just
 `system` on both `platform-use1-eks` and `preprod-use1-eks`). All workload capacity is
-[Karpenter](https://karpenter.sh/docs/) (ADR-078), and Karpenter's own controller runs inside the cluster,
+[Karpenter](https://karpenter.sh/docs/), and Karpenter's own controller runs inside the cluster,
 on `system`. So you can't naively zero `system`: do it while Karpenter is still managing nodes and you kill
 the controller mid-flight, orphaning its EC2 instances — detached from any nodegroup, still billing. Parking
 has to shut Karpenter down first, cleanly, and in order.
@@ -96,7 +96,7 @@ Nine steps; the ones that carry weight:
    apply uses the helm/kubernetes providers, which need the private API — fronted by the in-cluster
    Tailscale subnet router that only reschedules once the restored `system` nodes are `Ready`. Apply too
    early and it fails and orphans Karpenter's helm releases from Terraform state (a "cannot re-use a name"
-   trap needing manual import, #660). On timeout it skips the karpenter apply and tells you to re-run — it
+   trap needing manual import). On timeout it skips the karpenter apply and tells you to re-run — it
    never applies into an unreachable API.
 5. **Recreate the NodePool** with `terragrunt apply -replace=helm_release.nodepool[0]`. A plain apply reports
    "0 changed" (Terraform still has the NodePool in state even though `down` deleted the live CR), so it has
@@ -121,7 +121,7 @@ Learnings-log entry after every cycle. These three are why.
 
 **1. After parking, `kubectl` is unreachable — and that's a successful park.** Scaling to zero also kills the
 in-cluster Tailscale subnet router that advertises the VPC CIDR to the tailnet, so the private EKS API
-(private-only by design, ADR-010) has no in-VPC path and `kubectl` times out (`i/o timeout` to the API ENI).
+(private-only by design) has no in-VPC path and `kubectl` times out (`i/o timeout` to the API ENI).
 Expected, not a failure. Confirm the park via the AWS EKS API instead:
 
 ```bash
@@ -159,7 +159,7 @@ means a CronJob run that fired during the API/DNS gap, not a live problem. Resta
 Every recovery sweep in `up` was born from a specific incident. Each story runs the same play: a band-aid to
 stop the bleeding, then surgery — fix the source so it can't recur.
 
-### Story A — the node-imbalance meltdown → the descheduler (ADR-093)
+### Story A — the node-imbalance meltdown → the descheduler
 
 The marquee 2026-07-02 incident. The scheduler places a pod on a node once and never moves it, so after
 unpark the first node up absorbs nearly everything. One preprod `t4g.large` ended with 59 pods (~99% CPU
@@ -169,13 +169,13 @@ deadlock: the one thing that could add capacity was starved on the hot node. Cap
 (balanced, the workload fits at ~69%/node) — pure distribution.
 
 `kubectl delete` doesn't help (the scheduler re-pins to the same hot node). `topologySpreadConstraints`
-(ADR-085) don't help either — they spread replicas of one workload, and a fleet of independent single-replica
+don't help either — they spread replicas of one workload, and a fleet of independent single-replica
 controllers has nothing to spread against.
 
 - **Band-aid:** `kubectl delete pod -n karpenter -l app.kubernetes.io/name=karpenter` — once Karpenter is
   `Ready` the rest self-heals, but it may reschedule onto the same hot node. Unblocks; doesn't fix.
-- **Durable fix:** the [kubernetes-sigs descheduler](https://github.com/kubernetes-sigs/descheduler)
-  ([ADR-093](../../adrs/093-descheduler-node-rebalancing.md), PR #1106) — a periodic CronJob running
+- **Durable fix:** the [kubernetes-sigs descheduler](https://github.com/kubernetes-sigs/descheduler) — a
+  periodic CronJob running
   `LowNodeUtilization`: evict pods off over-utilized nodes so they reschedule onto under-utilized ones. It
   respects PodDisruptionBudgets, uses `nodeFit: true` so it never strands a pod `Pending`, and skips
   DaemonSet/local-storage/system-critical pods.
@@ -195,12 +195,7 @@ under the 40% default — so it never qualified as a rebalance destination. (Mod
 [`infra/modules/descheduler`](https://github.com/asanexample/platform/blob/main/infra/modules/descheduler);
 live units under `platform` and `preprod`.)
 
-> **Honest doc-drift.** ADR-093's header still reads `Status: Proposed`, and commit #1106 is tagged
-> `[WIP — not applied]` — yet the CronJobs have been live on both clusters for days. The ADR and commit are
-> stale versus reality; ADR-093 is really Accepted. Flagged here rather than papered over — the "secondary
-> sources are leads, not proof" rule doing its job.
-
-### Story B — DB-client startup ordering → `platctl up` self-heal (#1105 → #1183)
+### Story B — DB-client startup ordering → `platctl up` self-heal
 
 A CNPG database and its client both restart on unpark. If the client comes up before the database is `Ready`,
 it fails every DB op and — never retrying — stays broken indefinitely. A pure ordering trap a node-health
@@ -211,10 +206,10 @@ delete, not a rollout-restart: a rollout-restart annotation would be reverted by
 up to ~12 min — long enough for a CNPG cluster to restore from a cold weekend-parked EBS volume and elect a
 primary.
 
-Then the tell that the discipline is real — the fix had its own bug. On the 2026-07-06 cold unpark, recovery #1105
+Then the tell that the discipline is real — the fix had its own bug. On the 2026-07-06 cold unpark, the recovery
 silently no-op'd: the CNPG operator hadn't yet recreated the `Cluster` CRs' pods when the check ran, so
 pod-only detection saw "no database here," declared nothing to wait for, and exited mute — leaving Backstage
-wedged at 503. Fixed at source in #1183 by deriving the expected-DB namespaces from the surviving `Cluster`
+wedged at 503. Fixed at source by deriving the expected-DB namespaces from the surviving `Cluster`
 CRs (which outlive parking, pod or no pod), and by never exiting mute — if a client stays stuck behind a
 database that never came `Ready`, it now names the victim and prints the manual finish. Proven live on the
 2026-07-07 unpark: `up` auto-restarted Backstage and Keycloak with zero manual intervention. A durable fix
@@ -222,7 +217,7 @@ that fixed a bug in a previous durable fix.
 
 ### Stories C, D, E — the rest of the corpus, briefly
 
-- **C — stale cross-VPC DNS after a preprod restore → `runReconnect` (#540).** When preprod's control-plane
+- **C — stale cross-VPC DNS after a preprod restore → `runReconnect`.** When preprod's control-plane
   ENIs are recreated (new private IPs), the platform VPC's `cross-vpc-dns` private hosted zone still maps the
   preprod API hostname to the old IPs, so ArgoCD (on platform) dials dead IPs (`dial tcp …:443: i/o
   timeout`) and every `XEnvironment`/Product sync fails with a misleading "unable to verify permissions."
@@ -242,15 +237,15 @@ that fixed a bug in a previous durable fix.
 
 ## The durable-fix discipline
 
-Every story is one principle (see `feedback_durable_fix_over_hotfix`): on any failure, fix the source, commit
+Every story is one principle: on any failure, fix the source, commit
 it, open a PR. A manual unblock to restore service is fine — but you have to land the durable fix so it can't
 recur.
 
 | Failure | Band-aid (unblock now) | Durable fix (can't recur) |
 | --- | --- | --- |
-| Node meltdown | `delete` the Karpenter pod | descheduler (ADR-093) |
-| DB-client ordering | `delete` the client pod | `up` DB recovery (#1105 → #1183) |
-| Stale cross-VPC DNS | re-apply by hand | `up` `runReconnect` (#540) |
+| Node meltdown | `delete` the Karpenter pod | descheduler |
+| DB-client ordering | `delete` the client pod | `up` DB recovery |
+| Stale cross-VPC DNS | re-apply by hand | `up` `runReconnect` |
 | Helm pending-upgrade | delete the revision secret | run slow applies in background |
 
 Why the discipline is even possible here ties back to the orientation: because the platform is fully IaC +
@@ -262,8 +257,8 @@ exists only in the running cluster.
 ## Status — built core, maturing envelope
 
 Parking is live and used on both clusters — clean cost-zero cycles, logged. The recovery sweeps and the
-descheduler are proven: the descheduler is live on both clusters (verified this session); the #1183
-DB-recovery auto-restarted Backstage and Keycloak with zero manual intervention on 2026-07-07; DNS-reconnect
+descheduler are proven: the descheduler is live on both clusters (verified this session); the
+DB-recovery sweep auto-restarted Backstage and Keycloak with zero manual intervention on 2026-07-07; DNS-reconnect
 has held on real preprod unparks. The core (`down`: drain → scale → bastion; `up`: restore → gates → sweeps)
 is fully built. What's still maturing is the reliability envelope — each sweep was born from a specific
 incident, and residual post-unpark victims still get cleaned up by hand, then durably fixed, each cycle.
@@ -272,12 +267,6 @@ Learnings log before every park/unpark, and append to it after.
 
 ## Go deeper
 
-- [ADR-093 — descheduler for node rebalancing](../../adrs/093-descheduler-node-rebalancing.md) (the
-  meltdown, the thresholds, the alternatives) ·
-  [ADR-078 — Karpenter elasticity](../../adrs/078-cluster-elasticity-karpenter.md) ·
-  [ADR-085 — workload availability](../../adrs/085-workload-availability-graceful-disruption-defaults.md)
-  (PDBs, topology-spread, replica floor) ·
-  [ADR-010 — private EKS API endpoint](../../adrs/010-private-eks-api-endpoint.md).
 - [`cmd/platctl/internal/cli/scale.go`](https://github.com/asanexample/platform/blob/main/cmd/platctl/internal/cli/scale.go)
   — every function cited here, with `scale_test.go` for the pure targeting logic.
 - Runbook: [`docs/runbooks/cluster-scale-down-up.md`](../../runbooks/cluster-scale-down-up.md) — the 7 known

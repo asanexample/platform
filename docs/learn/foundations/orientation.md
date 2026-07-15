@@ -65,8 +65,7 @@ The tour runs from the outside in, from the land down to the pod, teaching each 
 Start at the outermost boundary. The platform lives in an **AWS Organization** — a tree of AWS accounts under
 a single management root — and the accounts are the load-bearing isolation boundary of the entire platform.
 
-There are five, in a two-branch tree ([ADR-004](../../adrs/004-account-management-strategy.md),
-[ADR-005](../../adrs/005-ou-hierarchy-design.md)):
+There are five, in a two-branch tree:
 
 - **The management account** — governance only. It owns the Organization itself, the org-wide guardrails
   (SCPs, below), and the Terraform **state backend**. It runs almost no workloads. *The landlord's office:
@@ -106,8 +105,8 @@ An **AWS account is a hard boundary** — a *separate security and billing princ
 
 ### SCPs — the zoning laws above the account
 
-One more thing operates *above* the accounts: **Service Control Policies**
-([ADR-003](../../adrs/003-scp-design-philosophy.md)). An IAM policy *grants* permissions and is enforced
+One more thing operates *above* the accounts: **Service Control Policies**.
+An IAM policy *grants* permissions and is enforced
 *inside* an account by that account's own admins — who can rewrite it. An SCP is a **ceiling, not a grant**,
 enforced by AWS Organizations from the management account, *above* the member account. Even the account's own
 root user can't escape it. Your effective permission is the **intersection** of every SCP above you and your
@@ -185,9 +184,8 @@ is impossible by construction.
 ### Secrets that live in the open
 
 One more piece, because it's a lovely trick. The repo is **public**, yet the account IDs, emails, and SSO URLs
-are committed *right in git* — encrypted with **[SOPS](https://github.com/getsops/sops)** and a KMS key
-([ADR-066](../../adrs/066-sops-encrypted-config-secrets.md)). At plan time, Terragrunt decrypts them *in
-memory* (never to disk) using the caller's AWS identity. Anyone can *see* the encrypted file; only someone with
+are committed *right in git* — encrypted with **[SOPS](https://github.com/getsops/sops)** and a KMS key. At
+plan time, Terragrunt decrypts them *in memory* (never to disk) using the caller's AWS identity. Anyone can *see* the encrypted file; only someone with
 the right AWS credentials can *read* it, and every decrypt is logged.
 
 > The encrypted secrets file is a **locked glass case in the public square**. Everyone can see the case is
@@ -207,15 +205,14 @@ Now *inside* an account. Each one gets a **VPC** — a private, isolated network
 gateway) but nothing on the internet can reach *in*. The same reusable module builds a public or fully
 airgapped topology by flipping two switches; the platform runs private.
 
-The addresses are planned, not accidental ([ADR-015](../../adrs/015-cidr-allocation-strategy.md)). Each cloud
+The addresses are planned, not accidental. Each cloud
 gets a `/14` summary; each environment a non-overlapping `/16` within it — platform `10.100.0.0/16`, preprod
 `10.101.0.0/16`, prod `10.102.0.0/16` — carved into per-AZ, per-tier subnets by deterministic math, not a
 spreadsheet. The discipline matters because **overlapping address ranges make routing between networks
 impossible** — you can't send a packet to a range that collides with your own. Disciplined CIDRs are the
 precondition for everything that connects the VPCs.
 
-And they *do* connect — through a **Transit Gateway**
-([ADR-034](../../adrs/034-transit-gateway-cross-account-connectivity.md)), a single hub in the platform
+And they *do* connect — through a **Transit Gateway**, a single hub in the platform
 account, shared to the spoke accounts. Every VPC attaches to it *once* and can then reach every other. Why a
 hub instead of connecting each pair directly with VPC peering? Peering is **non-transitive** and grows as
 *N×(N−1)/2* connections — a combinatorial mess, each needing manual setup on both sides. A hub grows
@@ -229,7 +226,7 @@ There's a subtle twist worth flagging, because it explains a whole module. The T
 *path* to the private cluster — but not a *name*. A private EKS API endpoint only resolves to its real
 (private) IPs *inside its own VPC*, via a hidden zone AWS won't let you share. So ArgoCD in the platform
 account, trying to reach the preprod cluster, gets the *public* DNS answer — pointing at IPs it can't route to.
-The **cross-VPC DNS** module ([ADR-035](../../adrs/035-cross-vpc-dns-resolution.md)) bridges that gap,
+The **cross-VPC DNS** module bridges that gap,
 dynamically looking up the cluster's current private IPs and publishing them where the hub can resolve them.
 (It's the recurring "cross-vpc-dns" gotcha you may have seen in operations.)
 
@@ -243,9 +240,8 @@ Full depth — the subnet tiers, the CIDR math, the TGW sharing, and the three c
 On the platform and preprod accounts sit the two Kubernetes clusters (EKS, Kubernetes **1.35**). Two things
 about them are foundational.
 
-**First: the control plane has no door to the internet.** The EKS API endpoint is **private-only**
-([ADR-010](../../adrs/010-private-eks-api-endpoint.md)) — `endpointPublicAccess: false`, verified live on both
-clusters. The API server's DNS name resolves only to private IPs inside the VPC. Reaching it needs *both* valid
+**First: the control plane has no door to the internet.** The EKS API endpoint is **private-only** —
+`endpointPublicAccess: false`, verified live on both clusters. The API server's DNS name resolves only to private IPs inside the VPC. Reaching it needs *both* valid
 AWS credentials *and* a network path into the VPC — a double gate. And the default is *closed*: the module
 defaults public access to `false`, so even a dropped config line can't silently expose the control plane.
 
@@ -265,9 +261,8 @@ provides it using **eBPF** — programs that run in the Linux kernel. Two conseq
   constant-time, updated in place. *iptables is a paper phone directory you read top-to-bottom; eBPF is a
   hash-indexed contacts app.*
 - Because there's *no CNI at birth*, the cluster can't be built in one shot — a pod can't get an IP until
-  Cilium is running, and CoreDNS is a pod. So the cluster is stood up in **four ordered layers**
-  ([ADR-009](../../adrs/009-eks-component-separation.md)): the cluster, then Cilium, then nodes, then the
-  add-ons. Each is a separate unit, and the order is *impossible to violate by accident*. This is the
+  Cilium is running, and CoreDNS is a pod. So the cluster is stood up in **four ordered layers**: the
+  cluster, then Cilium, then nodes, then the add-ons. Each is a separate unit, and the order is *impossible to violate by accident*. This is the
   "Cilium-first" rule you'll hear about.
 
 Full depth — private EKS, the BYOCNI ordering, the eBPF datapath, and the ingress-identity gotcha — is the
@@ -278,7 +273,7 @@ Full depth — private EKS, the BYOCNI ordering, the eBPF datapath, and the ingr
 ## Stop 5 — the compute (floors added as occupancy changes)
 
 A cluster is nothing without machines to run pods on. The platform uses **two layers of compute**, and the
-split is the interesting part ([ADR-078](../../adrs/078-cluster-elasticity-karpenter.md)):
+split is the interesting part:
 
 - **A small, fixed "system" node group** — the floor. A couple of always-on nodes that hold the things that
   can *never* go down or that nothing else can provision: Karpenter itself, CoreDNS, the Cilium operator, and
@@ -290,7 +285,7 @@ split is the interesting part ([ADR-078](../../adrs/078-cluster-elasticity-karpe
   place is usually the workload layer's own autoscaler: every scaffolded Service ships a default **Horizontal
   Pod Autoscaler** that adds replicas as CPU load climbs — so rising load drives the HPA to add pods, pending
   pods drive Karpenter to add a node, and when load falls the HPA removes pods and Karpenter consolidates the
-  now-idle node away. The two autoscalers compose into one closed loop (ADR-078 Phase 2, proven live).
+  now-idle node away. The two autoscalers compose into one closed loop.
 
 > The system group is the always-on generator; Karpenter is renting extra generators by the hour. You keep one
 > running for the lights that can never go out (Karpenter itself can't provision the node it runs on); you rent
@@ -299,7 +294,7 @@ split is the interesting part ([ADR-078](../../adrs/078-cluster-elasticity-karpe
 Two foundational details ride along. Every Karpenter node comes up **tainted** `node.cilium.io/agent-not-ready`
 — a "wet paint, do not sit" sign that repels pods until Cilium's agent lands and removes it, extending the
 Cilium-first rule to nodes that appear at 3 a.m. And a **descheduler**
-([ADR-093](../../adrs/093-descheduler-node-rebalancing.md)) periodically *rebalances* — because the scheduler
+periodically *rebalances* — because the scheduler
 places a pod once and never moves it, so after a scale-up a dozen independent single-replica services can all
 pile onto the first node that came up. The descheduler is the maître d' who rebalances a lopsided dining room —
 moving parties to emptier tables, but only to a seat that fits them *right now* and never mid-meal.
@@ -315,20 +310,19 @@ A private campus still needs a way for traffic *in* and for engineers *in* — t
 
 **The visitors' door — ingress.** Public (or Tailscale-internal) traffic to an app arrives at a single
 **Network Load Balancer**, is terminated (TLS) by **Cilium's Envoy**, and routed to the right pod by a
-**Gateway API `HTTPRoute`** matching the hostname ([ADR-017](../../adrs/017-gateway-api-over-ingress.md)). One
+**Gateway API `HTTPRoute`** matching the hostname. One
 `*.<domain>` wildcard certificate and one wildcard listener serve *every* subdomain, so a new app needs zero
 certificate work — [cert-manager](https://cert-manager.io/) issues the wildcard from Let's Encrypt, and
 external-dns writes the DNS record. A single knob, `internal`, flips the whole posture: the platform cluster's
 Load Balancer is **internal** (reachable only inside the VPC, i.e. over Tailscale — its dashboards aren't on
-the internet); preprod's is **external** (public, for stakeholder demos, holding only synthetic data —
-[ADR-029](../../adrs/029-preprod-public-ingress-gateway-api.md)).
+the internet); preprod's is **external** (public, for stakeholder demos, holding only synthetic data).
 
 > The wildcard cert is one master key for the whole apartment building — add a thousand apartments, still one
 > key. (The flip side: a domain you *don't* own doesn't fit the master key, which is why external custom
 > domains are deferred.)
 
 **The staff door — access.** Since the API has no public endpoint, how does an engineer run `kubectl`? Over
-**[Tailscale](https://tailscale.com/)** ([ADR-011](../../adrs/011-tailscale-for-private-cluster-access.md)).
+**[Tailscale](https://tailscale.com/)**.
 A Tailscale "subnet router" runs *inside* the cluster and advertises the whole VPC range to your private
 tailnet; split-DNS points the cluster's API hostname at the in-VPC resolver. Join the tailnet and `kubectl`
 just works — no VPN, no public endpoint. (A separate SSM tunnel is the fallback for when Tailscale itself is
@@ -339,7 +333,7 @@ fight Cilium's eBPF for control of the kernel's routing table.
 > routing loops. Userspace mode hands Tailscale its own wheel.
 
 And a security note that ties back to [Identity](../identity/orientation.md): the role `kubectl` uses
-(`PlatformAdmin`) is **operate, not author** ([ADR-040](../../adrs/040-platform-engineer-access-model.md)) —
+(`PlatformAdmin`) is **operate, not author** —
 you can debug, exec, drain, restart, but you *can't* create resources or edit system namespaces by hand.
 Authoring goes through GitOps. Even the humans who run the platform hold no standing power to rewrite it.
 
@@ -366,7 +360,7 @@ consequence of a foundational choice:
   only reachable *through* the subnet router — during a bootstrap (or if the router is down) that resolves
   before the route exists. The "locked yourself in the room with the key inside" trap.
 - **"Everything landed on one node and it fell over after an unpark."** The scheduler-never-moves-pods problem
-  the descheduler exists to fix — the reason ADR-093 was written, after a real incident.
+  the descheduler exists to fix, after a real incident.
 
 ## Go deeper
 

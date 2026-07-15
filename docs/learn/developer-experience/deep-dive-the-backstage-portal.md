@@ -4,9 +4,9 @@ The portal is the single pane of glass over the platform — one place to see wh
 
 ## Build the control plane first, then a thin window onto it
 
-The platform underneath a developer is deliberately deep. [Crossplane](https://docs.crossplane.io/) provisions environments, [ArgoCD](https://argo-cd.readthedocs.io/) delivers apps, [Kyverno](https://kyverno.io/) enforces admission, Keycloak does identity, the LGTM+P stack does observability. Each is the right tool for its job, and each comes with its own CLI, CRD, and mental model. A developer forced to learn all five to ship one service effectively has **no platform**. So the platform grows a single place to see the whole picture. That's the **B** in the BACK stack (Backstage → ArgoCD → Crossplane → Kubernetes, [ADR-046](../../adrs/046-back-stack-for-developer-self-service.md)), adopted in [ADR-051](../../adrs/051-backstage-developer-portal.md).
+The platform underneath a developer is deliberately deep. [Crossplane](https://docs.crossplane.io/) provisions environments, [ArgoCD](https://argo-cd.readthedocs.io/) delivers apps, [Kyverno](https://kyverno.io/) enforces admission, Keycloak does identity, the LGTM+P stack does observability. Each is the right tool for its job, and each comes with its own CLI, CRD, and mental model. A developer forced to learn all five to ship one service effectively has **no platform**. So the platform grows a single place to see the whole picture. That's the **B** in the BACK stack (Backstage → ArgoCD → Crossplane → Kubernetes).
 
-Think of an airport control tower. It's one vantage point over the whole operation — the planes, the trucks, the runways (Crossplane, ArgoCD, Kyverno). Controllers see everything and coordinate, but they're never on the tarmac turning bolts. Where the metaphor breaks: a real tower issues binding clearances by radio — it *acts*. Backstage doesn't. It can see the tarmac and place an order (a PR), but it holds no wrench and pushes no plane. That constraint is the whole design, and it's why [ADR-046](../../adrs/046-back-stack-for-developer-self-service.md) built the control plane first and explicitly rejected a portal that fires imperative pipelines (alternative #3: "the *C* is the point").
+Think of an airport control tower. It's one vantage point over the whole operation — the planes, the trucks, the runways (Crossplane, ArgoCD, Kyverno). Controllers see everything and coordinate, but they're never on the tarmac turning bolts. Where the metaphor breaks: a real tower issues binding clearances by radio — it *acts*. Backstage doesn't. It can see the tarmac and place an order (a PR), but it holds no wrench and pushes no plane. That constraint is the whole design: the control plane comes first, and a portal that fires imperative pipelines is exactly what this rejects — the *C* is the point.
 
 Everything below follows from "thin window, control plane first."
 
@@ -21,14 +21,14 @@ So "I grepped the `backstage` module and the Cost tab isn't there" is a wrong-pl
 
 ## Backstage is deployed by Terragrunt, not GitOps — on purpose
 
-Backstage is platform infrastructure, like ArgoCD or cert-manager, not a tenant app. So the module is a Terragrunt `helm_release` of the official `backstage/backstage` chart running our signed image, like every other platform add-on. The reason is a bootstrapping cycle you must not create: the portal observes ArgoCD, so it can't depend on the very ArgoCD it observes. Put Backstage in the GitOps loop and a cold start deadlocks — ArgoCD can't come up cleanly while the thing watching it waits on ArgoCD. Terragrunt breaks the cycle ([ADR-051](../../adrs/051-backstage-developer-portal.md), "Deploy via Terragrunt, not GitOps").
+Backstage is platform infrastructure, like ArgoCD or cert-manager, not a tenant app. So the module is a Terragrunt `helm_release` of the official `backstage/backstage` chart running our signed image, like every other platform add-on. The reason is a bootstrapping cycle you must not create: the portal observes ArgoCD, so it can't depend on the very ArgoCD it observes. Put Backstage in the GitOps loop and a cold start deadlocks — ArgoCD can't come up cleanly while the thing watching it waits on ArgoCD. Terragrunt breaks the cycle.
 
 What the module stands up, from `main.tf`:
 
 - **The Helm release** — port `7007`, [`ClusterIP`](https://kubernetes.io/docs/concepts/services-networking/service/). Ingress is the Cilium Gateway via an `HTTPRoute` (`gateway.networking.k8s.io`), not a Kubernetes `Ingress`; it's Tailscale-internal only, at `backstage.aws.refplat.org`. The chart's bundled bitnami Postgres is disabled — we bring our own.
-- **An in-cluster Postgres** — a [CloudNativePG](https://cloudnative-pg.io/documentation/current/) `Cluster` (`backstage-db`, one instance → the pod `backstage-db-1`). Backstage creates a database per plugin at startup, so its app role needs `CREATEDB`; superuser access is off, so the module grants it declaratively via a CNPG managed role rather than an imperative `ALTER ROLE`. Backups are Barman Cloud → S3 ([#1119](https://github.com/asanexample/platform/issues/1119)). `database.mode = "rds"` is the planned prod toggle; dev runs CNPG in-cluster today.
+- **An in-cluster Postgres** — a [CloudNativePG](https://cloudnative-pg.io/documentation/current/) `Cluster` (`backstage-db`, one instance → the pod `backstage-db-1`). Backstage creates a database per plugin at startup, so its app role needs `CREATEDB`; superuser access is off, so the module grants it declaratively via a CNPG managed role rather than an imperative `ALTER ROLE`. Backups are Barman Cloud → S3. `database.mode = "rds"` is the planned prod toggle; dev runs CNPG in-cluster today.
 - **Five ExternalSecrets** projecting one credential each from AWS Secrets Manager by path — the OIDC client secret (`platform/keycloak/backstage-oidc`), the read-only GitHub App, the scaffolder write App, the ArgoCD read-only token, and the audit-DB DSN.
-- **An EKS Pod Identity *reader* role** — the pod's AWS identity, granted via a [Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) association, not an IRSA ServiceAccount annotation ([ADR-047](../../adrs/047-pod-identity-as-aws-identity-standard.md)).
+- **An EKS Pod Identity *reader* role** — the pod's AWS identity, granted via a [Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) association, not an IRSA ServiceAccount annotation.
 
 Live, that's exactly two pods and the route:
 
@@ -63,19 +63,17 @@ This is the design decision that keeps the tower honest. The Software Catalog is
 
 Two other mechanisms fill in the rest of the graph — and, unlike the credential-free projection above, one of them needs cluster access. An app repo's `catalog-info.yaml` becomes a Component via GitHub discovery, and the Kubernetes plugin surfaces Crossplane-composed AWS resources (S3/SQS/SNS/DynamoDB) on an Environment's Kubernetes *tab* — that one does use cluster/AWS credentials, on the cross-account workload clusters.
 
-So the browse experience is a direct rendering of the [domain model](../domain-model/orientation.md) — Team → Product → Service → Environment ([ADR-067](../../adrs/067-idp-domain-model.md)). Projection beats scrape because git is the source of truth: the catalog stays correct with no privileged cluster access and cannot drift from what's declared. A guardrail rides along — `catalog.rules: [Component, Location]` — so an app repo can register a `Component` but not spoof a `Group` or `System`. No ownership forgery.
+So the browse experience is a direct rendering of the [domain model](../domain-model/orientation.md) — Team → Product → Service → Environment. Projection beats scrape because git is the source of truth: the catalog stays correct with no privileged cluster access and cannot drift from what's declared. A guardrail rides along — `catalog.rules: [Component, Location]` — so an app repo can register a `Component` but not spoof a `Group` or `System`. No ownership forgery.
 
-The live registries today: teams **acme / globex / platform**, their products (acme's `shop`, `checkout`, `conformance`; globex's `widgets`; platform's `triage-copilot`), and their environments. The projection runs in `projection_mode = "v3"` — a unit flag, not baked into the image (the v3 code already ships dormant; `v2 → v3` needed no rebuild).
+The live registries today: teams **alpha / bravo / platform**, their products (alpha's `shop`, `checkout`; bravo's `dispatch`; platform's `triage-copilot`), and their environments. The projection runs in `projection_mode = "v3"` — a unit flag, not baked into the image (the v3 code already ships dormant; `v2 → v3` needed no rebuild).
 
-## Auth: direct Keycloak OIDC — and a superseded-decision trap
+## Auth: direct Keycloak OIDC
 
-Read the ADR body carefully here, because most of it is wrong on purpose. [ADR-051](../../adrs/051-backstage-developer-portal.md)'s Decision section describes Identity-Center → Dex (SAML→OIDC) with an oauth2-proxy session-cookie workaround ([#202](https://github.com/asanexample/platform/issues/202)). That is all retired. The ADR carries a 2026-06-27 amendment saying so: Dex and the oauth2-proxy are removed ([ADR-053/059](../../adrs/053-identity-and-cross-system-authorization-strategy.md) supersede the ADR-052 broker). The ADR's own header amendment overrides its own body — secondary sources are leads, not proof.
-
-What's actually live: Backstage authenticates directly against Keycloak — the `oidc` sign-in provider, a confidential `backstage` client, issuer on the `platform` realm at `keycloak.aws.refplat.org`, with the groups claim driving ownership and RBAC. Keycloak brokers any upstream IdP invisibly ([ADR-059](../../adrs/059-identity-topology-pluggable-idp-seam.md)). Two secrets make it work: the client secret, synced from `platform/keycloak/backstage-oidc` (created by the `keycloak-config` unit) into `OIDC_CLIENT_SECRET`; and a Terraform-generated `AUTH_SESSION_SECRET` that signs the session cookie — the OAuth handshake stores state in a cookie, so without it the provider errors with *"authentication requires session support"*. Because Backstage now authenticates every request itself, the pod needs no ingress NetworkPolicy and the old oauth2-proxy `:7007` lockdown is gone — the gateway routes straight to it.
+Backstage authenticates directly against Keycloak — the `oidc` sign-in provider, a confidential `backstage` client, issuer on the `platform` realm at `keycloak.aws.refplat.org`, with the groups claim driving ownership and RBAC. Keycloak brokers any upstream IdP invisibly. Two secrets make it work: the client secret, synced from `platform/keycloak/backstage-oidc` (created by the `keycloak-config` unit) into `OIDC_CLIENT_SECRET`; and a Terraform-generated `AUTH_SESSION_SECRET` that signs the session cookie — the OAuth handshake stores state in a cookie, so without it the provider errors with *"authentication requires session support"*. Because Backstage authenticates every request itself, the pod needs no ingress NetworkPolicy — the gateway routes straight to it.
 
 One sharp edge: the split-horizon host alias. The OIDC issuer host (`keycloak.aws.refplat.org`) is pinned via a pod `hostAlias` to the gateway's ClusterIP, so the backend's token exchange hits the gateway Envoy directly instead of the flaky internal-NLB hairpin — while TLS still validates the wildcard cert. The ClusterIP is looked up dynamically from the gateway Service on every apply (a `data.kubernetes_service_v1` read), never hardcoded, so it self-heals if the Service is recreated.
 
-RBAC ([#197](https://github.com/asanexample/platform/issues/197)): the permission framework plus a permission policy gates each run to the requester's own team. Team members can run the non-privileged templates (new-environment / new-resource / request-promotion / new-product); privileged ones (`new-team`, offboarding) set `requireAdmin` and are admin-gated server-side. A live unit comment still reads "admin-only," but the per-template gating in the template headers supersedes it — the deployed permission policy in the app image is the final arbiter.
+RBAC: the permission framework plus a permission policy gates each run to the requester's own team. Team members can run the non-privileged templates (new-environment / new-resource / request-promotion / new-product); privileged ones (`new-team`, offboarding) set `requireAdmin` and are admin-gated server-side. The deployed permission policy in the app image is the final arbiter.
 
 ## The plugins — read-only, scoped, never cluster-admin
 
@@ -90,21 +88,21 @@ It also surfaces Crossplane-composed AWS resources (S3/SQS/SNS/DynamoDB) on an E
 
 **ArgoCD plugin** (Roadie) — reads the self-hosted ArgoCD over the in-cluster HTTP API with a read-only token (account `backstage`, `role:readonly`), synced from `platform/argocd/backstage-token`. Components link via an `argocd/app-selector` annotation; `frontend_url` gives working "open in ArgoCD" links (the backend URL is unreachable from a browser). Gotcha: a Helm 3-way merge can drop the token id from `argocd-cm` after an apply → the card 401s → re-mint (runbook `backstage-argocd.md`).
 
-**Cost tab** ([ADR-091](../../adrs/091-cost-guardrails.md) A3) — the canonical check-the-right-code case. The plugin ships in the app image, so grepping the infra `backstage` module finds nothing. The entire infra side is one line in a different unit — the `mimir` unit:
+**Cost tab** — the canonical check-the-right-code case. The plugin ships in the app image, so grepping the infra `backstage` module finds nothing. The entire infra side is one line in a different unit — the `mimir` unit:
 
 ```hcl
-# ADR-091 A3: admit Backstage's Cost tab to query the Mimir gateway directly (the ns default-denies ingress).
+# admit Backstage's Cost tab to query the Mimir gateway directly (the ns default-denies ingress).
 query_consumer_namespaces = ["backstage"]
 ```
 
-That admits the `backstage` namespace to query the hub Mimir gateway (the `observability` namespace default-denies ingress). The tab renders spend against the budget the team declared in `Team.spec.envelope.budget`. ADR-091 is Accepted / built + live — though ADR-091's *"Remaining"* prose still lists the Cost tab, which is stale (ADR-092 already treats it as existing).
+That admits the `backstage` namespace to query the hub Mimir gateway (the `observability` namespace default-denies ingress). The tab renders spend against the budget the team declared in `Team.spec.envelope.budget`.
 
-**Audit / My-Access view** ([ADR-088](../../adrs/088-temporary-power-activation.md)) — reads borrow history from the ADR-084 `platform-directory` Postgres via `AUDIT_DB_DSN`, and drives the temporary-power Activate-Power flow. This is the one exception to the otherwise read-only posture: the `backstage` ServiceAccount is bound (via a `backstage-activators` group, create-only on `Activation` objects) with a single narrow write capability. Everything else the pod can do is a read.
+**Audit / My-Access view** — reads borrow history from the `platform-directory` Postgres via `AUDIT_DB_DSN`, and drives the temporary-power Activate-Power flow. This is the one exception to the otherwise read-only posture: the `backstage` ServiceAccount is bound (via a `backstage-activators` group, create-only on `Activation` objects) with a single narrow write capability. Everything else the pod can do is a read.
 
 ## The honest status — live vs designed
 
-- **Live** (verified on the platform cluster this session): Backstage Phase 2.0–2.4 at `backstage.aws.refplat.org`, Tailscale-internal behind the Cilium Gateway `HTTPRoute`, pod `Running`; direct Keycloak OIDC (Dex + oauth2-proxy retired); catalog projection v3; Kubernetes / ArgoCD / Cost plugins + the audit view enabled; CNPG-backed single instance (`backstage-db-1`) with S3 Barman backups. The Scaffolder is `enable_scaffolder = true` (BACK Phase 3), with ten templates in-repo under [`scaffolder/templates/`](https://github.com/asanexample/platform/tree/main/scaffolder/templates) — note ADR-051's Decision still frames the Scaffolder as "Phase 3 / read-only until then," which predates enablement.
-- **Designed / not wired:** TechDocs — the plugin exists in the image (the backend even reserves a `techdocs/` working dir) but serving this learning corpus through it is a separate open effort ([#938](https://github.com/asanexample/platform/issues/938)), not built. It's why these docs use absolute, `main`-pinned source links: they survive the eventual move into TechDocs. Also: RDS database mode is a planned follow-up (dev runs CNPG today).
+- **Live** (verified on the platform cluster this session): Backstage Phase 2.0–2.4 at `backstage.aws.refplat.org`, Tailscale-internal behind the Cilium Gateway `HTTPRoute`, pod `Running`; direct Keycloak OIDC; catalog projection v3; Kubernetes / ArgoCD / Cost plugins + the audit view enabled; CNPG-backed single instance (`backstage-db-1`) with S3 Barman backups. The Scaffolder is `enable_scaffolder = true` (BACK Phase 3), with ten templates in-repo under [`scaffolder/templates/`](https://github.com/asanexample/platform/tree/main/scaffolder/templates).
+- **Designed / not wired:** TechDocs — the plugin exists in the image (the backend even reserves a `techdocs/` working dir) but serving this learning corpus through it is a separate open effort, not built. It's why these docs use absolute, `main`-pinned source links: they survive the eventual move into TechDocs. Also: RDS database mode is a planned follow-up (dev runs CNPG today).
 
 ## Gotchas that teach
 
@@ -112,16 +110,9 @@ That admits the `backstage` namespace to query the hub Mimir gateway (the `obser
 - **"The Cost tab / a plugin isn't in the backstage module."** Right — it's in the app image. The infra side is usually one line in a different unit (Cost = the `mimir` unit's `query_consumer_namespaces`). Two repos.
 - **"Backstage sign-in 503s."** The backing Postgres is a single CNPG instance; after a keycloak-db blip the `openid-client` can cache a failed discovery and wedge → `kubectl rollout restart deploy/backstage`. Keep this one resident — single-instance auth DBs are fragile.
 - **"The Kubernetes plugin 401s on a cluster."** The cluster `name` must be the real EKS cluster name (`platform-use1-eks` / `preprod-use1-eks`) — it's the EKS token's `x-k8s-aws-id`. A display name silently targets the wrong cluster.
-- **"The ADR says Dex / oauth2-proxy."** The body does; the 2026-06-27 amendment retires it. Read ADR headers and amendments before the body — secondary sources are leads, not proof.
 
 ## Go deeper
 
-- **ADRs (source of truth):** [ADR-046 BACK stack](../../adrs/046-back-stack-for-developer-self-service.md) ·
-  [ADR-051 Backstage-as-portal](../../adrs/051-backstage-developer-portal.md) (read the amendment first) ·
-  [ADR-048 federated Crossplane](../../adrs/048-federated-per-cluster-crossplane.md) ·
-  [ADR-067 domain model](../../adrs/067-idp-domain-model.md) ·
-  [ADR-088 temporary access](../../adrs/088-temporary-power-activation.md) ·
-  [ADR-091 cost visibility](../../adrs/091-cost-guardrails.md).
 - **The code:**
   [`infra/modules/backstage/main.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/backstage/main.tf) ·
   [`variables.tf`](https://github.com/asanexample/platform/blob/main/infra/modules/backstage/variables.tf) ·

@@ -41,8 +41,7 @@ Two consequences run through everything:
 - **This is not a greenfield agent platform.** An agent is a workload with extra demands, and the platform
   already runs governed workloads well — scoped identity (Pod Identity), admission policy (Kyverno), signed
   supply chain (cosign/SLSA), zero-trust networking (Cilium), and a propose-via-PR gate. The agentic platform
-  extends that existing moat rather than inventing a parallel one
-  ([ADR-074](../../adrs/074-agentic-workloads-platform.md)).
+  extends that existing moat rather than inventing a parallel one.
 
 The metaphor for the rest of this page: hiring and supervising a brilliant, fast, but unpredictable new
 contractor.
@@ -58,8 +57,7 @@ contractor.
 
 ## What an agent is: an `XAgent` claim
 
-An agent is defined by one git-committed claim — an `XAgent`
-([ADR-082](../../adrs/082-platform-agent-runtime-xagent.md)). The key insight: `XAgent` is to a platform agent
+An agent is defined by one git-committed claim — an `XAgent`. The key insight: `XAgent` is to a platform agent
 what `XEnvironment` is to a tenant. Both are Crossplane composites; both turn a single declarative claim into a
 provisioned slot — a namespace, a ServiceAccount, an identity, RBAC, and network policy — reconciled from git;
 both split provisioning (Crossplane) from workload delivery (ArgoCD). The difference is what they're shaped
@@ -99,7 +97,7 @@ platform boxes it in on four independent axes ([deep dive](deep-dive-bounding-th
   heal around — you can't just `kubectl scale 0`, because the delivery controller would revert that. A
   dead-man's switch: it doesn't ask the agent to stop, it removes the fuel.
 
-Add the data boundary ([ADR-076](../../adrs/076-agent-observability.md)): the agent's telemetry carries
+Add the data boundary: the agent's telemetry carries
 metadata freely (tokens, latency, tool names), but raw prompt/response content is redacted per compliance tier
 and never shipped to a SaaS; secrets in context is a hard never. All of this — plus admission policy (Kyverno)
 and an admin-gated authoring flow — is genuinely built and enforced today.
@@ -107,8 +105,7 @@ and an admin-gated authoring flow — is genuinely built and enforced today.
 ## How it earns more: the autonomy ladder (designed, not built)
 
 Propose-only is the floor, not the forever. The question the platform answers on paper — and this is the
-honest part — is how an agent could safely earn the right to act on some things without a human each time
-([ADR-086](../../adrs/086-autonomous-agent-access.md), still a Proposed sketch).
+honest part — is how an agent could safely earn the right to act on some things without a human each time.
 
 The design: autonomy is graduated, per-action-class, earned, and machine-bounded — never a global property of
 an agent. An agent earns autonomy one action class at a time. It runs in shadow (proposes, and the system
@@ -124,7 +121,7 @@ bound.
 The honest status: almost none of this is built. The `autonomy.mode` field is schema-locked to `propose-only`
 — the API can't even express autonomy today. The grader, the reversibility registry, and the action-time
 policy engine are all unbuilt; the whole thing is gated on an eval-as-a-service that doesn't exist yet. The
-one shipped piece is the forward-capture substrate (#1074): a hardened, write-once S3 corpus that captures
+one shipped piece is the forward-capture substrate: a hardened, write-once S3 corpus that captures
 real triage episodes now — because telemetry ages out, so an incident you don't record at the time is lost
 forever, and you can't build an eval corpus retroactively.
 
@@ -136,8 +133,7 @@ is careful about exactly this line.
 
 ## The one real agent: the triage copilot
 
-All of the above is exercised by exactly one live agent: the triage copilot
-([ADR-080](../../adrs/080-triage-copilot.md)), the reference `XAgent`
+All of the above is exercised by exactly one live agent: the triage copilot, the reference `XAgent`
 ([worked-example deep dive](deep-dive-the-triage-copilot.md)). Its job in one line: shorten the time from "an
 alert fired" to "a human knows where to look and who owns it."
 
@@ -150,11 +146,10 @@ fabricating a cause — a confident-wrong root cause is the dangerous failure.
 
 Two threads connect out to other modules:
 
-- **Owner-routing** ([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)): the agent
+- **Owner-routing**: the agent
   resolves the culprit's team from the git registries (it's a consumer, not a control plane) and posts to that
   team's Slack — the live team floor. Resolution is split from mention-policy so a directory bug can't misfire
-  a page; the finer path (@mentioning the commit author, live on-call paging) is designed but not yet built
-  (ADR-084 Phases 1/3).
+  a page; the finer path (@mentioning the commit author, live on-call paging) is designed but not yet built.
 - **Evaluation**: the triage card carries accept / correct / dismiss buttons; the human's verdict is the
   online eval signal, and the seed of the future autonomy ladder.
 
@@ -172,7 +167,7 @@ observability, and all the bounding machinery (least-privilege identity, the env
 admission policy, the data boundary).
 
 Designed but not built: the autonomy ladder (only its capture substrate ships; `autonomy.mode` is locked to
-propose-only), the resource agent (ADR-075, a second designed-but-unbuilt agent), and eval-as-a-service (the
+propose-only), the resource agent (a second designed-but-unbuilt agent), and eval-as-a-service (the
 hard blocker for any autonomy).
 
 Deferred: multi-agent / agent-to-agent, full content-capture, and a model gateway.

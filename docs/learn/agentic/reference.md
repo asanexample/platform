@@ -1,26 +1,13 @@
 # Learn: The Agentic Platform — reference
 
-A lookup reference; the [orientation](orientation.md) builds the model from the ground up. Verified against
-code + ADRs + git history. The hub cluster was parked at write time, so live-status here rests on the ADR
-"built+live" headers, the committed claim, and the continuous promote commits — not a fresh `kubectl`.
+A lookup reference; the [orientation](orientation.md) builds the model from the ground up. The hub cluster
+was parked at write time, so live-status here rests on the committed claim and the continuous promote
+commits — not a fresh `kubectl`.
 
-## The ADR map
-
-| ADR | What | Status |
-| --- | --- | --- |
-| **[074](../../adrs/074-agentic-workloads-platform.md)** | The thesis — agents as a governed workload class (run/govern/secure); extends the existing moat | Proposed (spine committed) |
-| **[082](../../adrs/082-platform-agent-runtime-xagent.md)** | The `XAgent` runtime — XRD + Composition on the hub | **Accepted, built+live** |
-| **[080](../../adrs/080-triage-copilot.md)** | The first/reference agent — the triage copilot | **Accepted, built+live** |
-| **[084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)** | Owner resolution + directory (triage → owning team) | Proposed; team-floor + PagerDuty live |
-| **[076](../../adrs/076-agent-observability.md)** | Agent/GenAI observability (see the Observability module) | Accepted, slices 1–3 live |
-| **[086](../../adrs/086-autonomous-agent-access.md)** | The autonomy ladder — graduated, eval-gated autonomy | **Proposed (sketch); only capture built** |
-| **[075](../../adrs/075-resource-agent.md)** | The resource agent (2nd, NL self-service) | Proposed, **not built** (#554) |
-| **[081](../../adrs/081-platform-service-delivery.md)** | Platform-service delivery — one supply chain, runtime forks by type | Proposed; supply-chain half stands |
-
-**The rule that emerged (082 vs 081):** *one supply chain for everyone; runtime forks by workload type* —
+**The governing rule:** *one supply chain for everyone; runtime forks by workload type* —
 tenant → `XEnvironment` on a workload cluster; platform agent → `XAgent` on the hub.
 
-## The `XAgent` (the claim) — [ADR-082](../../adrs/082-platform-agent-runtime-xagent.md)
+## The `XAgent` (the claim)
 
 `XAgent` : agent :: `XEnvironment` : tenant. Crossplane composite, **cluster-scoped** (the claim *is* the XR;
 authoring needs cluster RBAC — the first gate), group `platform.refplat.org/v1beta1`, hub-only. Chart:
@@ -49,7 +36,7 @@ ArgoCD's job (the provisioning ⟂ delivery split).
 `gitops/agents/*.yaml` → an ArgoCD **registry-sync** Application (AppProject whitelists *only* `XAgent`
 cluster resources) syncs claims to the hub Crossplane → Composition reconciles the slot. A **per-agent
 workload ApplicationSet** (`agent-<name>`) fans out over the agent's `Release` records
-(`gitops/releases/<team>/<product>/*.yaml`, promoted signed **digest**, ADR-071) and delivers the workload
+(`gitops/releases/<team>/<product>/*.yaml`, promoted signed **digest**) and delivers the workload
 into the slot (its AppProject: `clusterResourceWhitelist: []` — no cluster writes ever). Bootstrap:
 `enable_agent_api = true` on the hub crossplane unit → after that, **adding an agent is a git commit** (no
 per-agent apply). Delivery wiring: `infra/modules/argocd-apps/agents.tf`.
@@ -65,7 +52,7 @@ per-agent apply). Delivery wiring: `infra/modules/argocd-apps/agents.tf`.
   egress (**CiliumNetworkPolicy**, not a k8s ipBlock — in-cluster dests are identity-matched, the Pod-Identity
   agent is host-local) only to DNS + kube-apiserver + host (creds) + `observability`/`platform-directory`/
   `keycloak` + `toFQDNs` Bedrock/`*.slack.com`/`api.github.com`.
-- **Data boundary** ([ADR-076](../../adrs/076-agent-observability.md)): metadata always; raw content
+- **Data boundary:** metadata always; raw content
   redacted per compliance tier, never to a SaaS; **secrets in context = hard never**; regulated tiers
   metadata-only.
 - **Kill-switch** (`lifecycle.phase: suspended`): Composition drops the **PodIdentityAssociation** → no
@@ -76,7 +63,7 @@ per-agent apply). Delivery wiring: `infra/modules/argocd-apps/agents.tf`.
   `restrict-agent-envelope` + `restrict-agent-control-plane` (only platform principals may author `XAgent`s).
   Plus **CODEOWNERS-gated** authoring (author ≠ approver — authoring grants cluster-read + Bedrock).
 
-## Autonomy ladder (designed only) — [ADR-086](../../adrs/086-autonomous-agent-access.md) / [deep dive](deep-dive-autonomy-and-evaluation.md)
+## Autonomy ladder (designed only) — [deep dive](deep-dive-autonomy-and-evaluation.md)
 
 Graduated, **per-action-class**, earned, machine-bounded: **shadow** (proposes; system records what it *would*
 have done + whether right) → eval scores vs a per-tier bar → **promoted** to autonomous on that class →
@@ -85,13 +72,13 @@ registry). *"More permissive" = move the guardrail human→machine, not remove i
 
 **Status:** `autonomy.mode` **schema-locked to `propose-only`** (the API can't express autonomy). Grader,
 reversibility registry, action-time policy engine = **unbuilt**; gated on **eval-as-a-service** (doesn't
-exist). **Built:** the *forward-capture substrate* (#1074) — `infra/modules/aws/agent-eval-store/` → S3
+exist). **Built:** the *forward-capture substrate* — `infra/modules/aws/agent-eval-store/` → S3
 `platform-agent-eval-corpus` (write-once, TLS-only, versioned, SSE-S3→CMK by cost profile), capturing real
 triage episodes `{alert-group, snapshot, label, rubric}`. The agent's write grant is on *its own claim*
 (avoids a chicken-and-egg on the composed role ARN). *"Build the pipeline, not the corpus; the examiner
 doesn't exist yet."*
 
-## The triage copilot (the one live agent) — [ADR-080](../../adrs/080-triage-copilot.md) / [deep dive](deep-dive-the-triage-copilot.md)
+## The triage copilot (the one live agent) — [deep dive](deep-dive-the-triage-copilot.md)
 
 **Job:** shorten "alert fired" → "human knows where to look + who owns it." **Loop:** Alertmanager webhook
 (triages the alert *group*, not each alert) → scope → **read-only** evidence (Mimir/Loki/Tempo/k8s) →
@@ -101,7 +88,7 @@ confidence · next *diagnostic* step, never a fix · `disposition` ∈ confident
 evidence). Below a confidence floor: **abstain + page a human** (a confident-wrong RCA scores worse than an
 abstain). **Autonomously triggered, strictly propose-only in action.**
 
-**Owner-routing** ([ADR-084](../../adrs/084-platform-identity-directory-and-owner-resolution.md)):
+**Owner-routing:**
 `resolveOwner({namespace, culpritLogin?})` reads the **git registries** (namespace→Product→Team; the agent is
 a *consumer*, not a control plane) → facts only; `applyMentionPolicy(resolved, {severity,disposition})`
 decides the ping (author → team on-call → user-group → channel → plain text). An **@mention fires only** at a
@@ -109,21 +96,21 @@ trusted tier AND confident-lead + critical. **Team is the resolution floor** (wo
 directory bug can't misfire a page.
 
 **Eval loop:** the triage card's **accept/correct/dismiss** buttons → `triage_feedback_total{verdict,disposition}`
-→ accept-rate *by disposition* (calibration) + the eval corpus. **Observed:** the "Triage Agent (ADR-076)"
+→ accept-rate *by disposition* (calibration) + the eval corpus. **Observed:** the "Triage Agent"
 dashboard — see the [Observability agent-obs deep dive](../observability/deep-dive-agent-observability.md).
 *Impl note:* the agent loop's Go source is in the app repo (`platform-triage-copilot`), not this infra
 repo — this repo defines the claim, runtime, directory backend, and observability.
 
 ## Status ledger
 
-- **LIVE:** `XAgent` runtime (082), triage copilot (080, propose-only, continuously promoted), agent-obs
-  (076 slices 1–3), the bounding machinery (identity/envelope/kill-switch/netpol/data-boundary/admission),
-  owner-routing team-floor + PagerDuty on-call (084 Phase 0/2), the eval **capture** substrate (#1074).
-- **Designed / not built:** the **autonomy ladder** enforcement (086 — grader, registry, policy engine);
-  **eval-as-a-service**; the **resource agent** (075, epic #554); full person-level identity linking (084
-  Phase 1/3); cross-cluster `access.clusters` roles.
+- **LIVE:** the `XAgent` runtime, the triage copilot (propose-only, continuously promoted), agent-obs
+  (slices 1–3), the bounding machinery (identity/envelope/kill-switch/netpol/data-boundary/admission),
+  owner-routing team-floor + PagerDuty on-call, the eval **capture** substrate.
+- **Designed / not built:** the **autonomy ladder** enforcement (grader, registry, policy engine);
+  **eval-as-a-service**; the **resource agent**; full person-level identity linking;
+  cross-cluster `access.clusters` roles.
 - **Deferred:** multi-agent / agent-to-agent (A2A); full content-capture w/ redaction; self-hosted Langfuse;
-  a model gateway; the FinOps agent (ADR-092 D7); a generic `XPlatformService` lane.
+  a model gateway; the FinOps agent; a generic `XPlatformService` lane.
 
 ## Gotchas
 

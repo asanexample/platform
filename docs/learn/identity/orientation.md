@@ -104,8 +104,8 @@ project → **verify**: the platform checks that the effected state matches the 
 [the security model](../spine/the-security-model.md) applies to every control.
 
 That projected Keycloak group isn't just stored — an app reads it at every sign-in. Here's the
-direct-Keycloak OIDC flow when robin opens an app like Backstage or ArgoCD (Dex retired — the app talks
-straight to Keycloak):
+direct-Keycloak OIDC flow when robin opens an app like Backstage or ArgoCD — the app talks straight to
+Keycloak:
 
 ![OIDC sign-in: the browser and app talk straight to Keycloak — authenticate (password plus passkey), exchange the auth code for id and access tokens, and read the groups claim for authorization.](images/identity-keycloak-signin-sequence.svg)
 
@@ -113,10 +113,10 @@ straight to Keycloak):
 
 Humans aren't the only subjects. Your `shop` pod needs to read its S3 bucket, so it needs an identity too,
 and the platform's answer is the same no-standing-secret instinct. Through EKS Pod Identity, a pod assumes a
-scoped AWS role *via its ServiceAccount* — the real one behind `acme`'s `shop`:
+scoped AWS role *via its ServiceAccount* — the real one behind `alpha`'s `shop`:
 
 ```text
-Pod-acme-shop-dev-web  →  arn:aws:iam::<workload-acct>:role/Pod-acme-shop-dev-web
+Pod-alpha-shop-dev-storefront  →  arn:aws:iam::<workload-acct>:role/Pod-alpha-shop-dev-storefront
 ```
 
 No access key is ever minted, stored in the image, or left sitting in a secret to be stolen; the pod gets
@@ -136,10 +136,10 @@ ever attenuates (each hop can narrow, never escalate).
 ![An agent's effective authority is the intersection of the agent's own grant and the calling human's scope; delegation only ever attenuates, never escalates.](images/identity-agent-authority-intersection.svg)
 
 It's not a parallel model: agents are subjects in the
-*same* grant model (ADR-068, extended), and delegation is just a grant. That, plus graduated autonomy
+*same* grant model, and delegation is just a grant. That, plus graduated autonomy
 (machine-enforced bounds on what an agent may do unattended), is the [Agentic platform](../_inventory.md)'s
 subject — the runtime and the copilot's base identity are live, the full delegation/autonomy machinery is
-largely designed (ADR-074/086). Flagged here so you don't file an agent under "plain workload."
+largely designed. Flagged here so you don't file an agent under "plain workload."
 
 ## Dangerous power you borrow, not hold
 
@@ -161,9 +161,9 @@ spec:
 ```
 
 The mechanism: an `on-demand` grant in the roster declares who may borrow what — but the projection
-generators deliberately exclude on-demand grants from the standing config
-([ADR-088](../../adrs/088-temporary-power-activation.md)). The eligibility exists in git, but the access
-does not exist in any system until you activate it — a step-up (re-prompt a passkey), a TTL, and loud audit.
+generators deliberately exclude on-demand grants from the standing config. The eligibility exists in git,
+but the access does not exist in any system until you activate it — a step-up (re-prompt a passkey), a
+TTL, and loud audit.
 When the clock runs out, it's auto-revoked. Nobody walks around holding apex power; they borrow it, use it,
 and it evaporates.
 
@@ -183,7 +183,7 @@ here; it's the default state of your most powerful roles.
   console until you do. That's the design, not a bug.
 - **"Per-team `kubectl` access isn't working."** The v3 Composition emits the in-cluster `developers`
   RoleBinding but not yet the `DeveloperAccess-<team>` IAM role + EKS access entry — that capability is
-  designed, not built (#647 → #364). Use `platctl kubeconfig` / PlatformAdmin meanwhile. It's also why the
+  designed, not built. Use `platctl kubeconfig` / PlatformAdmin meanwhile. It's also why the
   live-verification for this module reads with PlatformAdmin.
 - **"The console shows access git doesn't."** That's declared-vs-effected drift — the projection is derived
   from git, so the fix is to reconcile it (or investigate the out-of-band change), never to hand-edit the
@@ -203,10 +203,4 @@ console-clicking, no lingering permissions.
 - The full model + projection details: the [Reference](reference.md).
 - The security framing: [The Security Model](../spine/the-security-model.md) (least privilege, zero standing
   trust); workloads in motion: [The Life of a Deployment](../spine/life-of-a-deployment.md).
-- Source of truth: [Identity & Access Strategy (north star)](../../architecture/identity-and-access-strategy.md) ·
-  [ADR-053 identity & authz](../../adrs/053-identity-and-cross-system-authorization-strategy.md) ·
-  [ADR-059 Keycloak seam](../../adrs/059-identity-topology-pluggable-idp-seam.md) ·
-  [ADR-088 temporary power](../../adrs/088-temporary-power-activation.md) ·
-  [ADR-041 Pod Identity](../../adrs/041-pod-identity-for-tenant-workloads.md) ·
-  [ADR-089](../../adrs/089-governance-registry-topology.md)/[ADR-090](../../adrs/090-governance-identity-model.md)
-  (the governance registry).
+- Source of truth: [Identity & Access Strategy (north star)](../../architecture/identity-and-access-strategy.md).

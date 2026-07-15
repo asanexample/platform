@@ -16,7 +16,7 @@ sibling of the [Environment API](../environment-api/): that provisions an *envir
 ## Read in this order
 
 1. **[Orientation](orientation.md)** — the one idea (one registry entry, everything derives from it), the
-   real `acme-shop` record, the derivations (github-oidc / policy / argocd-apps, plus github-teams), and the
+   real `alpha-shop` record, the derivations (github-oidc / policy / argocd-apps, plus github-teams), and the
    paved road (scaffolder → gate → reconcile-on-merge).
 2. **[Reference](reference.md)** — the `Product` schema, the derivations table, the paved road, and gotchas.
 
@@ -28,5 +28,3 @@ newcomer-followable playbook covering both the Backstage scaffolder path and a d
 - The pieces that derive from the registry: [Delivery](../delivery/orientation.md) ·
   [Policy](../policy/orientation.md) · [Supply chain](../supply-chain/orientation.md) ·
   [Environment API](../environment-api/orientation.md).
-- Why it's shaped this way: [ADR-069](../../adrs/069-delivery-source-of-truth-product-environment.md)
-  (registry as source of truth) · [ADR-067](../../adrs/067-idp-domain-model.md) (the domain model).

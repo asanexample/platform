@@ -17,9 +17,8 @@ runtime credentials). Two planes, and they never cross:
 | Home | committed `infra/live/aws/secrets.enc.yaml` (KMS-sealed) | AWS Secrets Manager → synced k8s Secret |
 | Read when | Terragrunt config-load (before providers) | runtime, in-cluster |
 | Credentials? | **no** (identifiers only) | **yes** |
-| ADR | [066](../../adrs/066-sops-encrypted-config-secrets.md) | [019](../../adrs/019-external-secrets-operator.md) |
 
-## Config-in-git — SOPS ([ADR-066](../../adrs/066-sops-encrypted-config-secrets.md), built+live)
+## Config-in-git — SOPS (built+live)
 
 - **File:** `infra/live/aws/secrets.enc.yaml` — SOPS-encrypted, committed to the public repo. Keys:
   `account_ids`, `admin_email`/`account_emails`, `state_bucket`, `state_role_arn`, `cloudflare_zone_id`,
@@ -41,15 +40,15 @@ runtime credentials). Two planes, and they never cross:
 - **Belongs here:** ✅ stable config identifiers. ❌ app secrets/credentials (those go to ESO). ❌ customer
   PII — never in git, encrypted or not.
 
-## Runtime secrets — ESO + Secrets Manager ([ADR-019](../../adrs/019-external-secrets-operator.md), built+live)
+## Runtime secrets — ESO + Secrets Manager (built+live)
 
 - **Source of truth:** AWS Secrets Manager. The bridge is the External Secrets Operator (chart
-  `0.14.3`, module `external-secrets`, ns `external-secrets`). Rejected alternatives (ADR-019): secrets in
+  `0.14.3`, module `external-secrets`, ns `external-secrets`). Alternatives that don't fit: secrets in
   TF state (couples rotation to apply, and state readers see all), Sealed Secrets (per-cluster key, no cloud
   integration), Vault (a Tier-0 system to run).
 - **`ClusterSecretStore`** (module `secret-stores`): `aws-secrets-manager` (SecretsManager) and
   `aws-secrets-manager-ssm` (Parameter Store, cheaper). No `auth` block — ESO authenticates as its own
-  Pod Identity (ADR-047, migrated from IRSA #594), so the bridge holds no secret. Both are live and
+  Pod Identity, so the bridge holds no secret. Both are live and
   Valid/ReadWrite/Ready.
 - **`ExternalSecret`** (per workload): `secretStoreRef` {name, kind: ClusterSecretStore} · `refreshInterval`
   (`1h` everywhere today) · `target.name` + `creationPolicy: Owner` · `data[]` (`secretKey` ← `remoteRef.key` +
@@ -65,9 +64,9 @@ runtime credentials). Two planes, and they never cross:
 - **Naming:** `platform/<subsystem>/<name>` (e.g. `platform/keycloak/admin`, `platform/backstage/github-app`).
   16 ExternalSecrets live across 8 namespaces, all `SecretSynced`.
 
-## The tenant paved road — ADR-070 (**designed, NOT built**)
+## The tenant paved road (**designed, NOT built**)
 
-[ADR-070](../../adrs/070-tenant-app-config-and-secrets.md), Proposed. The designed model: config (non-secret)
+The designed model: config (non-secret)
 lives in git on the claim's `services.<svc>.config` and becomes a ConfigMap; secrets live in the store, the
 claim holds only key names, and the Composition mints a per-environment ExternalSecret. The write path makes
 Backstage the sole broker (`platctl secret set` calls the same API), Pod-Identity-scoped to
@@ -88,7 +87,7 @@ platform's own services use ESO extensively.
 
 ESO itself proves the point: it reads the store via Pod Identity, so the secrets bridge has no secret of its own.
 
-## Rotation — [ADR-094](../../adrs/094-secret-rotation-strategy.md) (**Proposed; mostly design**)
+## Rotation (**mostly design**)
 
 The hard half is solved — identity creds are keyless. The static residue (~26 secrets at `Rotation: null`)
 sorts into four classes:
@@ -102,11 +101,11 @@ sorts into four classes:
 
 - **Three shared primitives:** Reloader (restart a workload on secret change — the keystone that turns a
   cached-old-value outage into a hands-off event) · rotation-age alerts (`secret_age_days`, alert past a
-  per-class max) · refresh-interval tiers (24h/1h/15m — ADR-024 defined, never wired).
+  per-class max) · refresh-interval tiers (24h/1h/15m — defined, never wired).
 - **One-owner guardrail:** exactly one owner per secret — TF or a rotation Lambda, never both. That's the top risk.
 - **Not Vault, deliberately:** ESO, Secrets Manager, and Pod Identity cover it. Vault would be a new Tier-0
   system, and keyless-first shrinks the problem instead of adding one.
-- **Status:** ADR-094 Proposed. Reloader is not deployed (the only `reloader` in-tree is Alloy's disabled
+- **Status:** Reloader is not deployed (the only `reloader` in-tree is Alloy's disabled
   `configReloader`); there are zero `aws_secretsmanager_secret_rotation` resources; there's no age metric (the
   only secrets alerts are `ExternalSecret`/`ClusterSecretStore Ready=False` — sync-failures, not age); refresh
   tiers are unwired (flat `1h`). A manual runbook covers ~4 secrets. Phase 1 (deploy the primitives) is
@@ -116,11 +115,8 @@ sorts into four classes:
 
 - **LIVE:** keyless everywhere (Pod Identity/OIDC/cosign); SOPS config-in-git; ESO plus ClusterSecretStores
   plus 16 platform ExternalSecrets; IAM scoped to `platform/*`.
-- **Designed, not built:** the tenant config/secrets paved road (ADR-070 — schema reserved, inert), and
-  automated rotation (ADR-094 — classification decided, primitives not deployed).
-- **Doc-drift:** ADR-019 still says IRSA (now Pod Identity, #594); ADR-066 §5 says `sops` is in
-  `.tool-versions` — it's in *neither* `.tool-versions` nor the runner image; Terragrunt decrypts via the
-  in-process SOPS library (needs `kms:Decrypt`), and the `sops` CLI is only for *editing*.
+- **Designed, not built:** the tenant config/secrets paved road (schema reserved, inert), and
+  automated rotation (classification decided, primitives not deployed).
 
 ## Gotchas
 

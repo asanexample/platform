@@ -34,10 +34,8 @@ This is the platform's single-source-of-truth instinct applied to onboarding:
 > supply-chain policies, the delivery apps. You register the Product; you never wire the pieces.
 
 The registry is the source of truth; every per-product system is a derived view of it. Add a Product = add a
-file; the rest materializes. That's
-[ADR-069](../../adrs/069-delivery-source-of-truth-product-environment.md): the Product registry (plus the
-Environment claims) replaced the old hand-maintained per-app config — there is no longer a list of apps anyone
-edits by hand.
+file; the rest materializes. The Product registry (plus the Environment claims) is the single record of every
+app — there is no separate hand-maintained per-app config anyone edits by hand.
 
 That last part is the quiet win. The failure mode of onboarding-by-hand isn't one dramatic mistake — it's
 drift: the ECR repo exists but the push role was scoped to the wrong repo; the verify policy got added but
@@ -55,17 +53,17 @@ code — the derivation is exact and re-runs every time the registry changes.
 
 ## The record — a Product in the registry
 
-Here's `acme`'s `shop` (`gitops/products/acme/shop.yaml`) — the essential spec, with the file's header comment
+Here's `alpha`'s `shop` (`gitops/products/alpha/shop.yaml`) — the essential spec, with the file's header comment
 and `metadata.labels` elided for clarity:
 
 ```yaml
 apiVersion: platform.refplat.org/v1beta1
 kind: Product
 metadata:
-  name: acme-shop
+  name: alpha-shop
 spec:
-  team: acme                        # who OWNS it (→ ownership, access, on-call)
-  repo: asanexample/acme-shop       # its source repo — and its supply-chain TRUST anchor
+  team: alpha                       # who OWNS it (→ ownership, access, on-call)
+  repo: asanexample/alpha-shop      # its source repo — and its supply-chain TRUST anchor
   tenancy: pooled                   # how it shares infrastructure
   defaultIsolation: { compute: dedicated-namespace }
   domains: []                       # any custom hostnames it serves
@@ -83,20 +81,20 @@ its slice per Product. This is the heart of it:
 
 ![One Product record fans out on merge into its derived footprint: the `github-oidc` CI push role (OIDC-federated, trusting only the product's repo), the per-product Kyverno verify-images / verify-attestations policies, the `argocd-apps` AppProject + ApplicationSet, and the `github-teams` ownership grant. The ECR repositories are the exception — they materialize when an Environment claim reconciles, not on the Product merge.](images/product-derivation.svg)
 
-- **`github-oidc`** derives a CI role that lets `acme-shop`'s pipeline push to its ECR repo — federated by
+- **`github-oidc`** derives a CI role that lets `alpha-shop`'s pipeline push to its ECR repo — federated by
   [GitHub OIDC](../supply-chain/orientation.md) so it needs no stored keys, and scoped so the role trusts only
-  `spec.repo`. `acme-shop`'s CI can't push as `globex-widgets`.
-- **`policy`** derives the per-product Kyverno policies — `verify-images-product-acme-shop` and
-  `verify-attestations-product-acme-shop` — so only signed, attested images from shop's repo run (the enforce
+  `spec.repo`. `alpha-shop`'s CI can't push as `bravo-dispatch`.
+- **`policy`** derives the per-product Kyverno policies — `verify-images-product-alpha-shop` and
+  `verify-attestations-product-alpha-shop` — so only signed, attested images from shop's repo run (the enforce
   side — Kyverno rejecting non-compliant images at admission; see [Policy](../policy/orientation.md)).
 - **`argocd-apps`** derives one AppProject + ApplicationSet per Product, which then fans out one ArgoCD
   Application per Environment (the delivery machinery from [Delivery](../delivery/orientation.md)).
 
 A fourth unit, `github-teams`, also derives from this registry — it grants the owning org-Team `push` on the
-`<team>-<product>` repo ([ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md)). The three above are
+`<team>-<product>` repo. The three above are
 the per-product footprint, which is why we foreground them; `github-teams` is the ownership grant.
 
-All three are computed from the same `acme-shop.yaml`. Change the registry, they re-derive. There's no second
+All three are computed from the same `alpha-shop.yaml`. Change the registry, they re-derive. There's no second
 place where "the list of products" lives to drift out of sync.
 
 This declare-once-then-derive shape is the platform's signature move, not a one-off.
@@ -119,8 +117,7 @@ repo. The Backstage New Product scaffolder creates the application for you:
    app skeleton + Dockerfile in your language, the Kubernetes manifests, and the supply-chain CI already wired
    to the shared signing pipeline. The owning GitHub team is granted `push` on the repo later — by the
    `github-teams` derived unit on reconcile, not at creation — and that `<team>-` name prefix is the
-   unspoofable team identity the supply chain trusts
-   ([ADR-072](../../adrs/072-app-repo-naming-and-team-ownership.md)). This is repo-on-demand: you don't wire up
+   unspoofable team identity the supply chain trusts. This is repo-on-demand: you don't wire up
    a repo, you get one that already builds, signs, and deploys.
 3. **It opens a platform PR** adding your `Product` registry file and a first dev Environment claim — so
    registering the Product and standing up its first environment are one action.
@@ -146,7 +143,7 @@ A Product doesn't live alone; it's the middle of the ownership model
   [Self-service resources](../self-service-resources/orientation.md)).
 - A **Product** is the application. It has one or more Services (deployable units → ECR repos
   `team-<team>/<product>-<svc>`).
-- An **Environment** is a Product at a stage (`acme-shop-dev`), provisioned by the
+- An **Environment** is a Product at a stage (`alpha-shop-dev`), provisioned by the
   [Environment API](../environment-api/orientation.md) from a claim.
 
 Onboarding a Product is registering that middle object; Environments and Services then hang off it.
@@ -172,5 +169,3 @@ Onboarding a Product is registering that middle object; Environments and Service
 - The pieces that derive from the registry: [Delivery](../delivery/orientation.md) ·
   [Policy](../policy/orientation.md) · [Supply chain](../supply-chain/orientation.md); the vocabulary:
   [the domain model](../domain-model/orientation.md).
-- Why it's shaped this way: [ADR-069 Product Registry as source of truth](../../adrs/069-delivery-source-of-truth-product-environment.md) ·
-  [ADR-067 domain model](../../adrs/067-idp-domain-model.md).

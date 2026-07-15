@@ -12,7 +12,7 @@ are a field on your claim — so read the [Environment API orientation](../envir
 ## Read in this order
 
 1. **[Orientation](orientation.md)** — one idea, *abstraction above the claim, safety below*, taught on a real
-   service (`acme/conformance` — four resources from four lines, running in steady state): abstract intent
+   service (`bravo/dispatch` — four resources from four lines, running in steady state): abstract intent
    (`kind`/`engine`/`access`), the derived least-privilege IAM you never write, the non-overridable safety
    floor, and how the coordinates reach your app.
 2. **[Reference](reference.md)** — the claim schema, the per-engine IAM tables, the safety floor, the naming,
@@ -26,5 +26,4 @@ building the existing four. Using a resource is easy; extending the catalog is t
 
 - The claim this extends: [The Environment API](../environment-api/orientation.md); where the derived IAM
   lands: [Identity & Access](../identity/orientation.md).
-- Why it's shaped this way: [ADR-073 Self-Service Cloud Resources](../../adrs/073-self-service-cloud-resources.md).
 - Provision one: the `environment-onboarding` skill.

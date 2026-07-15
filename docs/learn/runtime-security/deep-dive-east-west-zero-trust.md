@@ -7,10 +7,10 @@ full frame and metaphor. If you already know Cilium, the terse lookup is the [Re
 
 ## East-west, and why the network floor isn't enough
 
-*North-south* traffic crosses the cluster edge — a browser reaching your service through the Gateway
-([ADR-017](../../adrs/017-gateway-api-over-ingress.md)), TLS-terminated there. *East-west* is the
+*North-south* traffic crosses the cluster edge — a browser reaching your service through the Gateway,
+TLS-terminated there. *East-west* is the
 larger conversation happening inside the cluster: service to service, pod to pod, node to node —
-`acme-shop` calling `acme-checkout`. It never touches the edge, so the edge's TLS does nothing for it.
+`storefront` calling `checkout`. It never touches the edge, so the edge's TLS does nothing for it.
 
 The platform already has a strong east-west floor:
 [Cilium](https://docs.cilium.io/en/stable/) L3/L4
@@ -25,11 +25,11 @@ zero-trust wants both:
   rogue pod in another namespace that satisfies the same selector is admitted too. Nothing forces a
   service to *prove* who it is with an attestable credential.
 
-[ADR-057](../../adrs/057-service-identity-and-east-west-zero-trust.md) delivers both. The decision
+The platform delivers both. The choice
 that matters is *how*: Cilium-native, no sidecar mesh. The platform is already all-in on Cilium, and
 Cilium covers L3/L4 + encryption + mTLS without an Istio/Linkerd control plane and a sidecar per pod.
 The one thing that *would* justify a mesh — L7 east-west traffic management, like service-to-service
-canary ([ADR-056](../../adrs/056-progressive-delivery-and-safe-rollback.md)) — isn't in scope here, so
+canary — isn't in scope here, so
 the mesh's operational weight buys nothing. Two Cilium features do the whole job: transparent
 encryption (Layer A) and mutual authentication (Layer B).
 
@@ -106,8 +106,6 @@ Peers: N]`, plus `spec.encryption.key` on each `CiliumNode`.
 
 ### The gotcha: enabling ≠ activating
 
-ADR-057 flags this as its real lesson.
-
 **Turning encryption on does not activate it on running agents.** The Helm change sets
 `enable-wireguard: "true"` in the `cilium-config` ConfigMap — but Cilium reads that value only at
 agent startup, and a ConfigMap change does *not* roll the DaemonSet. Symptom: only the nodes whose
@@ -125,8 +123,6 @@ kubectl rollout restart ds/cilium -n kube-system
 
 Then every agent re-reads the config and establishes the mesh. (Auto-triggering this roll on an
 encryption-config change is a noted module follow-up — for now it's a manual step in the runbook.)
-Git trail: [#1193](https://github.com/asanexample/platform/pull/1193) added module support →
-[#1197](https://github.com/asanexample/platform/pull/1197) enabled it on both clusters.
 
 ---
 
@@ -155,16 +151,16 @@ The moving parts:
    identity handshake before allowing it, and caches the result in a BPF auth-cache — visible as
    `cilium-dbg bpf auth list` → `AUTH TYPE: spire` for the authenticated identity pair.
 
-Here is the full handshake on the showcase `acme-shop → acme-checkout` path — and what happens to an
+Here is the full handshake on the showcase `storefront → checkout` path — and what happens to an
 impostor that wears the right label but holds no valid SVID:
 
 ```mermaid
 sequenceDiagram
-    participant Shop as acme-shop pod
+    participant Shop as storefront pod
     participant Imp as impostor pod
     participant Cil as Cilium agent
     participant SP as SPIRE
-    participant Chk as acme-checkout pod
+    participant Chk as checkout pod
     Shop->>Cil: open TCP to checkout WireGuard-encrypted
     Cil->>Cil: match CNP auth-required rule
     Cil->>SP: verify shop and checkout SVIDs
@@ -223,25 +219,22 @@ Platform's `cilium-config` reads `mesh-auth-enabled: "false"` — exactly the in
 
 ### What it secures (the proof)
 
-The [#1204](https://github.com/asanexample/platform/issues/1204) demo (a tracking issue) is the
-payoff: the real `acme-shop → acme-checkout` east-west call succeeds and is
+The showcase demo is the
+payoff: the real `storefront → checkout` east-west call succeeds and is
 SPIRE-mutually-authenticated (`cilium-dbg bpf auth list` shows `AUTH TYPE: spire` for the
 shop↔checkout identity pair), while a cross-team impostor pod in another namespace is dropped at
 checkout's ingress — even though, label-wise, a plain NetworkPolicy might have let it through. That is
 the zero-trust promise made concrete: label ≠ identity.
 
-One subtlety: the `authentication.mode: required` `CiliumNetworkPolicy` lives in the `acme-shop`
+One subtlety: the `authentication.mode: required` `CiliumNetworkPolicy` lives in the `alpha-shop`
 application repo (external `asanexample/*`), *not* in this platform repo — so you won't find it under
-`gitops/`. Tenants author their own east-west + auth posture, which is why the delivery AppProject had
-to be widened to permit tenant `(Cilium)NetworkPolicy`
-([#1207](https://github.com/asanexample/platform/pull/1207)).
+`gitops/`. Tenants author their own east-west + auth posture, which is why the delivery AppProject
+permits tenant `(Cilium)NetworkPolicy`.
 
-**Decision resolved — embedded SPIRE, not standalone.** Cilium's embedded SPIRE attests via k8s PSAT
+**Embedded SPIRE, not standalone.** Cilium's embedded SPIRE attests via k8s PSAT
 and issues SVIDs cleanly on the overlay + WireGuard stack; a standalone SPIRE deployment is
 unnecessary overhead here. Revisit it *only* if identities are ever needed beyond Cilium — app-level
-mTLS a service terminates itself, or cross-cluster SPIFFE federation. Git trail:
-[#1209](https://github.com/asanexample/platform/pull/1209) (module + enable-on-preprod) →
-[#1207](https://github.com/asanexample/platform/pull/1207) (AppProject).
+mTLS a service terminates itself, or cross-cluster SPIFFE federation.
 
 ---
 
@@ -259,8 +252,7 @@ why you need all of them, not one:
 | Behavioral detection | Is a running pod misbehaving? | Falco (eBPF syscall monitoring) | Live detecting, routing deferred |
 
 The bottom row — Falco — is a different subject: it watches *behavior*, not the network. This deep
-dive doesn't re-teach it. See the [Falco deep dive](deep-dive-falco.md) and
-[ADR-045](../../adrs/045-falco-runtime-threat-detection.md).
+dive doesn't re-teach it. See the [Falco deep dive](deep-dive-falco.md).
 
 Two more runtime-hardening facts, both owned by the [Policy](../policy/orientation.md) module rather
 than this one: Kyverno auto-injects `securityContext` defaults on every pod
@@ -283,37 +275,29 @@ no regulated tenant exists yet.
    substitute a plain allow, because Cilium **unions** allows and a plain allow would *bypass* the
    auth requirement.
 4. **Tenants author their own auth posture.** The auth-required policy lives in the app repo, so the
-   delivery AppProject had to permit tenant `(Cilium)NetworkPolicy` ([#1207]) — otherwise ArgoCD
+   delivery AppProject must permit tenant `(Cilium)NetworkPolicy` — otherwise ArgoCD
    refuses to sync it.
 5. **SPIRE persistence collides with the EBS-encryption SCP.** The SPIRE server datastore is a PVC.
    Where an SCP enforces EBS encryption, the StorageClass **must** be an encrypted one — resolved by
-   making preprod's **encrypted-gp3 the default StorageClass**
-   ([#1202](https://github.com/asanexample/platform/pull/1202)/[#1203](https://github.com/asanexample/platform/pull/1203)),
+   making preprod's **encrypted-gp3 the default StorageClass**,
    which is why `spire_persistence` / `spire_storage_class` exist. Setting `spire_persistence = false`
    gives an in-memory datastore — fine for a throwaway spike, wrong for a showcase (registrations
    vanish on restart).
 
 ## Honest status — built vs designed
 
-- **WireGuard encryption: genuinely done.** Live fleet-wide on both clusters. Not a spike — the real
+- **WireGuard encryption: genuinely done.** Live fleet-wide on both clusters — the real
   deployed posture.
-- **mTLS identity: a live preprod showcase, not a spike, not torn down.** SPIRE is running, the
-  `acme-shop → acme-checkout` pair is mutually authenticated, and the impostor is dropped — proven
+- **mTLS identity: a live preprod showcase.** SPIRE is running, the
+  `storefront → checkout` pair is mutually authenticated, and the impostor is dropped — proven
   live. But it is one service pair on preprod only, *not* the platform cluster, *not* fleet-wide.
 - **Fleet-wide / tier-gated enforcement: designed, not built.** Wiring `authentication.mode: required`
   into the Crossplane Environment Composition per compliance tier (the Composition already has `$tier`
-  in scope; `regulated` is the trigger per ADR-057 decision #3) is the follow-up — deliberately parked
+  in scope; `regulated` is the trigger) is the follow-up — deliberately parked
   until a regulated tenant actually exists, and none does today.
 
 ## Go deeper
 
-- [ADR-057 — Service Identity & East-West Zero Trust](../../adrs/057-service-identity-and-east-west-zero-trust.md)
-  — the decisions (Cilium-native, SPIFFE, tier-property, no-mesh-unless-L7), both as-built
-  implementation-notes sections, and the open questions now resolved.
-- Related ADRs: [ADR-017 (Gateway API / north-south)](../../adrs/017-gateway-api-over-ingress.md),
-  [ADR-008 (Cilium as CNI)](../../adrs/008-cilium-as-cross-cloud-cni.md),
-  [ADR-049 (tier model — the network isolation column)](../../adrs/049-tenant-model-team-tenant-zone.md),
-  [ADR-041 (Pod Identity — the workload→cloud plane)](../../adrs/041-pod-identity-for-tenant-workloads.md).
 - The code: the [`cilium` module](https://github.com/asanexample/platform/blob/main/infra/modules/cilium/main.tf)
   (`variables.tf` for every knob) and the live units
   ([preprod](https://github.com/asanexample/platform/blob/main/infra/live/aws/preprod/us-east-1/platform/cilium/terragrunt.hcl),

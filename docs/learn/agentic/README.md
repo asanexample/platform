@@ -15,7 +15,7 @@ cautious area. What follows is a whole-picture tour plus focused deep dives.
    The one idea, and a tour: what an agent is (an `XAgent` claim), how it's bounded, and how it could earn
    more (the autonomy ladder), ending on the one real agent. Includes an honest "one agent, mostly early"
    status.
-2. **[Reference](reference.md)** — the dense lookup: the ADR map, the `XAgent` claim and Composition, the
+2. **[Reference](reference.md)** — the dense lookup: the `XAgent` claim and Composition, the
    GitOps control plane, the bounding machinery, the autonomy ladder, the triage copilot, the status ledger,
    and gotchas.
 
@@ -28,7 +28,7 @@ cautious area. What follows is a whole-picture tour plus focused deep dives.
 - **[Autonomy & evaluation](deep-dive-autonomy-and-evaluation.md)** — the graduated, eval-gated autonomy
   ladder (designed), the eval loop, and the forward-capture substrate that *is* built.
 - **[The triage copilot](deep-dive-the-triage-copilot.md)** — the one live agent, end to end, plus
-  owner-routing (ADR-084).
+  owner-routing.
 
 ## Then
 

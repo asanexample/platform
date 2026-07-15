@@ -13,8 +13,8 @@ A lookup reference. For the model behind these fields, see the [orientation](ori
 | `spec.repo` | ✅ | the single owner/repo sourcing the Product's Service(s); the supply-chain trust anchor. |
 | `spec.tenancy` | ✅ | `pooled` (customers logical) \| `per-customer` (a dedicated Environment per Customer at prod). |
 | `spec.defaultIsolation.compute` | | `shared-namespace` → `dedicated-namespace` → `dedicated-nodes` → `dedicated-cluster` → `dedicated-account` (floored by tier; an Environment may dial up). |
-| `spec.restrictWithinTeam` | | if true, even team members need an explicit AccessGrant (ADR-068); auto-true for pci/hipaa. |
-| `spec.domains[]` | | vanity hostnames the Product **owns** (the allow-set); each `{host, dns: managed\|external}`. An Environment binds a subset (ADR-061). |
+| `spec.restrictWithinTeam` | | if true, even team members need an explicit AccessGrant; auto-true for pci/hipaa. |
+| `spec.domains[]` | | vanity hostnames the Product **owns** (the allow-set); each `{host, dns: managed\|external}`. An Environment binds a subset. |
 
 The Team (`gitops/teams/<team>.yaml`) owns Products and sets the envelope that bounds them — allowed
 stages, quota caps, and the self-service `allowedEngines`.
@@ -28,10 +28,9 @@ Each unit does `fileset` + `yamldecode` over `gitops/products/**` and derives pe
 | **`github-oidc`** | a CI push role (GitHub OIDC-federated, keyless) → push to the Product's ECR | `spec.repo` — the role trusts *only* that repo |
 | **`policy`** | `verify-images-product-<p>` + `verify-attestations-product-<p>` (signed + attested, from the repo) | `spec.repo` |
 | **`argocd-apps`** | one AppProject + ApplicationSet per Product → fans out an ArgoCD App per Environment that has a Release | `metadata.name`, `spec.team`; the git-files generator fans out over `gitops/releases/<team>/<product>/*.yaml` (one App per Environment that has a Release) |
-| **`github-teams`** | the owning org-Team's `push` grant on the `<team>-<product>` repo (ADR-072) | `spec.repo` (bare repo name), `spec.team` |
+| **`github-teams`** | the owning org-Team's `push` grant on the `<team>-<product>` repo | `spec.repo` (bare repo name), `spec.team` |
 
-Per-**Service** ECR repos are `team-<team>/<product>-<svc>`. (The v2 `teams.hcl` these replaced is retired —
-ADR-069.)
+Per-**Service** ECR repos are `team-<team>/<product>-<svc>`.
 
 ## The paved road
 
@@ -66,7 +65,5 @@ ADR-069.)
 ## Go deeper
 
 - **Onboard one** (step-by-step): [How-to: onboard a new Product](how-to-onboard-a-product.md).
-- [ADR-069 Product registry as source of truth](../../adrs/069-delivery-source-of-truth-product-environment.md) ·
-  [ADR-067 domain model](../../adrs/067-idp-domain-model.md) · [ADR-061 domains](../../adrs/061-tenant-ingress-and-custom-domain-strategy.md).
 - The consumers: [Delivery](../delivery/orientation.md) · [Policy](../policy/orientation.md) ·
   [Supply chain](../supply-chain/orientation.md) · [Environment API](../environment-api/orientation.md).
