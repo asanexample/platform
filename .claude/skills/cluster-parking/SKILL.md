@@ -99,6 +99,22 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-14 (second PARK, after the c6g node migration) — routine cost-zero. NEW for the next unpark: preprod
+  now provisions BIG c6g nodes, not tiny r6g.medium.** Both parked clean (node groups `desiredSize=0`, 0
+  instances, bastions stopped); preprod avoided the EC2NodeClass i/o-timeout this cycle (just the softer
+  finalizer-stuck warning). **The change baked in this session (#1603, applied):** added a `min_instance_cpu`
+  knob to the karpenter module and set preprod `min_instance_cpu = 3` (4 vCPU+). Root cause it fixes: preprod
+  ran 4× r6g.medium (1 vCPU) — cheapest instance meeting the 8 GiB memory floor with no CPU floor — and each
+  node's fixed ~410m DaemonSet slab was 43% pure overhead, so per-node DaemonSets (alloy-profiles) couldn't fit
+  once tenant apps packed in → a manual pod-eviction EVERY unpark. With the 4-vCPU floor, Karpenter drift-replaced
+  the r6g.medium fleet with **c6g.xlarge/2xlarge** (compute-optimized, cheapest per-vCPU at 8 GiB+ — $0.012/vCPU
+  spot); CPU util dropped 88-99% → 22-25%, DaemonSet overhead → ~5-12%, node count halved, alloy-profiles healed
+  structurally. **So next unpark: expect preprod to come up on a c6g.xlarge/2xlarge or two (NOT a pile of r6g.medium),
+  with comfortable headroom — the daily alloy-profiles eviction dance is retired.** Cost ~neutral (roughly
+  $0.097/hr Karpenter once consolidated, vs the old fragile $0.055 under-provisioned). Everything else from today's
+  marathon (router do-not-disrupt, tightened caps + at-capacity alert, platform consolidation, kyverno mem) is in
+  the entry below.
+
 - **2026-07-14 (end-of-day PARK) — routine cost-zero park, capping a MARATHON day of durable fixes. The headline
   for the NEXT unpark: the Tailscale-router flapping that made every preprod issue this week hard to diagnose is
   now FIXED — expect a materially calmer unpark.** Park itself: both cost-zero (node groups `desiredSize=0`, 0
