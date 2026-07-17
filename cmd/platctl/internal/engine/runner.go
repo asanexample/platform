@@ -130,9 +130,14 @@ func (r *TerragruntRunner) Run(ctx context.Context, unit *Unit, action Action, a
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	secretEnv, err := r.resolveSecretEnv(runCtx, unit)
+	if err != nil {
+		return err
+	}
+
 	cmd := exec.CommandContext(runCtx, r.binary(), cmdArgs...)
 	cmd.Dir = unit.Path
-	cmd.Env = r.buildEnv(unit)
+	cmd.Env = append(r.buildEnv(unit), secretEnv...)
 	// Run the unit in its own process group so a cancel reaches the whole tree
 	// (terragrunt → OpenTofu → provider plugins), not just the wrapper — a wedged
 	// child otherwise outlives the parent (e.g. a plugin blocked on a black-holed
@@ -182,7 +187,7 @@ func (r *TerragruntRunner) Run(ctx context.Context, unit *Unit, action Action, a
 		}()
 	}
 
-	err := cmd.Run()
+	err = cmd.Run()
 	cancel()        // stop the watchdog if the command finished on its own
 	watchdog.Wait() // ensure the watchdog goroutine has exited before reading state
 	output := w.String()
@@ -240,6 +245,43 @@ func detectProtectedResources(output string, protectedTypes []string) []string {
 		}
 	}
 	return found
+}
+
+// parseSecretSpec splits an env_from_secret value "<secret-id>[@<profile>]" into the secret
+// id and the AWS profile to read it with. An absent @profile falls back to defaultProfile
+// (the unit's own). Split on the LAST '@' so secret ids containing '@' are tolerated.
+func parseSecretSpec(spec, defaultProfile string) (secretID, profile string) {
+	secretID, profile = spec, defaultProfile
+	if i := strings.LastIndex(spec, "@"); i >= 0 {
+		secretID, profile = spec[:i], spec[i+1:]
+	}
+	return secretID, profile
+}
+
+// resolveSecretEnv fetches each of unit.EnvFromSecret from Secrets Manager and returns
+// KEY=VALUE env entries for the subprocess. The secret VALUE is never logged; a fetch failure
+// aborts the unit (it can't run without its credential). us-east-1 matches every secret here.
+func (r *TerragruntRunner) resolveSecretEnv(ctx context.Context, unit *Unit) ([]string, error) {
+	if len(unit.EnvFromSecret) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(unit.EnvFromSecret))
+	for envVar, spec := range unit.EnvFromSecret {
+		secretID, profile := parseSecretSpec(spec, unit.Auth["profile"])
+		args := []string{"secretsmanager", "get-secret-value", "--secret-id", secretID,
+			"--query", "SecretString", "--output", "text", "--region", "us-east-1"}
+		if profile != "" {
+			args = append(args, "--profile", profile)
+		}
+		cmd := exec.CommandContext(ctx, "aws", args...)
+		cmd.Env = os.Environ()
+		val, err := cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("resolving env_from_secret %s for %s from %q: %w", envVar, unit.Name, secretID, err)
+		}
+		out = append(out, envVar+"="+strings.TrimRight(string(val), "\n"))
+	}
+	return out, nil
 }
 
 // buildEnv constructs the environment variable list for a unit's subprocess.

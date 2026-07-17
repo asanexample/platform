@@ -45,19 +45,19 @@ terraform {
 EOF
 }
 
-# PagerDuty provider — API token from Secrets Manager (platform/pagerduty/api-token, created by hand).
-# The aws provider comes from root.hcl (PlatformDeployer). Cloud-only unit (no cluster dependency).
+# PagerDuty provider — token from the PAGERDUTY_TOKEN env var, injected by platctl via
+# `env_from_secret` (.platctl.yaml) from Secrets Manager platform/pagerduty/api-token (created by
+# hand). It is DELIBERATELY not read via a Terraform data source in the provider block: a data
+# source referenced from a provider config evaluates empty during `terraform destroy`, so the
+# provider can't authenticate to tear down its own PagerDuty resources ("No valid credentials
+# found"). Env-sourcing sidesteps that. NB a MANUAL `terragrunt apply/destroy` of this unit must
+# export PAGERDUTY_TOKEN first (platctl does it automatically). The aws provider comes from
+# root.hcl (PlatformDeployer). Cloud-only unit (no cluster dependency).
 generate "provider_pagerduty" {
   path      = "provider_pagerduty.tf"
   if_exists = "overwrite_terragrunt"
   contents  = <<EOF
-data "aws_secretsmanager_secret_version" "pagerduty_token" {
-  secret_id = "platform/pagerduty/api-token"
-}
-
-provider "pagerduty" {
-  token = data.aws_secretsmanager_secret_version.pagerduty_token.secret_string
-}
+provider "pagerduty" {}
 EOF
 }
 

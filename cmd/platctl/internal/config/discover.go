@@ -61,21 +61,24 @@ func discoverUnits(envName, envDir string, envCfg EnvConfig, cfg *Config, envPat
 			return nil, fmt.Errorf("parsing dependencies for %s: %w", qualifiedName, err)
 		}
 
-		// Merge implicit deps from config overrides
+		// Merge implicit deps + env-from-secret from config overrides
+		var envFromSecret map[string]string
 		if override, ok := cfg.Overrides[qualifiedName]; ok {
 			deps = append(deps, override.ImplicitDeps...)
+			envFromSecret = override.EnvFromSecret
 		}
 
 		// Deduplicate and sort
 		deps = dedup(deps)
 
 		unit := &engine.Unit{
-			Name:      qualifiedName,
-			Path:      unitDir,
-			Env:       envName,
-			Provider:  envCfg.Provider,
-			DependsOn: deps,
-			Auth:      cfg.AuthForUnit(envName, unitName),
+			Name:          qualifiedName,
+			Path:          unitDir,
+			Env:           envName,
+			Provider:      envCfg.Provider,
+			DependsOn:     deps,
+			Auth:          cfg.AuthForUnit(envName, unitName),
+			EnvFromSecret: envFromSecret,
 		}
 		units = append(units, unit)
 	}

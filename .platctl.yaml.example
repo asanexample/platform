@@ -90,6 +90,15 @@ overrides:
     hook_config:
       patterns: "keycloak_"
 
+  # env_from_secret injects a Secrets Manager value as an env var for the unit's apply/destroy — feed a
+  # provider its credential this way instead of a TF data source in the provider block (a data-source-backed
+  # provider config evaluates EMPTY during `destroy`, so the provider can't authenticate to tear its own
+  # resources down). Value is "<secret-id>[@<profile>]"; @profile reads it with a different AWS profile than
+  # the unit's (its account may differ). The pagerduty provider then reads PAGERDUTY_TOKEN from the env.
+  platform/pagerduty:
+    env_from_secret:
+      PAGERDUTY_TOKEN: "platform/pagerduty/api-token@platform"
+
   platform/tailscale:
     hook: crd_two_stage
     hook_target: "helm_release.tailscale_operator[0]"

@@ -73,12 +73,31 @@ func TestIsRetryable(t *testing.T) {
 		{"codeartifact upstream race", runErr("ConflictException: being used as an upstream repository"), true},
 		{"vpc dependency violation", runErr("DependencyViolation: resource has a dependent object"), true},
 		{"throttling", runErr("ThrottlingException: Rate exceeded"), true},
+		{"kyverno webhook no endpoints", runErr(`Internal error occurred: failed calling webhook "validate.kyverno.svc-fail": ... no endpoints available for service "kyverno-svc"`), true},
+		{"helm uninstall race", runErr("Error: Error uninstalling release\nUnable to uninstall Helm release cilium: failed to delete release: cilium"), true},
 		{"bucket not empty — deterministic", runErr("BucketNotEmpty: The bucket you tried to delete is not empty"), false},
 		{"plain permanent error", runErr("Error: invalid value for some argument"), false},
 	}
 	for _, c := range cases {
 		if got := isRetryable(c.err); got != c.want {
 			t.Errorf("%s: isRetryable = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestParseSecretSpec(t *testing.T) {
+	cases := []struct {
+		spec, defProfile, wantID, wantProfile string
+	}{
+		{"platform/pagerduty/api-token@platform", "management", "platform/pagerduty/api-token", "platform"},
+		{"some/secret", "management", "some/secret", "management"},  // no @ -> unit default
+		{"some/secret", "", "some/secret", ""},                      // no default either
+		{"weird@id@platform", "management", "weird@id", "platform"}, // split on LAST @
+	}
+	for _, c := range cases {
+		id, prof := parseSecretSpec(c.spec, c.defProfile)
+		if id != c.wantID || prof != c.wantProfile {
+			t.Errorf("parseSecretSpec(%q, %q) = (%q, %q), want (%q, %q)", c.spec, c.defProfile, id, prof, c.wantID, c.wantProfile)
 		}
 	}
 }
