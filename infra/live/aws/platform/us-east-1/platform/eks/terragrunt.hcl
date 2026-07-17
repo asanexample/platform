@@ -18,6 +18,7 @@ dependency "networking" {
     vpc_id                = "vpc-mock"
     subnet_ids            = {}
     eks_security_group_id = "sg-mock"
+    vpc_cidr_block        = "10.100.0.0/16"
   }
   mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
 }
@@ -54,6 +55,11 @@ inputs = {
 
   endpoint_private_access = true
   endpoint_public_access  = false # API only reachable via Tailscale VPN or SSM bastion
+
+  # Open the private API to the VPC CIDR so the out-of-cluster Tailscale subnet router
+  # (platform/tailscale-router) can forward SNAT'd tailnet traffic to it — the managed
+  # cluster SG otherwise admits only node/cluster-SG members. (ADR-010)
+  additional_api_ingress_cidrs = [dependency.networking.outputs.vpc_cidr_block]
 
   eks_addons = {} # Managed addons deployed separately in eks-addons unit (BYOCNI ordering)
 
