@@ -139,6 +139,13 @@ type UnitOverride struct {
 	HookTarget    string            `yaml:"hook_target,omitempty"`
 	HookConfig    map[string]string `yaml:"hook_config,omitempty"`
 	ImplicitDeps  []string          `yaml:"implicit_deps,omitempty"`
+	// EnvFromSecret injects Secrets Manager values as environment variables for the unit's
+	// apply/destroy subprocess: map of ENV_VAR -> "<secret-id>[@<profile>]". Use it to feed a
+	// provider its credential via env (e.g. PAGERDUTY_TOKEN) instead of a Terraform data source
+	// — a data source referenced from a provider block evaluates empty during `destroy`, so the
+	// provider can't authenticate to tear its own resources down. The optional @profile reads the
+	// secret with a different AWS profile than the unit's (its account may differ). Never logged.
+	EnvFromSecret map[string]string `yaml:"env_from_secret,omitempty"`
 	// TeardownSkip keeps a unit out of teardown — it stays in the graph (so its dependents still order
 	// correctly) but is never destroyed. Used for bootstrap-tier infra that must survive a rebuild, like
 	// iam-roles (the PlatformDeployer role the next bootstrap assumes) — analogous to the state backend,

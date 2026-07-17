@@ -25,11 +25,14 @@ const DefaultMaxRetries = 2
 
 // retryablePattern matches transient apply/destroy failures that a fresh attempt
 // typically clears: provider-plugin startup glitches, dropped connections, throttling,
-// and deletion-ordering races (a resource momentarily still referenced by a dependent
-// another wave is concurrently removing — e.g. CodeArtifact "being used as an upstream",
-// or a VPC DependencyViolation while an ENI finishes detaching). Deterministic failures
-// (e.g. BucketNotEmpty, SCP-protected) are deliberately absent — retrying them wastes time.
-var retryablePattern = regexp.MustCompile(`(?i)cannot obtain plugin client|plugin.*(crashed|exited|did not respond)|connection reset|connection refused|broken pipe|i/o timeout|no such host|unexpected EOF|TLS handshake timeout|throttl|TooManyRequests|RequestLimitExceeded|ConflictException|being used as an upstream|DependencyViolation|ResourceInUseException`)
+// deletion-ordering races (a resource momentarily still referenced by a dependent another
+// wave is concurrently removing — e.g. CodeArtifact "being used as an upstream", or a VPC
+// DependencyViolation while an ENI finishes detaching), and Kyverno-webhook races during
+// teardown (a failurePolicy:Fail webhook whose pods are already gone blocks admission-gated
+// deletes and helm uninstalls until its config is removed a moment later — this hit karpenter,
+// kube-bench, and cilium). Deterministic failures (BucketNotEmpty, SCP-protected) are
+// deliberately absent — retrying them wastes time.
+var retryablePattern = regexp.MustCompile(`(?i)cannot obtain plugin client|plugin.*(crashed|exited|did not respond)|connection reset|connection refused|broken pipe|i/o timeout|no such host|unexpected EOF|TLS handshake timeout|throttl|TooManyRequests|RequestLimitExceeded|ConflictException|being used as an upstream|DependencyViolation|ResourceInUseException|no endpoints available for service|failed calling webhook|error uninstalling release|failed to delete release`)
 
 // Hook defines a pre-apply or multi-stage operation for a unit.
 // Hooks are responsible for calling the runner — the engine delegates entirely to them.

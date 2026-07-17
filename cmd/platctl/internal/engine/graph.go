@@ -36,6 +36,10 @@ type Unit struct {
 	Provider  string            // Cloud provider: "aws", "azure", etc.
 	DependsOn []string          // Qualified names of units this unit depends on
 	Auth      map[string]string // Provider-specific credentials (e.g., {"profile": "management"})
+
+	// EnvFromSecret maps an environment variable to a Secrets Manager spec ("<secret-id>[@<profile>]")
+	// resolved and injected into the apply/destroy subprocess at run time. See config.UnitOverride.
+	EnvFromSecret map[string]string
 }
 
 // Graph holds units and their dependency relationships.
