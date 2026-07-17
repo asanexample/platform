@@ -84,6 +84,10 @@ to target a single environment.`,
 				LogWriter: func(unit string, data []byte) {
 					_ = logger.Append(unit, data)
 				},
+				// Kill a unit that goes silent for this long — a wedged destroy (e.g. a
+				// black-holed AWS SDK connection) never self-recovers and otherwise stalls
+				// the whole teardown. The engine's retry then re-attempts it with a fresh process.
+				InactivityTimeout: engine.DefaultInactivityTimeout,
 			}
 
 			// Initialize + persist a fresh teardown state up-front (all units Pending) so `platctl status`
@@ -139,7 +143,9 @@ to target a single environment.`,
 				}
 			}
 
-			eng := engine.NewEngine(runner, store, g, statePath, engine.WithConcurrency(concurrency))
+			eng := engine.NewEngine(runner, store, g, statePath,
+				engine.WithConcurrency(concurrency),
+				engine.WithRetry(engine.DefaultMaxRetries, engine.DefaultRetryBackoff))
 			eng.Hooks = hookMap
 			eng.Logger = logger
 
