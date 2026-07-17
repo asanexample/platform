@@ -4,10 +4,13 @@
 set -euo pipefail
 
 # --- dependencies (AL2023 ships neither awscli nor jq by default) ---
+# Install awscli under /var/tmp (EBS-backed), NOT /tmp: on AL2023 /tmp is a tmpfs
+# (RAM-backed) sized to a fraction of memory, and the ~200 MB awscli extract
+# overflows it on a small instance ("write error (disk full?)"), aborting the boot.
 dnf install -y jq unzip
-curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
-unzip -q /tmp/awscliv2.zip -d /tmp
-/tmp/aws/install
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /var/tmp/awscliv2.zip
+unzip -oq /var/tmp/awscliv2.zip -d /var/tmp
+/var/tmp/aws/install
 AWS=/usr/local/bin/aws
 
 # --- kernel IP forwarding (required for subnet routing) ---
