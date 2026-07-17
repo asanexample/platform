@@ -99,6 +99,22 @@ make build-platctl                          # build ./bin/platctl
 
 <!-- newest first -->
 
+- **2026-07-17 (end-of-day PARK) — routine, cost-zero, no surprises. Both parked clean; preprod was the cleaner
+  half again.** `AWS_PROFILE=management ./bin/platctl down --env <env> --yes` each (built `./bin/platctl` from
+  current `main` first), run in parallel. **Platform**: the by-now-familiar slow-drain warnings ("Karpenter
+  NodeClaims still present after 6m", "EC2NodeClass still present after 90s (finalizer stuck?)") then `system`→0,
+  **4 nodes force-terminated** (PDB-blocked lifecycle hooks), bastion `i-04ce304b14380f8d8` stopped. **Preprod**:
+  clean — "Karpenter nodes drained and terminated" + "EC2NodeClass deleted" **symmetrically**, no warnings, 1 node
+  force-terminated. Notably preprod did **NOT** hit the `deleting EC2NodeClass: ... i/o timeout` (nor the softer
+  finalizer-stuck warning) that dogged the 07-12/07-13/07-14 parks — cleanest preprod park in a week, so the
+  down/up NodeClass symmetry should hold on the next unpark (no orphaned-NodeClass watch-item this cycle). **Verified
+  cost-zero via the AWS EKS API + EC2** (kubectl unreachable post-park as always — TS subnet router gone): both
+  `system` node groups `desiredSize=0, minSize=0`, and **0 running/pending instances in BOTH accounts**. Preprod's
+  `down` output did not print a "Stopping SSM bastion" line (either no bastion Name-tag discovered or it was already
+  stopped), but the account-wide 0-running-instances check confirms nothing billable is left either way. Reinforced
+  the stale-static-cred guard again (`unset AWS_ACCESS_KEY_ID/SECRET/SESSION_TOKEN` in the SAME command as each
+  `aws` verify call). Nothing to fix — boringly repeatable park; the interesting half remains unpark.
+
 - **2026-07-14 (second PARK, after the c6g node migration) — routine cost-zero. NEW for the next unpark: preprod
   now provisions BIG c6g nodes, not tiny r6g.medium.** Both parked clean (node groups `desiredSize=0`, 0
   instances, bastions stopped); preprod avoided the EC2NodeClass i/o-timeout this cycle (just the softer
