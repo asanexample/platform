@@ -11,6 +11,16 @@ misconfigurations:
       to 0.0.0.0/0 is required because AWS SSM endpoints resolve to IPs outside
       the VPC; documented in the module.
 
+  - id: AWS-0104
+    paths:
+      - "aws/tailscale-router/main.tf"
+    statement: >-
+      The Tailscale subnet router uses an egress-only security group (no
+      ingress). Broad egress to 0.0.0.0/0 on 443/3478/41641 is required: the
+      Tailscale coordination server, DERP relays, and STUN/WireGuard peers
+      resolve to arbitrary internet IPs that cannot be enumerated as a CIDR.
+      Forwarded subnet traffic is separately scoped to the advertised VPC CIDR.
+
   - id: AWS-0040
     paths:
       - "aws/eks/main.tf"

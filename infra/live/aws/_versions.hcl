@@ -16,11 +16,12 @@ locals {
     transit_gateway = "${local.source_base}/aws//transit-gateway"
 
     # Compute
-    eks            = "${local.source_base}/aws//eks"
-    eks_addons     = "${local.source_base}/aws//eks-addons"
-    eks_node_group = "${local.source_base}/aws//eks-node-group"
-    karpenter      = "${local.source_base}/aws//karpenter"
-    ssm_bastion    = "${local.source_base}/aws//ssm-bastion"
+    eks              = "${local.source_base}/aws//eks"
+    eks_addons       = "${local.source_base}/aws//eks-addons"
+    eks_node_group   = "${local.source_base}/aws//eks-node-group"
+    karpenter        = "${local.source_base}/aws//karpenter"
+    ssm_bastion      = "${local.source_base}/aws//ssm-bastion"
+    tailscale_router = "${local.source_base}/aws//tailscale-router" # durable out-of-cluster subnet router (ADR-010)
 
     # IAM
     iam_roles        = "${local.source_base}/aws//iam_roles"

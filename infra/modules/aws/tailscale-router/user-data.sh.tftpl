@@ -1,0 +1,38 @@
+#!/bin/bash
+# Tailscale subnet router bootstrap. NOTE: no `set -x` — it would echo the auth
+# secret into the cloud-init console log.
+set -euo pipefail
+
+# --- dependencies (AL2023 ships neither awscli nor jq by default) ---
+dnf install -y jq unzip
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+AWS=/usr/local/bin/aws
+
+# --- kernel IP forwarding (required for subnet routing) ---
+cat >/etc/sysctl.d/99-tailscale.conf <<'EOF'
+net.ipv4.ip_forward = 1
+net.ipv6.conf.all.forwarding = 1
+EOF
+sysctl -p /etc/sysctl.d/99-tailscale.conf
+
+# --- Tailscale ---
+curl -fsSL https://tailscale.com/install.sh | sh
+systemctl enable --now tailscaled
+
+# --- auth: read the OAuth client secret and use it directly as an auth key ---
+# Tagged auth => the device is preauthorized and its advertised routes auto-approve
+# (via the tailnet autoApprovers). Non-ephemeral so a brief offline window doesn't
+# deregister the router.
+CLIENT_SECRET="$($AWS secretsmanager get-secret-value \
+  --secret-id '${auth_secret_id}' --region '${region}' \
+  --query SecretString --output text | jq -r '.clientSecret')"
+
+tailscale up \
+  --auth-key="$${CLIENT_SECRET}?ephemeral=false&preauthorized=true" \
+  --advertise-routes='${advertise_routes}' \
+  --advertise-tags='${advertise_tags}' \
+  --hostname='${hostname}' \
+  --accept-dns=false \
+  --accept-routes=false

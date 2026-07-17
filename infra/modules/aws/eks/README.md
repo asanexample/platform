@@ -117,6 +117,7 @@ No modules.
 | [aws_iam_role_policy_attachment.vpc_resource_controller](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_kms_alias.eks](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_alias) | resource |
 | [aws_kms_key.eks](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_key) | resource |
+| [aws_vpc_security_group_ingress_rule.api_additional_cidr](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_security_group_ingress_rule) | resource |
 | [tls_certificate.cluster](https://registry.terraform.io/providers/hashicorp/tls/latest/docs/data-sources/certificate) | data source |
 
 ## Inputs
@@ -126,6 +127,7 @@ No modules.
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Name of the EKS cluster | `string` | n/a | yes |
 | <a name="input_subnet_ids"></a> [subnet\_ids](#input\_subnet\_ids) | Subnet IDs for the EKS cluster ENIs | `list(string)` | n/a | yes |
 | <a name="input_access_entries"></a> [access\_entries](#input\_access\_entries) | IAM principal to Kubernetes access policy mappings | <pre>map(object({<br/>    principal_arn = string<br/>    # Optional: when set, an AWS-managed access policy is associated (e.g. AmazonEKSEditPolicy).<br/>    # When null, the entry maps the principal to kubernetes_groups for cluster-managed RBAC instead.<br/>    policy_arn        = optional(string)<br/>    type              = optional(string, "STANDARD")<br/>    scope_type        = optional(string, "cluster")<br/>    namespaces        = optional(list(string))<br/>    kubernetes_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
+| <a name="input_additional_api_ingress_cidrs"></a> [additional\_api\_ingress\_cidrs](#input\_additional\_api\_ingress\_cidrs) | Extra CIDR blocks allowed to reach the PRIVATE API endpoint on 443, added as ingress rules on the EKS-managed cluster security group. The managed SG admits only its own members (nodes) by default, so an out-of-cluster caller whose traffic is SNAT'd into the VPC — e.g. a standalone Tailscale subnet router (ADR-010) — needs its CIDR opened here. Empty = default behaviour (node/cluster SG members only). | `list(string)` | `[]` | no |
 | <a name="input_additional_security_group_ids"></a> [additional\_security\_group\_ids](#input\_additional\_security\_group\_ids) | Additional security group IDs to attach to the cluster (e.g. networking module's EKS SG) | `list(string)` | `[]` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to create resources in this module | `bool` | `true` | no |
 | <a name="input_eks_addons"></a> [eks\_addons](#input\_eks\_addons) | EKS managed add-ons to install (e.g. coredns, kube-proxy) | <pre>map(object({<br/>    most_recent = optional(bool, true)<br/>  }))</pre> | `{}` | no |

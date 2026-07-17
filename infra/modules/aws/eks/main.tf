@@ -105,6 +105,27 @@ resource "aws_eks_cluster" "this" {
 }
 
 # ---------------------------------------------------------------------------
+# Additional private-API ingress — out-of-cluster access paths
+# ---------------------------------------------------------------------------
+# The EKS-managed cluster SG admits only its own members (nodes) on 443. An
+# out-of-cluster caller whose forwarded traffic is SNAT'd into the VPC — e.g. a
+# standalone Tailscale subnet router (ADR-010) — reaches the private API from a
+# VPC IP that isn't in that SG, so open the API to its CIDR here. Default-empty,
+# so this is a no-op until a unit opts in.
+resource "aws_vpc_security_group_ingress_rule" "api_additional_cidr" {
+  for_each = local.create ? toset(var.additional_api_ingress_cidrs) : toset([])
+
+  security_group_id = aws_eks_cluster.this[0].vpc_config[0].cluster_security_group_id
+  description       = "HTTPS to private API from ${each.value}"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = each.value
+
+  tags = var.tags
+}
+
+# ---------------------------------------------------------------------------
 # OIDC Provider (for IRSA)
 # ---------------------------------------------------------------------------
 

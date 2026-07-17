@@ -44,6 +44,12 @@ variable "public_access_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "additional_api_ingress_cidrs" {
+  description = "Extra CIDR blocks allowed to reach the PRIVATE API endpoint on 443, added as ingress rules on the EKS-managed cluster security group. The managed SG admits only its own members (nodes) by default, so an out-of-cluster caller whose traffic is SNAT'd into the VPC — e.g. a standalone Tailscale subnet router (ADR-010) — needs its CIDR opened here. Empty = default behaviour (node/cluster SG members only)."
+  type        = list(string)
+  default     = []
+}
+
 variable "enabled_cluster_log_types" {
   description = "EKS control plane log types to enable"
   type        = list(string)
