@@ -5,8 +5,9 @@
 resource "aws_s3_bucket" "this" {
   for_each = var.create ? var.buckets : {}
 
-  bucket = each.key
-  tags   = merge(var.tags, each.value.tags)
+  bucket        = each.key
+  force_destroy = each.value.force_destroy
+  tags          = merge(var.tags, each.value.tags)
 }
 
 # Hard-block all public access (defense in depth alongside the scoped bucket policy).

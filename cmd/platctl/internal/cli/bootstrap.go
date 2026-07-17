@@ -189,6 +189,9 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool, concur
 		LogWriter: func(unit string, data []byte) {
 			_ = logger.Append(unit, data)
 		},
+		// Kill a unit that goes silent for this long — a wedged apply never self-recovers
+		// and otherwise stalls the whole bootstrap; the engine's retry re-attempts it fresh.
+		InactivityTimeout: engine.DefaultInactivityTimeout,
 	}
 
 	// Resolve hooks from config overrides
@@ -207,7 +210,9 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool, concur
 		}
 	}
 
-	eng := engine.NewEngine(runner, store, g, statePath, engine.WithConcurrency(concurrency))
+	eng := engine.NewEngine(runner, store, g, statePath,
+		engine.WithConcurrency(concurrency),
+		engine.WithRetry(engine.DefaultMaxRetries, engine.DefaultRetryBackoff))
 	eng.Hooks = hookMap
 	eng.Logger = logger
 

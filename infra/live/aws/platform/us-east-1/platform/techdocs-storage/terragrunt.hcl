@@ -27,6 +27,9 @@ inputs = {
       # Same-account read/write is granted on the roles' own identity policies (no bucket policy needed).
       reader_role_arns = []
       writer_role_arns = []
+      # The bucket holds the built docs site (regenerated from source on every deploy), so it's
+      # rebuild-disposable — force_destroy so a teardown doesn't fail with BucketNotEmpty.
+      force_destroy = true
       tags = {
         Component = "techdocs"
         Purpose   = "learning-portal-techdocs-site"
