@@ -152,6 +152,14 @@ type UnitOverride struct {
 	// which teardown already leaves alone. Without it, recreating the role needs the break-glass
 	// OrganizationAccountAccessRole path (scripts/bootstrap-iam-roles.sh).
 	TeardownSkip bool `yaml:"teardown_skip,omitempty"`
+	// BootstrapSkip keeps a unit out of bootstrap — it stays in the graph (so its dependents still order
+	// correctly) but is never applied. The symmetric counterpart of TeardownSkip, for a LEAF unit that
+	// legitimately cannot apply because of external state the rebuild can't provision — e.g. pagerduty,
+	// whose provider needs a live PagerDuty SaaS token that may be revoked. Without it a single failed
+	// leaf makes eng.Run return an error, which aborts bootstrap BEFORE the lockdown phase — leaving the
+	// public EKS endpoints open. Only safe for a leaf (nothing depends on its outputs); apply it manually
+	// once the external prerequisite is restored.
+	BootstrapSkip bool `yaml:"bootstrap_skip,omitempty"`
 }
 
 // ManualStep defines a prerequisite that requires user action before a unit can be applied.

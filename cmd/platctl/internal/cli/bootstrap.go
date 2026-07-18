@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -279,6 +280,25 @@ func runBootstrap(cmd *cobra.Command, envFilter string, resume, yes bool, concur
 			}
 		}
 		fmt.Println()
+	}
+
+	// bootstrap_skip: pre-mark configured leaf units completed so the engine never applies them. A leaf that
+	// legitimately can't apply (e.g. pagerduty with a revoked SaaS token) would otherwise fail eng.Run and
+	// abort BEFORE the lockdown phase, leaving the public EKS endpoints open. Mirrors teardown_skip. The
+	// engine lazily builds State inside Run, so seed it here (unless resume already loaded one) before marking.
+	if eng.State == nil {
+		eng.State = engine.NewState(engine.Apply.String(), g.Units())
+	}
+	var bootstrapSkipped []string
+	for name, override := range cfg.Overrides {
+		if override.BootstrapSkip && g.Unit(name) != nil {
+			eng.State.MarkCompleted(name)
+			bootstrapSkipped = append(bootstrapSkipped, name)
+		}
+	}
+	if len(bootstrapSkipped) > 0 {
+		slices.Sort(bootstrapSkipped)
+		fmt.Printf("Skipping (bootstrap_skip — apply manually once the external prerequisite is restored): %v\n\n", bootstrapSkipped)
 	}
 
 	fmt.Printf("Bootstrapping %d units...\n\n", g.Len())
