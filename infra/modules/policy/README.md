@@ -122,12 +122,18 @@ already-provisioned database). Namespace pairs are declared per binding at the u
 so the module carries no product-specific data. First consumer: Flagship
 ([ADR-099](../../../docs/adrs/099-feature-flags-platform-service.md)).
 
-RBAC splits READ from WRITE. READ (`get/list/watch` on Secrets) is cluster-wide via a ClusterRole bound to
-both Kyverno controllers with an explicit ClusterRoleBinding — forced, because `generateExisting` enumerates
-triggers with a *cluster-scoped* list, and read-only (Kyverno's admission webhooks already observe every
-Secret). WRITE stays namespace-scoped: a Role in each target namespace (`create/update/patch/delete`) and a
-`resourceNames`-pinned Role in each source namespace (`update/patch`, so `synchronize` can label the source to
-watch it for rotation) — so Kyverno can only materialise the clone where a binding declares it.
+RBAC is cluster-scoped, bound to both Kyverno controllers with explicit ClusterRoleBindings (not aggregation
+labels — the admission pre-flight authz check runs synchronously at policy admission, but aggregated
+ClusterRoles reconcile asynchronously, which would race it). READ (`get/list/watch` on Secrets) is cluster-wide
+because `generateExisting` enumerates triggers with a *cluster-scoped* list; it's read-only (Kyverno's
+admission webhooks already observe every Secret). WRITE cannot be namespace-scoped either, but for an
+*ordering* reason: the target Environment namespace and the platform-database source namespace are created
+**downstream** of this policy unit (by Crossplane / ArgoCD delivery), so a namespace-scoped Role can't be
+created eagerly here — a from-scratch bootstrap would fail `namespaces not found`. It mirrors the `generate-pdb`
+policy's shape (a cluster-scoped ClusterRole for its own downstream-namespace resources), kept tight: `create`
+can't be name-scoped (the object doesn't exist yet, but Kyverno only ever creates the exact Secret its generate
+rule names — bounded by the ClusterPolicy, not RBAC), while `update/patch/delete` are `resourceNames`-pinned to
+the declared cloned Secret(s), so Kyverno can reconcile/rotate/relabel those and touch no other Secret.
 
 ## Usage
 
