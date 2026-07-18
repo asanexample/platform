@@ -65,6 +65,7 @@ locals {
     argocd_clusters               = "${local.source_base}/argocd-clusters"
     argocd_apps                   = "${local.source_base}/argocd-apps"
     argo_rollouts                 = "${local.source_base}/argo-rollouts"
+    prometheus_operator_crds      = "${local.source_base}/aws//prometheus-operator-crds" # early CRD install to break the ServiceMonitor bootstrap deadlock
     cert_manager                  = "${local.source_base}/cert-manager"
     external_dns                  = "${local.source_base}/external-dns"
     external_secrets              = "${local.source_base}/external-secrets"
@@ -113,37 +114,38 @@ locals {
 
   # Helm chart version pins — single source of truth across environments
   helm_versions = {
-    cilium                = "1.19.4"
-    argocd                = "9.5.14"
-    argo_rollouts         = "2.41.0" # argoproj/argo-rollouts — progressive delivery (ADR-056); app v1.9.0
-    cert_manager          = "1.17.1"
-    external_dns          = "1.16.1"
-    external_secrets      = "0.14.3"
-    kyverno               = "3.8.1"
-    tailscale_operator    = "1.96.5"
-    falco                 = "9.0.0"
-    descheduler           = "0.35.1" # kubernetes-sigs/descheduler — node rebalancer (ADR-093). Pinned to the v0.35 line = k8s 1.35 (official compat matrix); bump with the cluster's k8s minor.
-    kube_prometheus_stack = "87.5.0" # latest stable, re-resolved 2026-07-01 (app v0.92.1; #595)
-    mimir                 = "6.0.6"
-    loki                  = "7.0.0"   # grafana/loki — P3a logs store (latest stable, resolved 2026-06-19)
-    alloy                 = "1.10.0"  # grafana/alloy — P3a log-collector DaemonSet
-    tempo                 = "2.25.5"  # grafana-community/tempo-distributed — P3b traces store (sized by cost_profile; app v2.10.7)
-    otel_collector        = "0.158.2" # open-telemetry/opentelemetry-collector — P3b trace gateway (app v0.153.0)
-    cloudwatch_exporter   = "0.46.0"  # prometheus-community/prometheus-yet-another-cloudwatch-exporter — P5b cloud-resource metrics (app v0.65.0)
-    opencost              = "2.5.23"  # opencost/opencost — P11 in-cluster cost allocation (app 1.120.3)
-    beyla                 = "1.16.8"  # grafana/beyla — P7a zero-code eBPF instrumentation (app 3.20.0)
-    otel_operator         = "0.116.0" # open-telemetry/opentelemetry-operator — P7b SDK auto-inject (app 0.153.0)
-    sloth                 = "0.16.0"  # slok/sloth — P9 SLO engine (burn-rate rules from PrometheusServiceLevel)
-    blackbox_exporter     = "11.13.0" # prometheus-community/prometheus-blackbox-exporter — P9b synthetics (app v0.28.0)
-    pyroscope             = "2.1.0"   # grafana/pyroscope — P8 continuous profiling store (LGTM+P)
-    policy_reporter       = "3.7.4"   # kyverno/policy-reporter — P12 PolicyReport metrics + dashboards (#93)
-    cortex_tenant         = "0.8.1"   # blind-oracle/cortex-tenant — P13 per-team write-path re-tenant (#590)
-    karpenter             = "1.13.0"  # Karpenter node autoscaling (ADR-078) — chart + karpenter-crd, OCI public.ecr.aws
-    crossplane            = "2.3.1"   # Crossplane v2 (ADR-046)
-    cloudnative_pg        = "0.28.2"  # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
-    backstage             = "2.8.1"   # official backstage Helm chart (points at our platform/backstage image)
-    keycloak              = "7.2.0"   # codecentric/keycloakx chart; Keycloak 26.6.3 via image-tag override — app IdP (ADR-053, B1)
-    arc_controller        = "0.14.2"  # gha-runner-scale-set-controller (ADR-065 / #323)
-    arc_runner_set        = "0.14.2"  # gha-runner-scale-set — pinned in lockstep with the controller
+    cilium                   = "1.19.4"
+    argocd                   = "9.5.14"
+    argo_rollouts            = "2.41.0" # argoproj/argo-rollouts — progressive delivery (ADR-056); app v1.9.0
+    cert_manager             = "1.17.1"
+    external_dns             = "1.16.1"
+    external_secrets         = "0.14.3"
+    kyverno                  = "3.8.1"
+    tailscale_operator       = "1.96.5"
+    falco                    = "9.0.0"
+    descheduler              = "0.35.1" # kubernetes-sigs/descheduler — node rebalancer (ADR-093). Pinned to the v0.35 line = k8s 1.35 (official compat matrix); bump with the cluster's k8s minor.
+    kube_prometheus_stack    = "87.5.0" # latest stable, re-resolved 2026-07-01 (app v0.92.1; #595)
+    prometheus_operator_crds = "30.0.1" # prometheus-community/prometheus-operator-crds — appVersion v0.92.1, matches kube_prometheus_stack above (early CRD install)
+    mimir                    = "6.0.6"
+    loki                     = "7.0.0"   # grafana/loki — P3a logs store (latest stable, resolved 2026-06-19)
+    alloy                    = "1.10.0"  # grafana/alloy — P3a log-collector DaemonSet
+    tempo                    = "2.25.5"  # grafana-community/tempo-distributed — P3b traces store (sized by cost_profile; app v2.10.7)
+    otel_collector           = "0.158.2" # open-telemetry/opentelemetry-collector — P3b trace gateway (app v0.153.0)
+    cloudwatch_exporter      = "0.46.0"  # prometheus-community/prometheus-yet-another-cloudwatch-exporter — P5b cloud-resource metrics (app v0.65.0)
+    opencost                 = "2.5.23"  # opencost/opencost — P11 in-cluster cost allocation (app 1.120.3)
+    beyla                    = "1.16.8"  # grafana/beyla — P7a zero-code eBPF instrumentation (app 3.20.0)
+    otel_operator            = "0.116.0" # open-telemetry/opentelemetry-operator — P7b SDK auto-inject (app 0.153.0)
+    sloth                    = "0.16.0"  # slok/sloth — P9 SLO engine (burn-rate rules from PrometheusServiceLevel)
+    blackbox_exporter        = "11.13.0" # prometheus-community/prometheus-blackbox-exporter — P9b synthetics (app v0.28.0)
+    pyroscope                = "2.1.0"   # grafana/pyroscope — P8 continuous profiling store (LGTM+P)
+    policy_reporter          = "3.7.4"   # kyverno/policy-reporter — P12 PolicyReport metrics + dashboards (#93)
+    cortex_tenant            = "0.8.1"   # blind-oracle/cortex-tenant — P13 per-team write-path re-tenant (#590)
+    karpenter                = "1.13.0"  # Karpenter node autoscaling (ADR-078) — chart + karpenter-crd, OCI public.ecr.aws
+    crossplane               = "2.3.1"   # Crossplane v2 (ADR-046)
+    cloudnative_pg           = "0.28.2"  # CNPG operator chart (app v1.29.1) — Backstage DB (ADR-051)
+    backstage                = "2.8.1"   # official backstage Helm chart (points at our platform/backstage image)
+    keycloak                 = "7.2.0"   # codecentric/keycloakx chart; Keycloak 26.6.3 via image-tag override — app IdP (ADR-053, B1)
+    arc_controller           = "0.14.2"  # gha-runner-scale-set-controller (ADR-065 / #323)
+    arc_runner_set           = "0.14.2"  # gha-runner-scale-set — pinned in lockstep with the controller
   }
 }
