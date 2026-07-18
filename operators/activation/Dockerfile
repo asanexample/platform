@@ -2,7 +2,11 @@
 # NOTE: build context is the REPO ROOT (not operators/activation), because the module consumes the
 # shared github.com/asanexample/platform/pkg via a local `replace => ../../pkg` that points outside the
 # module dir. Build with: docker build -f operators/activation/Dockerfile <repo-root>  (the Makefile does this).
-FROM golang:1.25 AS builder
+# Builder base must satisfy operators/activation/go.mod's `go` directive (currently 1.26): the official
+# golang image sets GOTOOLCHAIN=local, so a builder older than the go.mod requirement fails `go mod download`
+# ("go.mod requires go >= 1.26.0") instead of silently fetching a newer toolchain. Keep this in lockstep with
+# the go.mod `go` line (a dependabot go-directive bump left it at 1.25 and broke the image build for a week).
+FROM golang:1.26 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
