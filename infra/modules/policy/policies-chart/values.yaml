@@ -57,8 +57,10 @@ enablePdbGenerate: true
 
 # Cross-namespace DB credential sync (ADR-099 Flagship; ADR-081). Clones a CNPG-generated <cluster>-app
 # Secret from a platform-database namespace into an app's Environment namespace (secretKeyRef can't cross
-# namespaces). Off by default; the unit sets the namespace pairs. RBAC is namespace-scoped per pair — the
-# background controller never gets cluster-wide secret access. kyvernoNamespace is where its SA lives.
+# namespaces). Off by default; the unit sets the namespace pairs. RBAC is cluster-scoped (the target/source
+# namespaces are created downstream by Crossplane/ArgoCD, so a namespace-scoped Role can't be created eagerly
+# here) but kept tight: cluster-wide READ + create, with update/patch/delete pinned by resourceNames to the
+# declared cloned Secret(s). See the RBAC note in sync-db-secret.yaml. kyvernoNamespace is where its SA lives.
 enableDbSecretSync: false
 kyvernoNamespace: kyverno
 dbSecretSyncBindings: []
