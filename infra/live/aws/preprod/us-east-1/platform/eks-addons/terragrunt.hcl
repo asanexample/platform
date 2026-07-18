@@ -83,7 +83,11 @@ inputs = {
     # (Cilium BYOCNI) pod IPs, so a default metrics-server fails aggregated-API discovery; on hostNetwork the
     # apiserver reaches it via the node IP (same pattern as the Crossplane providers / Kyverno webhooks).
     metrics-server = {
-      configuration_values = jsonencode({ hostNetwork = { enabled = true } })
+      # replicas=1: preprod's system node group is a single node (desired/max small, dev profile), and with
+      # hostNetwork the addon's default 2 replicas need 2 distinct hosts — the 2nd stays Pending, so the addon
+      # never reaches ACTIVE and blocks karpenter (which sits behind eks-addons), starving the cluster of the
+      # very capacity the 2nd replica needs. One replica fits the single node, unblocking the whole chain.
+      configuration_values = jsonencode({ hostNetwork = { enabled = true }, replicas = 1 })
     }
   }
 
