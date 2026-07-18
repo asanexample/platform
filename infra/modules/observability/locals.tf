@@ -214,6 +214,11 @@ locals {
   }
 
   helm_values = {
+    # CRDs (ServiceMonitor, PrometheusRule, ...) are owned by the dedicated prometheus-operator-crds unit,
+    # installed early to break the from-scratch bootstrap deadlock (workloads that ship a ServiceMonitor run
+    # before this stack). Defer to it so there is a single CRD owner (no Helm ownership conflict).
+    crds = { enabled = false }
+
     # --- EKS accuracy: managed control plane is unscrapeable; Cilium replaces kube-proxy. ---
     # Disable the scrape jobs AND their alert rule groups so we don't ship empty dashboards
     # or perpetually-firing "target down" alerts.

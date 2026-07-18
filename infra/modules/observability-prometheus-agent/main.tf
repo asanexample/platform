@@ -72,6 +72,11 @@ locals {
 
   # ---- kube-prometheus-stack in AGENT mode: scrape-and-ship only, no UI / no alerting / no local query. ----
   helm_values = {
+    # CRDs (ServiceMonitor, ...) are owned by the dedicated prometheus-operator-crds unit, installed early
+    # to break the from-scratch bootstrap deadlock (a ServiceMonitor-shipping chart otherwise runs before the
+    # stack that provides the CRD). Defer to it here so there is a single CRD owner (no Helm ownership clash).
+    crds = { enabled = false }
+
     fullnameOverride = var.helm_release_name
 
     # A spoke ships to the hub; it has no Grafana, no Alertmanager, and evaluates no rules (the hub owns

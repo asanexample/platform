@@ -16,6 +16,16 @@ terraform {
 # naming a kind with no CRD fails to create (Kyverno #7839), so the CRDs must land first (the `policy` unit
 # declares the dependency on this unit). The Gateway-API traffic-router plugin (weighted canary) is wired in a
 # later phase.
+dependency "prometheus_operator_crds" {
+  config_path = "../prometheus-operator-crds"
+
+  # Ordering-only: the Prometheus Operator CRDs (ServiceMonitor, ...) must exist before this unit's
+  # chart renders one, else the helm provider fails ("no matches for kind ServiceMonitor ... ensure CRDs
+  # are installed first") on a from-scratch bootstrap.
+  mock_outputs                            = {}
+  mock_outputs_allowed_terraform_commands = ["init", "validate", "plan", "destroy"]
+}
+
 dependency "eks" {
   config_path = "../eks"
 
