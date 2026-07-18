@@ -81,6 +81,15 @@ resource "aws_eks_addon" "this" {
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
 
+  # A Deployment-style addon (metrics-server, coredns) can't reach ACTIVE until worker nodes are Ready to
+  # schedule it. On a from-scratch bootstrap the nodes are still coming up, so the default 20m create wait can
+  # expire while the addon sits CREATING. Give it more room; it clears once capacity lands (a --resume also
+  # re-checks and finds it ACTIVE).
+  timeouts {
+    create = "30m"
+    update = "30m"
+  }
+
   tags = var.tags
 }
 
