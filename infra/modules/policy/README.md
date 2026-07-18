@@ -126,14 +126,15 @@ RBAC is cluster-scoped, bound to both Kyverno controllers with explicit ClusterR
 labels — the admission pre-flight authz check runs synchronously at policy admission, but aggregated
 ClusterRoles reconcile asynchronously, which would race it). READ (`get/list/watch` on Secrets) is cluster-wide
 because `generateExisting` enumerates triggers with a *cluster-scoped* list; it's read-only (Kyverno's
-admission webhooks already observe every Secret). WRITE cannot be namespace-scoped either, but for an
-*ordering* reason: the target Environment namespace and the platform-database source namespace are created
+admission webhooks already observe every Secret). WRITE cannot be namespace-scoped either, for **two** reasons:
+(1) *ordering* — the target Environment namespace and the platform-database source namespace are created
 **downstream** of this policy unit (by Crossplane / ArgoCD delivery), so a namespace-scoped Role can't be
-created eagerly here — a from-scratch bootstrap would fail `namespaces not found`. It mirrors the `generate-pdb`
-policy's shape (a cluster-scoped ClusterRole for its own downstream-namespace resources), kept tight: `create`
-can't be name-scoped (the object doesn't exist yet, but Kyverno only ever creates the exact Secret its generate
-rule names — bounded by the ClusterPolicy, not RBAC), while `update/patch/delete` are `resourceNames`-pinned to
-the declared cloned Secret(s), so Kyverno can reconcile/rotate/relabel those and touch no other Secret.
+created eagerly here (a from-scratch bootstrap would fail `namespaces not found`); and (2) Kyverno's **generate
+pre-flight authz check** issues a *name-less* SubjectAccessReview for `create/update/delete` on the target
+Secret's namespace when the policy is admitted — a `resourceNames`-pinned grant fails that SAR, so Kyverno
+rejects the policy (`background-controller requires permissions update,delete for v1/Secret in namespace …`).
+So WRITE is a cluster-scoped ClusterRole with **un-name-scoped** verbs, mirroring `generate-pdb`; the
+ClusterPolicy itself is what bounds which Secret is actually written (Kyverno only ever writes the one it names).
 
 ## Usage
 

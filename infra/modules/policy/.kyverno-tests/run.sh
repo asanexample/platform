@@ -126,16 +126,18 @@ grep -q 'name: kyverno:sync-db-secret-read' <<<"$DS" || { echo "FAIL: cluster-wi
 # namespace-scoped Role — that's the from-scratch-bootstrap fix. Bound by ClusterRoleBinding to both SAs.
 grep -q 'name: kyverno:sync-db-secret-write' <<<"$DS" || { echo "FAIL: cluster-scoped write ClusterRole missing"; exit 1; }
 grep -qE '^kind: Role$' <<<"$DS" && { echo "FAIL: no namespace-scoped Role may render — namespaces are created downstream, so eager Role creation deadlocks bootstrap"; exit 1; }
-grep -q 'resourceNames: \["flagship-db-app"\]' <<<"$DS" || { echo "FAIL: write ClusterRole must pin update/patch/delete to the cloned Secret via resourceNames"; exit 1; }
+# WRITE verbs must NOT be resourceNames-pinned: Kyverno's generate pre-flight authz check does a NAME-LESS
+# SubjectAccessReview for create/update/delete on the target Secret's namespace, and a resourceNames-scoped
+# grant fails it — Kyverno then REJECTS the policy at admission (verified live). So the write is un-name-scoped,
+# same as the generate-pdb ClusterRole; the ClusterPolicy is what bounds which Secret is actually written.
+grep -qE '^[[:space:]]*resourceNames:' <<<"$DS" && { echo "FAIL: write ClusterRole must NOT use resourceNames — Kyverno's name-less generate authz pre-flight rejects a name-scoped grant"; exit 1; }
+grep -q 'verbs: \["create", "update", "patch", "delete"\]' <<<"$DS" || { echo "FAIL: write ClusterRole must grant un-name-scoped create/update/patch/delete on secrets"; exit 1; }
 grep -q 'name: kyverno-background-controller' <<<"$DS" || { echo "FAIL: write RBAC must bind the background controller SA"; exit 1; }
 grep -q 'name: kyverno-admission-controller' <<<"$DS" || { echo "FAIL: write RBAC must also bind the admission controller SA (its pre-flight authz check rejects the policy otherwise)"; exit 1; }
 # Guard: the READ ClusterRole must be READ-ONLY — no write verb in its rule block (scope the grep to that role).
 awk '/name: kyverno:sync-db-secret-read$/{f=1} f&&/^rules:/{r=1} r&&/kind: (ClusterRole|ClusterRoleBinding)/{exit} r' <<<"$DS" \
   | grep -qE '"(create|update|patch|delete)"' && { echo "FAIL: the read ClusterRole must be READ-ONLY (write lives in kyverno:sync-db-secret-write)"; exit 1; }
-# Guard: create must NOT be resourceName-pinned (create can't be name-scoped) but update/patch/delete MUST be —
-# assert the write ClusterRole grants a bare create verb.
-grep -q 'verbs: \["create"\]' <<<"$DS" || { echo "FAIL: write ClusterRole must grant an un-name-scoped create (a create verb cannot carry resourceNames)"; exit 1; }
-echo "DB-secret-sync render-check passed (clone + cluster-scoped READ/WRITE, write pinned by resourceNames)."
+echo "DB-secret-sync render-check passed (clone + cluster-scoped READ/WRITE, un-name-scoped for the generate authz pre-flight)."
 
 # NOTE: the restrict-environment-envelope / restrict-environment-control-plane policies (and their tests) moved to the
 # crossplane module — infra/modules/crossplane/.kyverno-tests/run.sh — because they match Crossplane CRDs and
