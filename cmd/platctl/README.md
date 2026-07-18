@@ -234,7 +234,7 @@ Hooks are pre-apply operations for units that need special handling:
 platctl is configured via `.platctl.yaml` in the repo root. The graph is auto-discovered; the config file only defines what can't be inferred:
 
 - **environments**: paths, providers, and auth credentials (including `region` for AWS API calls)
-- **overrides**: per-unit auth, bootstrap args, hooks, implicit deps
+- **overrides**: per-unit auth, bootstrap args, hooks, implicit deps, `env_from_secret`, and the skip flags — `teardown_skip` (keep a unit out of teardown, e.g. bootstrap-tier `iam-roles`) and its symmetric counterpart `bootstrap_skip` (keep a **leaf** out of bootstrap when it can't apply because of external state the rebuild can't provision, e.g. `pagerduty` with a revoked SaaS token — so one failed leaf doesn't abort bootstrap before the lockdown phase)
 - **manual_steps**: prerequisites that require user action
 - **lockdown**: post-bootstrap hardening steps
 

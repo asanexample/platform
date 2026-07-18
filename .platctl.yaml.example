@@ -98,6 +98,12 @@ overrides:
   platform/pagerduty:
     env_from_secret:
       PAGERDUTY_TOKEN: "platform/pagerduty/api-token@platform"
+    # bootstrap_skip: keep this LEAF out of bootstrap (never applied) — the symmetric counterpart of
+    # teardown_skip. Use it when a leaf legitimately can't apply because of external state the rebuild can't
+    # provision — e.g. a revoked/absent PagerDuty SaaS token. Without it, one failed leaf makes the whole
+    # bootstrap return an error BEFORE the lockdown phase, leaving the public EKS endpoints open. Only safe
+    # for a leaf (nothing consumes its outputs); apply it by hand once the token is restored, or remove this.
+    # bootstrap_skip: true
 
   platform/tailscale:
     hook: crd_two_stage
