@@ -10,6 +10,15 @@ locals {
     "arn:aws:iam::*:role/${role}"
   ]
 
+  # Tag-SCP-only exemption (ADR-017 two-axis, #072): the blanket exempt_roles PLUS the tag-only
+  # roles. Used ONLY by require-tagging + DenyTeamTagTampering — every OTHER SCP still binds these
+  # roles. Keeps provisioners least-privileged: exempt from tag governance (they tag at create),
+  # subject to all other guardrails. Empty tag_scp_exempt_roles → identical to exempt_role_arns.
+  tag_scp_exempt_role_arns = concat(
+    local.exempt_role_arns,
+    [for role in var.tag_scp_exempt_roles : "arn:aws:iam::*:role/${role}"],
+  )
+
   top_level_ous = { for k, v in var.organizational_units : k => v if v.parent == null }
   child_ous     = { for k, v in var.organizational_units : k => v if v.parent != null }
 

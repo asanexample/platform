@@ -81,6 +81,12 @@ variable "exempt_roles" {
   default     = ["OrganizationAccountAccessRole"]
 }
 
+variable "tag_scp_exempt_roles" {
+  description = "IAM role names exempt from ONLY the two tag-governance SCPs (require-tagging + DenyTeamTagTampering), NOT the blanket exempt_roles. For provisioners/controllers (e.g. nh-deployer, Karpenter) that must set governance tags on resources they create at creation time, yet remain subject to every OTHER guardrail — the ADR-017 two-axis / #072 finding: a tag-only exemption instead of blanket admin-exempt."
+  type        = list(string)
+  default     = []
+}
+
 variable "enable_hipaa_scp" {
   description = "Whether to enable the HIPAA eligible services allowlist SCP."
   type        = bool
