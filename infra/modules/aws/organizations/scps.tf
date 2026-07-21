@@ -437,7 +437,7 @@ data "aws_iam_policy_document" "protect_data_and_network" {
     condition {
       test     = "ArnNotLike"
       variable = "aws:PrincipalArn"
-      values   = concat(local.exempt_role_arns, ["arn:aws:iam::*:role/aws-service-role/*"])
+      values   = concat(local.tag_scp_exempt_role_arns, ["arn:aws:iam::*:role/aws-service-role/*"])
     }
   }
 }
@@ -468,7 +468,7 @@ data "aws_iam_policy_document" "require_tagging" {
       condition {
         test     = "ArnNotLike"
         variable = "aws:PrincipalArn"
-        values   = local.exempt_role_arns
+        values   = local.tag_scp_exempt_role_arns
       }
     }
   }

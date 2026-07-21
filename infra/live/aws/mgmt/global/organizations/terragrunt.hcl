@@ -16,7 +16,19 @@ inputs = {
   create_organization = true
   tags                = include.base.locals.tags
   allowed_regions     = ["us-east-1", "us-west-2"]
-  required_tags       = ["Environment", "ManagedBy", "Owner"]
+  # Team joins the org-wide required tags (ADR-017 US2 / spec 00-foundation/004). Gated by the
+  # read-only preprod-safety probe (#078 PASS) + a prod/test/platform sweep before apply — never
+  # applied blind (require-tagging binds the Platform OU AND the Workloads OU incl. prod).
+  required_tags = ["Environment", "ManagedBy", "Owner", "Team"]
+
+  # Tag-SCP-ONLY exemption (ADR-017 two-axis / #072): nh-deployer (the least-privilege footprint
+  # provisioner) and the footprint's Karpenter controller tag resources with Team at create, so
+  # they must clear require-tagging + DenyTeamTagTampering — but they are NOT admin and stay bound
+  # by every OTHER SCP. Deliberately NOT added to the blanket exempt_roles (that would re-create the
+  # admin∩blanket-exemption hazard ADR-017 removes). nh-portability-karpenter-* is anchored per this
+  # cluster (name_prefix), matching the existing legacy-karpenter anchoring, so an unrelated role
+  # cannot inherit the exemption.
+  tag_scp_exempt_roles = ["nh-deployer", "nh-portability-karpenter-*"]
   # crossplane-ecr-provisioner (platform) Team-tags tenant ECR repos; crossplane-provisioner-* (per workload
   # cluster) Team-tags the Pod-team IAM roles it creates — both need the DenyTeamTagTampering exemption (BACK
   # stack P2b / ADR-048). A wildcard covers preprod now + prod later.
