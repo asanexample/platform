@@ -47,7 +47,7 @@ jobs:
       # Need the script on disk. pull_request_target → checkout defaults to the trusted BASE (main), and the
       # script only calls `gh` (no PR input is read/executed), so this is safe. (#506 extracted this from an
       # inline run: block but didn't add the checkout — the script then 127'd; this restores it.)
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Wait for the Product PR to merge, then dispatch reconcile
         env:
           GH_TOKEN: ${{ github.token }}
