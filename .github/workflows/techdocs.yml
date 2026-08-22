@@ -32,9 +32,9 @@ jobs:
       ENTITY: default/component/platform-learning-portal
       BUCKET: refplat-platform-techdocs
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
@@ -56,7 +56,7 @@ jobs:
         run: techdocs-cli generate --no-docker --source-dir build --output-dir build/site --verbose
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: arn:aws:iam::829808296602:role/github-actions-techdocs-publish
           aws-region: us-east-1

@@ -21,7 +21,7 @@ jobs:
       terragrunt: ${{ steps.read.outputs.terragrunt }}
       helm: ${{ steps.read.outputs.helm }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: read
         name: Read /.tool-versions
         run: |
@@ -37,8 +37,8 @@ jobs:
     name: platctl Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: cmd/platctl/go.mod
           cache-dependency-path: cmd/platctl/go.sum
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: versions
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
@@ -71,7 +71,7 @@ jobs:
       # Provider plugin cache — without it every module's `tofu init` re-downloads aws/helm/kubernetes (~30×).
       TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tofu-plugin-cache
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           tofu_version: ${{ needs.versions.outputs.opentofu }}
@@ -144,7 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: versions
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Terragrunt
         env:
           # Version from /.tool-versions (the `versions` job); the release tag is v-prefixed.
@@ -164,7 +164,7 @@ jobs:
     name: Markdown Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Lint changed markdown files
@@ -195,7 +195,7 @@ jobs:
     name: Doc Currency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -252,7 +252,7 @@ jobs:
     name: Gate Scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install yq (mikefarah)
         run: |
           sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
@@ -276,7 +276,7 @@ jobs:
       # Pin to the chart's appVersion (helm_versions.kyverno = 3.8.1) so test semantics match.
       KYVERNO_VERSION: "1.18.1"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
@@ -316,7 +316,7 @@ jobs:
     env:
       CROSSPLANE_VERSION: "v2.2.3" # crank CLI version (built from source — see install step). Newest that still ships cmd/crank on the Go proxy; it was removed from the main module at v2.3.0, so a 2.3.x bump needs re-plumbing off go-install.
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Scope: this validates the crossplane module's OWN example fixtures (.environment-api-tests) against the
       # XRD — a PR that changes no infra/modules/crossplane/** can't affect it. Short-circuit to green (the job
       # still runs + reports, so it stays a valid required check), skipping the ~2-min crank build. Registry PRs
@@ -340,7 +340,7 @@ jobs:
         with:
           # Canonical Helm pin from /.tool-versions — keep CLI rendering on the 3.x line (not floating to v4).
           version: v${{ needs.versions.outputs.helm }}
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: steps.scope.outputs.run == 'true'
         with:
           go-version: stable
@@ -370,7 +370,7 @@ jobs:
     env:
       CROSSPLANE_VERSION: "v2.2.3" # crank CLI version (built from source — see install step). Newest that still ships cmd/crank on the Go proxy; it was removed from the main module at v2.3.0, so a 2.3.x bump needs re-plumbing off go-install.
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Scope: this renders the crossplane module's OWN Composition + example fixtures — a PR that changes no
       # infra/modules/crossplane/** can't affect it. Short-circuit to green (skip the ~2.5-min crank build +
       # function-image pulls), staying a valid required check. Registry PRs (gitops/**, e.g. a decommission) have
@@ -389,7 +389,7 @@ jobs:
           else
             echo "run=false" >> "$GITHUB_OUTPUT"; echo "no crossplane module change → skipping (gitops claims are rendered by the gitops Gate)"
           fi
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: steps.scope.outputs.run == 'true'
         with:
           go-version: stable
@@ -417,7 +417,7 @@ jobs:
     name: TFLint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: terraform-linters/setup-tflint@6e1e0642c0289bd619021bf6b34e3c08ed1e005a # v6.3.0
       - name: Lint all modules
         run: |
@@ -456,7 +456,7 @@ jobs:
     env:
       TRIVY_VERSION: "0.70.0" # pinned clean release; v0.69.4 was the malicious one
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Trivy CLI (download release binary + verify SHA-256)
         run: |
           base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
@@ -497,8 +497,8 @@ jobs:
     name: Semgrep (SAST)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Install Semgrep (pinned)
@@ -536,7 +536,7 @@ jobs:
     env:
       GITLEAKS_VERSION: "8.30.1" # pinned; bump deliberately to pull newer default rules
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # full history — `gitleaks git` scans every commit
       - name: Install gitleaks CLI (download release binary + verify SHA-256)
