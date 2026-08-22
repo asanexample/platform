@@ -80,7 +80,7 @@ jobs:
       # PR head below is sparse, data-only.)
       # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
       - name: Checkout base (trusted)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.ref }}
           path: base
@@ -101,7 +101,7 @@ jobs:
       # nosemgrep: yaml.github-actions.security.pull-request-target-code-checkout.pull-request-target-code-checkout
       - name: Checkout PR registry (untrusted, data-only)
         if: steps.classify.outputs.any == 'true'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
@@ -180,7 +180,7 @@ jobs:
       # Environment+Product join), catching schema/envelope-valid-but-render-breaking claims. Only when there
       # are Environment files. Docker is preinstalled on ubuntu-latest; crank is built from the Go module proxy
       # (releases.crossplane.io intermittently 403s runner IPs — same install as the Tenant Claims Gate).
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: steps.classify.outputs.any == 'true' && steps.classify.outputs.environment_files != ''
         with:
           go-version: stable
